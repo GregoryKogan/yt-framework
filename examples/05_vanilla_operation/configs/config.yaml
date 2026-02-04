@@ -1,0 +1,7 @@
+stages:
+  enabled_stages:
+    - run_vanilla
+
+pipeline:
+  mode: "dev"
+  build_folder: "//tmp/examples/05_vanilla_operation/build"

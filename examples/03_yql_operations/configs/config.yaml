@@ -1,0 +1,7 @@
+stages:
+  enabled_stages:
+    - setup_data
+    - yql_examples
+
+pipeline:
+  mode: "dev"

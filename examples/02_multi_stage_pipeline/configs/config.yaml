@@ -1,0 +1,10 @@
+stages:
+  # Only stages listed here will be executed
+  # Stages are executed in the order listed
+  enabled_stages:
+    - create_users
+    - create_orders
+    - join_data
+
+pipeline:
+  mode: "dev"

@@ -1,0 +1,4 @@
+client:
+  users_table: //tmp/examples/02_multi_stage_pipeline/users
+  orders_table: //tmp/examples/02_multi_stage_pipeline/orders
+  output_table: //tmp/examples/02_multi_stage_pipeline/user_orders

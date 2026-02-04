@@ -1,0 +1,12 @@
+job:
+  message: Hello from custom Docker image!
+
+client:
+  operations:
+    vanilla:
+      max_failed_job_count: 1
+      resources:
+        pool: default
+        docker_image: docker.io/gregorykogan/yt-framework:latest
+        memory_limit_gb: 4
+        cpu_limit: 2

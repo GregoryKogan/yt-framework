@@ -1,0 +1,12 @@
+job:
+  greeting: Hello from YT cluster!
+  iterations: 5
+
+client:
+  operations:
+    vanilla:
+      max_failed_job_count: 1
+      resources:
+        pool: default
+        memory_limit_gb: 2
+        cpu_limit: 1

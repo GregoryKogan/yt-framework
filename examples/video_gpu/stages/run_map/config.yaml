@@ -1,0 +1,23 @@
+job:
+  output_bucket: <your-bucket>
+  output_prefix: <your-prefix>
+  image_format: jpg
+  model_name: yolov8n-seg.pt
+  num_workers: 2
+
+client:
+  operations:
+    map:
+      input_table: //tmp/examples/video_gpu/paths_table
+      output_table: //tmp/examples/video_gpu/results_table
+      max_failed_job_count: 1
+      checkpoint:
+        checkpoint_base: //tmp/examples/video_gpu/checkpoints
+        local_checkpoint_path: <your-checkpoint-path>
+      resources:
+        docker_image: harbor.eye.salute.ru/vision/yolo_ultralytics:0.0.2
+        pool: <your-pool>
+        pool_tree: <your-pool-tree>
+        memory_limit_gb: 16
+        cpu_limit: 2
+        gpu_limit: 1

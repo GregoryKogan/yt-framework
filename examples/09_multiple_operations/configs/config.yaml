@@ -1,0 +1,8 @@
+stages:
+  enabled_stages:
+    - create_input
+    - process_and_validate
+
+pipeline:
+  mode: "dev"
+  build_folder: "//tmp/examples/09_multiple_operations/build"

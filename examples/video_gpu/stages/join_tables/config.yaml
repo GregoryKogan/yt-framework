@@ -1,0 +1,6 @@
+client:
+  results_table: //tmp/examples/video_gpu/results_table
+  paths_table: //tmp/examples/video_gpu/paths_table
+  joined_table: //tmp/examples/video_gpu/joined_table
+  join_key: input_s3_path
+  join_type: LEFT

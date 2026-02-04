@@ -1,0 +1,6 @@
+stages:
+  enabled_stages:
+    - create_table
+
+pipeline:
+  mode: "dev" # or "prod" to run on the YT cluster

@@ -1,0 +1,16 @@
+# This config file is used when the --config CLI argument is specified as "custom".
+# python pipeline.py --config configs/config_custom.yaml
+
+stages:
+  enabled_stages:
+    - process_data
+
+pipeline:
+  mode: "dev"
+  build_folder: "//tmp/examples/08_multiple_configs/build"
+
+# Custom config values accessible in stages via self.deps.pipeline_config
+dataset:
+  size: "custom"
+  row_count: 50
+  prefix: "custom_"

@@ -1,0 +1,15 @@
+job:
+  multiplier: 2
+  prefix: processed_
+
+client:
+  operations:
+    map:
+      input_table: //tmp/examples/04_map_operation/input
+      output_table: //tmp/examples/04_map_operation/output
+      max_failed_job_count: 1
+      resources:
+        pool: default
+        memory_limit_gb: 4
+        cpu_limit: 2
+        job_count: 2

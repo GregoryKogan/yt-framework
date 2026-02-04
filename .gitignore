@@ -1,0 +1,30 @@
+# Python package build artifacts
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+build/
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+*.env
+!*example.env
+
+# IDEs
+.vscode/
+.cursor/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local testing artifacts
+.dev/
+.build/
+
+# Checkpoints
+*.pt

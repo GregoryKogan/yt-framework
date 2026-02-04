@@ -1,0 +1,2 @@
+client:
+  output_table: //tmp/examples/08_multiple_configs/processed_data

@@ -1,0 +1,4 @@
+client:
+  users_table: //tmp/examples/03_yql_operations/users
+  orders_table: //tmp/examples/03_yql_operations/orders
+  archive_orders_table: //tmp/examples/03_yql_operations/archive_orders

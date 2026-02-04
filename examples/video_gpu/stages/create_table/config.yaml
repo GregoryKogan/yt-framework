@@ -1,0 +1,6 @@
+client:
+  input_bucket: <your-bucket>
+  input_prefix: <your-prefix>
+  file_extension: mp4
+  max_files: 10
+  paths_table: //tmp/examples/video_gpu/paths_table

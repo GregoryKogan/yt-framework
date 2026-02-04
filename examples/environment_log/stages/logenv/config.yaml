@@ -1,0 +1,22 @@
+job:
+  these: are
+  some: values
+  to:
+    be:
+      - displayed
+      - in
+      - the
+      - log
+  string: "string"
+  number: 1234567890
+  list: [1, 2, 3, 4, 5]
+  boolean: true
+  null_t: null
+
+client:
+  operations:
+    vanilla:
+      resources:
+        pool: "default"
+        memory_limit_gb: 1
+        cpu_limit: 1

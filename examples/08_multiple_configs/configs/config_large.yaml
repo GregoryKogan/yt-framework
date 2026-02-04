@@ -1,0 +1,15 @@
+# This config file is used when the --config CLI argument is specified as "large".
+# python pipeline.py --config configs/config_large.yaml
+
+stages:
+  enabled_stages:
+    - process_data
+
+pipeline:
+  mode: "dev"
+  build_folder: "//tmp/examples/08_multiple_configs/build"
+
+# Custom config values accessible in stages via self.deps.pipeline_config
+dataset:
+  size: "large"
+  row_count: 100

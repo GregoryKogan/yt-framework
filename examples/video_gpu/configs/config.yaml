@@ -1,0 +1,9 @@
+stages:
+  enabled_stages:
+    - create_table
+    - run_map
+    - join_tables
+
+pipeline:
+  mode: "dev"
+  build_folder: "//tmp/examples/video_gpu/build"

@@ -1,0 +1,7 @@
+stages:
+  enabled_stages:
+    - list_s3
+
+pipeline:
+  mode: "prod"
+  build_folder: "//tmp/examples/06_s3_integration/build"

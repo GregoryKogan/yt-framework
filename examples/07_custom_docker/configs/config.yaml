@@ -1,0 +1,7 @@
+stages:
+  enabled_stages:
+    - run_in_docker
+
+pipeline:
+  mode: "prod"
+  build_folder: "//tmp/examples/07_custom_docker/build"

@@ -1,0 +1,13 @@
+client:
+  users_table: //tmp/examples/03_yql_operations/users
+  orders_table: //tmp/examples/03_yql_operations/orders
+  archive_orders_table: //tmp/examples/03_yql_operations/archive_orders
+  output:
+    joined: //tmp/examples/03_yql_operations/output/joined
+    filtered: //tmp/examples/03_yql_operations/output/filtered
+    selected: //tmp/examples/03_yql_operations/output/selected
+    aggregated: //tmp/examples/03_yql_operations/output/aggregated
+    united: //tmp/examples/03_yql_operations/output/united
+    distinct: //tmp/examples/03_yql_operations/output/distinct
+    sorted: //tmp/examples/03_yql_operations/output/sorted
+    limited: //tmp/examples/03_yql_operations/output/limited

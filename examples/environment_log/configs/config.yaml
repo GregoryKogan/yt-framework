@@ -1,0 +1,7 @@
+stages:
+  enabled_stages:
+    - logenv
+
+pipeline:
+  mode: "dev"
+  build_folder: "//tmp/examples/environment_log/build"

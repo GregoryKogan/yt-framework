@@ -1,0 +1,9 @@
+# Test files
+**/test_*.py
+**/tests/
+**/*_test.py
+
+# Documentation
+docs/
+*.md
+!README.md

@@ -1,0 +1,20 @@
+job:
+  multiplier: 2
+  prefix: "processed_"
+
+client:
+  operations:
+    process:
+      input_table: //tmp/examples/09_multiple_operations/input
+      output_table: //tmp/examples/09_multiple_operations/processed
+      resources:
+        pool: default
+        memory_limit_gb: 4
+        cpu_limit: 2
+        job_count: 2
+    
+    validate:
+      resources:
+        pool: default
+        memory_limit_gb: 2
+        cpu_limit: 1

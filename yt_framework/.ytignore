@@ -1,0 +1,9 @@
+# Exclude test files from framework uploads
+**/test_*.py
+**/tests/
+**/*_test.py
+
+# Exclude documentation
+docs/
+*.md
+!README.md

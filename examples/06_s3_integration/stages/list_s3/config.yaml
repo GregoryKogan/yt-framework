@@ -1,0 +1,6 @@
+client:
+  input_bucket:  # must be set, e.g. my-bucket
+  input_prefix:  # must be set, e.g. /data/videos
+  file_extension: mp4
+  max_files: 100
+  output_table: //tmp/examples/06_s3_integration/s3_paths
