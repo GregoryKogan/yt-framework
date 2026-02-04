@@ -6,7 +6,35 @@ build-backend = "setuptools.build_meta"
 name = "yt_framework"
 version = "0.1.0"
 description = "YTsaurus pipeline framework with utilities and common modules"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+    {name = "Artem Zavarzin", email = "artemutz555@gmail.com"},
+    {name = "Gregory Koganovsky", email = "g.koganovsky@gmail.com"},
+]
+maintainers = [
+    {name = "Gregory Koganovsky", email = "g.koganovsky@gmail.com"},
+    {name = "Artem Zavarzin", email = "artemutz555@gmail.com"},
+]
+keywords = [
+    "ytsaurus",
+    "yt",
+    "pipeline",
+    "data-processing",
+    "map-reduce",
+    "distributed-computing",
+    "big-data",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering",
+    "Topic :: System :: Distributed Computing",
+]
 dependencies = [
     "botocore==1.35.99",
     "boto3==1.35.99",
@@ -15,6 +43,11 @@ dependencies = [
     "duckdb>=1.0.0",
     "omegaconf>=2.3.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/GregoryKogan/yt-framework"
+Repository = "https://github.com/GregoryKogan/yt-framework"
+Issues = "https://github.com/GregoryKogan/yt-framework/issues"
 
 [project.optional-dependencies]
 dev = [

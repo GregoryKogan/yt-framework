@@ -23,6 +23,18 @@ A powerful Python framework for building and executing data processing pipelines
 
 ## Installation
 
+### For Users
+
+Install from PyPI:
+
+```bash
+pip install yt_framework
+```
+
+### For Developers and Contributors
+
+Install in editable mode from source:
+
 ```bash
 pip install -e .
 ```
