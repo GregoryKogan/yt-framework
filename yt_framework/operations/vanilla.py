@@ -15,7 +15,11 @@ from omegaconf import DictConfig
 from yt_framework.utils.logging import log_header, log_success
 from yt_framework.core.stage import StageContext
 from yt_framework.yt.client_base import OperationResources
-from .common import build_environment, prepare_docker_auth, _get_config_value_with_default
+from .common import (
+    build_environment,
+    prepare_docker_auth,
+    _get_config_value_with_default,
+)
 from .dependency_strategy import TarArchiveDependencyBuilder
 
 
@@ -78,11 +82,13 @@ def _prepare_vanilla_operation(
     # Get Docker auth credentials from loaded secrets
     # Support both resources.docker_image and direct docker_image for flexibility
     docker_image = None
-    if "resources" in operation_config and operation_config.resources.get("docker_image"):
+    if "resources" in operation_config and operation_config.resources.get(
+        "docker_image"
+    ):
         docker_image = operation_config.resources.docker_image
     elif operation_config.get("docker_image"):
         docker_image = operation_config.docker_image
-    
+
     docker_auth = prepare_docker_auth(
         docker_image=docker_image,
         docker_username=environment.get("DOCKER_AUTH_USERNAME"),
@@ -131,13 +137,17 @@ def run_vanilla(
         logger=logger,
     )
 
-    log_header(logger, "Vanilla Operation", f"Task: {task_name} | Script: {vanilla_operation_data.script_path}")
+    log_header(
+        logger,
+        "Vanilla Operation",
+        f"Task: {task_name} | Script: {vanilla_operation_data.script_path}",
+    )
     logger.debug(f"Dependencies: {len(vanilla_operation_data.dependencies)} files")
 
     # Command is always provided by the dependency builder (tar archive mode)
     if not vanilla_operation_data.command:
         raise ValueError("Command not provided by dependency builder")
-    
+
     command = vanilla_operation_data.command
 
     # Extract job parameters from operation_config.resources (or top-level as fallback)
@@ -146,19 +156,29 @@ def run_vanilla(
     if not resources_config:
         # Fallback to top-level config if resources section doesn't exist
         resources_config = operation_config
-    
+
     logger.debug("Extracting operation resources from config")
-    
+
     pool = _get_config_value_with_default(resources_config, "pool", "default", logger)
-    pool_tree = _get_config_value_with_default(resources_config, "pool_tree", None, logger)
-    docker_image = _get_config_value_with_default(resources_config, "docker_image", None, logger)
-    memory_gb = _get_config_value_with_default(resources_config, "memory_limit_gb", 4, logger)
+    pool_tree = _get_config_value_with_default(
+        resources_config, "pool_tree", None, logger
+    )
+    docker_image = _get_config_value_with_default(
+        resources_config, "docker_image", None, logger
+    )
+    memory_gb = _get_config_value_with_default(
+        resources_config, "memory_limit_gb", 4, logger
+    )
     cpu_limit = _get_config_value_with_default(resources_config, "cpu_limit", 2, logger)
     gpu_limit = _get_config_value_with_default(resources_config, "gpu_limit", 0, logger)
     job_count = _get_config_value_with_default(resources_config, "job_count", 1, logger)
-    user_slots = _get_config_value_with_default(resources_config, "user_slots", None, logger)
-    max_failed_jobs = _get_config_value_with_default(operation_config, "max_failed_job_count", 1, logger)
-    
+    user_slots = _get_config_value_with_default(
+        resources_config, "user_slots", None, logger
+    )
+    max_failed_jobs = _get_config_value_with_default(
+        operation_config, "max_failed_job_count", 1, logger
+    )
+
     resources = OperationResources(
         pool=pool,
         pool_tree=pool_tree,
@@ -188,10 +208,10 @@ def run_vanilla(
 
     # Wait for completion
     success = context.deps.yt_client.wait_for_operation(operation)
-    
+
     if success:
         log_success(logger, "Vanilla operation completed successfully")
     else:
         logger.error("Vanilla operation failed")
-    
+
     return success

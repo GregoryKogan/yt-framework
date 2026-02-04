@@ -20,6 +20,7 @@ from yt_framework.utils.ignore import YTIgnoreMatcher
 def _get_ytjobs_dir() -> Path:
     """Get ytjobs package directory dynamically."""
     import ytjobs
+
     return Path(ytjobs.__file__).parent
 
 
@@ -29,7 +30,7 @@ def _copy_ytjobs_to_build_dir(
 ) -> int:
     """
     Copy ytjobs package to local build directory.
-    
+
     Respects .ytignore patterns if present in the ytjobs directory.
 
     Args:
@@ -44,10 +45,10 @@ def _copy_ytjobs_to_build_dir(
     target_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"Copying ytjobs package to {target_dir}...")
-    
+
     # Initialize .ytignore matcher for ytjobs directory
     ignore_matcher = YTIgnoreMatcher(ytjobs_dir)
-    
+
     file_count = 0
     ignored_count = 0
 
@@ -55,10 +56,12 @@ def _copy_ytjobs_to_build_dir(
         if source_file.is_file():
             # Check if file should be ignored
             if ignore_matcher.should_ignore(source_file):
-                logger.debug(f"Ignoring file (matched .ytignore): {source_file.relative_to(ytjobs_dir)}")
+                logger.debug(
+                    f"Ignoring file (matched .ytignore): {source_file.relative_to(ytjobs_dir)}"
+                )
                 ignored_count += 1
                 continue
-            
+
             rel_path = source_file.relative_to(ytjobs_dir)
             target_file = target_dir / rel_path
             target_file.parent.mkdir(parents=True, exist_ok=True)
@@ -78,7 +81,7 @@ def _copy_stage_to_build_dir(
 ) -> int:
     """
     Copy a single stage's code and config to local build directory.
-    
+
     Respects .ytignore patterns if present in the stage directory.
 
     Args:
@@ -91,7 +94,7 @@ def _copy_stage_to_build_dir(
     """
     stage_name = stage_dir.name
     file_count = 0
-    
+
     # Initialize .ytignore matcher for stage directory
     ignore_matcher = YTIgnoreMatcher(stage_dir)
     ignored_count = 0
@@ -103,7 +106,11 @@ def _copy_stage_to_build_dir(
         if not ignore_matcher.should_ignore(config_path):
             try:
                 config = OmegaConf.load(config_path)
-                if "job" in config and config.job and (not isinstance(config.job, dict) or len(config.job) > 0):
+                if (
+                    "job" in config
+                    and config.job
+                    and (not isinstance(config.job, dict) or len(config.job) > 0)
+                ):
                     target_config = build_dir / "stages" / stage_name / "config.yaml"
                     target_config.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(config_path, target_config)
@@ -113,7 +120,9 @@ def _copy_stage_to_build_dir(
                 # If config parsing fails, skip it
                 pass
         else:
-            logger.debug(f"  Ignoring config: {stage_name}/config.yaml (matched .ytignore)")
+            logger.debug(
+                f"  Ignoring config: {stage_name}/config.yaml (matched .ytignore)"
+            )
             ignored_count += 1
 
     # Copy src directory
@@ -126,10 +135,12 @@ def _copy_stage_to_build_dir(
             if source_file.is_file():
                 # Check if file should be ignored
                 if ignore_matcher.should_ignore(source_file):
-                    logger.debug(f"  Ignoring file: {source_file.relative_to(stage_dir)} (matched .ytignore)")
+                    logger.debug(
+                        f"  Ignoring file: {source_file.relative_to(stage_dir)} (matched .ytignore)"
+                    )
                     ignored_count += 1
                     continue
-                
+
                 rel_path = source_file.relative_to(src_dir)
                 target_file = target_src / rel_path
                 target_file.parent.mkdir(parents=True, exist_ok=True)
@@ -138,7 +149,9 @@ def _copy_stage_to_build_dir(
 
         logger.debug(f"  Copied {file_count} files from {stage_name}/src/")
         if ignored_count > 0:
-            logger.debug(f"  Ignored {ignored_count} files from {stage_name}/ (matched .ytignore patterns)")
+            logger.debug(
+                f"  Ignored {ignored_count} files from {stage_name}/ (matched .ytignore patterns)"
+            )
 
     return file_count
 
@@ -151,14 +164,14 @@ def _create_unified_wrapper_script(
 ) -> None:
     """
     Create unified wrapper script for map or vanilla operations.
-    
+
     The wrapper script:
     1. Extracts code.tar.gz archive
     2. Sets up PYTHONPATH to include current directory
     3. Sets JOB_CONFIG_PATH to stage config
     4. Installs requirements.txt if present
     5. Executes the appropriate script (mapper.py or vanilla.py)
-    
+
     Args:
         stage_name: Name of the stage
         operation_type: Type of operation ('map' or 'vanilla')
@@ -170,10 +183,10 @@ def _create_unified_wrapper_script(
         script_path = f"stages/{stage_name}/src/mapper.py"
     else:  # vanilla
         script_path = f"stages/{stage_name}/src/vanilla.py"
-    
+
     # Check if requirements.txt exists in the stage directory
     requirements_path = f"stages/{stage_name}/requirements.txt"
-    
+
     bash_script = f"""
 #!/bin/bash
 set -e
@@ -218,7 +231,7 @@ def _create_wrappers_for_stage(
 ) -> None:
     """
     Create wrapper scripts for a stage based on what operation types it has.
-    
+
     Args:
         stage_name: Name of the stage
         stage_dir: Path to stage directory
@@ -226,14 +239,14 @@ def _create_wrappers_for_stage(
         logger: Logger instance
     """
     src_dir = stage_dir / "src"
-    
+
     if not src_dir.exists():
         return
-    
+
     # Check which operation types this stage supports
     has_mapper = (src_dir / "mapper.py").exists()
     has_vanilla = (src_dir / "vanilla.py").exists()
-    
+
     # Create wrapper for each operation type found
     if has_mapper:
         _create_unified_wrapper_script(
@@ -242,7 +255,7 @@ def _create_wrappers_for_stage(
             build_dir=build_dir,
             logger=logger,
         )
-    
+
     if has_vanilla:
         _create_unified_wrapper_script(
             stage_name=stage_name,
@@ -423,7 +436,9 @@ def upload_code_as_archive(
         build_code_dir: Optional path to local build directory. If None, creates
                        a directory inside pipeline_dir
     """
-    log_header(logger, "Code Upload", f"Tar archive mode | Build folder: {build_folder}")
+    log_header(
+        logger, "Code Upload", f"Tar archive mode | Build folder: {build_folder}"
+    )
 
     # Resolve build directory path
     build_code_dir = _resolve_build_code_dir(

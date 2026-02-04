@@ -30,7 +30,9 @@ class JoinDataStage(BaseStage):
         )
 
         row_count = self.deps.yt_client.row_count(self.config.client.output_table)
-        self.logger.info(f"Joined table has {row_count} rows: {self.config.client.output_table}")
+        self.logger.info(
+            f"Joined table has {row_count} rows: {self.config.client.output_table}"
+        )
 
         debug["final_table"] = self.config.client.output_table
         debug["final_row_count"] = row_count

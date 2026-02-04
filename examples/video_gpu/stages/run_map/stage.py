@@ -6,7 +6,9 @@ from yt_framework.operations.checkpoint import init_checkpoint_directory
 
 class RunMapStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
-        init_checkpoint_directory(self.context, self.config.client.operations.map.checkpoint)
+        init_checkpoint_directory(
+            self.context, self.config.client.operations.map.checkpoint
+        )
 
         if not run_map(self.context, self.config.client.operations.map):
             raise RuntimeError("Map operation failed")

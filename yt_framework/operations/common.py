@@ -14,7 +14,7 @@ from yt_framework.utils.env import load_secrets
 
 def _construct_command(script_path: str) -> str:
     """Construct command from script path."""
-    if script_path.endswith('.sh'):
+    if script_path.endswith(".sh"):
         return f"bash {script_path}"
     else:
         return f"python3 {script_path}"
@@ -28,13 +28,13 @@ def _get_config_value_with_default(
 ) -> Any:
     """
     Get config value with default, logging when default is used.
-    
+
     Args:
         config: OmegaConf DictConfig object
         key: Config key to access (supports dot notation like "client.pool")
         default: Default value to use if key is missing or None
         logger: Logger instance for logging defaults
-        
+
     Returns:
         Config value if present and not None, otherwise default
     """
@@ -43,13 +43,13 @@ def _get_config_value_with_default(
         if key not in config:
             logger.info(f"  Using default {key}={default} (not specified in config)")
             return default
-        
+
         value = config.get(key)
         # If value is None, use default and log
         if value is None:
             logger.info(f"  Using default {key}={default} (value is None in config)")
             return default
-        
+
         return value
     except Exception:
         # Key doesn't exist or access failed, use default

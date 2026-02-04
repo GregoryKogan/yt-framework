@@ -74,16 +74,16 @@ def process_and_write_results(
 ) -> None:
     """
     Execute a processing function and write results as they're yielded.
-    
+
     Streams results without loading them all into memory, which is critical
     for jobs processing millions of rows.
-    
+
     Note: We manually manage stdout here rather than using redirect_stdout_to_stderr()
     context manager because we need to toggle stdout for each result:
     - Redirect stdout→stderr during processing (iterator yields)
     - Restore stdout to write each result as JSON
     - Re-redirect for next iteration
-    
+
     This toggling pattern can't be achieved with a single context manager.
 
     Args:
@@ -96,10 +96,10 @@ def process_and_write_results(
     if redirect_output:
         # Save original stdout (same pattern as redirect_stdout_to_stderr)
         original_stdout = sys.stdout
-        
+
         # Redirect stdout to stderr for processing
         sys.stdout = sys.stderr
-        
+
         try:
             # Iterate and process - any processing output goes to stderr
             for result in processing_func(data, **kwargs):

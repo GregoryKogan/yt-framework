@@ -31,7 +31,12 @@ from typing import Optional, Dict, Any, cast, TypeAlias
 
 from omegaconf import OmegaConf, DictConfig
 from yt_framework.yt.factory import create_yt_client
-from yt_framework.utils.logging import setup_logging, log_header, log_operation, log_success
+from yt_framework.utils.logging import (
+    setup_logging,
+    log_header,
+    log_operation,
+    log_success,
+)
 from yt_framework.utils.env import load_secrets
 from yt_framework.core.registry import StageRegistry
 from yt_framework.core.dependencies import PipelineStageDependencies
@@ -39,6 +44,7 @@ from yt_framework.operations.upload import upload_all_code
 
 
 DebugContext: TypeAlias = Dict[str, Any]
+
 
 class BasePipeline:
     """
@@ -127,10 +133,10 @@ class BasePipeline:
     def create_stage_dependencies(self) -> PipelineStageDependencies:
         """
         Create stage dependencies for injection.
-        
+
         This method creates a dependency container with only what stages need,
         following the Interface Segregation Principle.
-        
+
         Returns:
             PipelineStageDependencies with yt_client, pipeline_config, configs_dir
         """
@@ -143,32 +149,32 @@ class BasePipeline:
     def _stages_need_code_execution(self) -> bool:
         """
         Check if any enabled stages need code execution on YT.
-        
+
         Stages need code execution if they have src/mapper.py or src/vanilla.py files.
-        
+
         Returns:
             True if any enabled stage needs code execution, False otherwise
         """
         enabled_stages = self.config.stages.enabled_stages
         if not enabled_stages:
             return False
-        
+
         stages_dir = self.pipeline_dir / "stages"
         for stage_name in enabled_stages:
             stage_dir = stages_dir / stage_name
             if not stage_dir.exists():
                 continue
-            
+
             src_dir = stage_dir / "src"
             if src_dir.exists():
                 return True
-        
+
         return False
 
     def upload_code(self, build_folder: Optional[str] = None) -> None:
         """
         Upload code to YT build folder.
-        
+
         Only uploads code if any enabled stages need code execution on YT.
         If no stages need code execution, this method does nothing.
 
@@ -178,7 +184,9 @@ class BasePipeline:
         """
         # Check if any stages need code execution
         if not self._stages_need_code_execution():
-            self.logger.debug("No stages require code execution on YT - skipping code upload")
+            self.logger.debug(
+                "No stages require code execution on YT - skipping code upload"
+            )
             return
 
         # Only require build_folder if code execution is needed
@@ -230,8 +238,10 @@ class BasePipeline:
                 "No enabled_stages found in stages config section. "
                 'Add: enabled_stages: ["stage1", "stage2", "stage3"]'
             )
-        
-        log_header(self.logger, "Pipeline", f"Starting execution | Stages: {enabled_stages}")
+
+        log_header(
+            self.logger, "Pipeline", f"Starting execution | Stages: {enabled_stages}"
+        )
 
         # Verify stage registry is set
         if self._stage_registry is None:
@@ -243,7 +253,7 @@ class BasePipeline:
         # Execute stages in order
         # Note: 'context' here is the shared data dict passed between stages
         context: DebugContext = {}
-        
+
         # Create dependencies once for all stages (separate from context!)
         stage_deps = self.create_stage_dependencies()
 
@@ -310,20 +320,34 @@ class BasePipeline:
         # Determine mode for logging
         try:
             temp_config = OmegaConf.load(config_path)
-            mode = temp_config.pipeline.get("mode", "dev") if isinstance(temp_config, DictConfig) else "dev"
+            mode = (
+                temp_config.pipeline.get("mode", "dev")
+                if isinstance(temp_config, DictConfig)
+                else "dev"
+            )
         except Exception as e:
             logger.error(f"Failed to determine mode: {e}")
             mode = "dev"
 
-        config_rel_path = config_path.relative_to(pipeline_dir) if config_path.is_relative_to(pipeline_dir) else config_path
-        log_header(logger, cls.__name__, f"Pipeline: {pipeline_dir} | Config: {config_rel_path} | Mode: {mode}")
+        config_rel_path = (
+            config_path.relative_to(pipeline_dir)
+            if config_path.is_relative_to(pipeline_dir)
+            else config_path
+        )
+        log_header(
+            logger,
+            cls.__name__,
+            f"Pipeline: {pipeline_dir} | Config: {config_rel_path} | Mode: {mode}",
+        )
 
         # Load configuration
         try:
             loaded_config = OmegaConf.load(config_path)
             # Ensure it's a DictConfig (not ListConfig)
             if not isinstance(loaded_config, DictConfig):
-                logger.error(f"Config file must contain a dictionary, got {type(loaded_config).__name__}")
+                logger.error(
+                    f"Config file must contain a dictionary, got {type(loaded_config).__name__}"
+                )
                 sys.exit(1)
             config = cast(DictConfig, loaded_config)
         except Exception as e:
@@ -347,43 +371,43 @@ class BasePipeline:
 class DefaultPipeline(BasePipeline):
     """
     Pipeline with automatic stage discovery.
-    
+
     Automatically discovers and registers all stages from the stages/ directory.
     No need to manually import or register stages - just put them in stages/
     and they'll be automatically found.
-    
+
     Usage:
         # pipeline.py
         from yt_framework.core.pipeline import DefaultPipeline
-        
+
         if __name__ == "__main__":
             DefaultPipeline.main()
-    
+
     The stages to run are still controlled by the enabled_stages configuration.
     """
-    
+
     def setup(self) -> None:
         """
         Automatically discover and register stages from stages/ directory.
-        
+
         Looks for all stage.py files in stages/*/ subdirectories and
         automatically imports and registers any BaseStage subclasses found.
         """
         from yt_framework.core.discovery import discover_stages
-        
+
         # Automatically discover stages
         stage_classes = discover_stages(
             pipeline_dir=self.pipeline_dir,
             logger=self.logger,
         )
-        
+
         # Register all discovered stages
         registry = StageRegistry()
         for stage_class in stage_classes:
             registry.add_stage(stage_class)
-        
+
         self.set_stage_registry(registry)
-        
+
         # Log discovered stages (already logged by discover_stages, but keep for consistency)
         if not stage_classes:
             self.logger.warning("No stages discovered - check stages/ directory")

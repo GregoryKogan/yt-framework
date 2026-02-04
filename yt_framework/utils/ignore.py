@@ -14,46 +14,46 @@ import fnmatch
 class YTIgnorePattern:
     """
     Represents a single .ytignore pattern.
-    
+
     This class compiles a pattern string into a regex for efficient matching
     against file paths. It supports the same syntax as .gitignore files.
-    
+
     Pattern Types:
-    - Simple wildcards: `*.pyc`, `test?` 
+    - Simple wildcards: `*.pyc`, `test?`
     - Character classes: `*.py[cod]`
     - Recursive wildcards: `**/*.log`
     - Directory patterns: `build/` (trailing slash)
     - Rooted patterns: `/config` (leading slash, root-only)
     - Negation patterns: `!important.py` (un-ignore)
-    
+
     Examples:
         Simple wildcard:
-        
+
         >>> from pathlib import Path
         >>> pattern = YTIgnorePattern("*.pyc", Path("/project"))
         >>> pattern.matches(Path("/project/test.pyc"))
         True
         >>> pattern.matches(Path("/project/test.py"))
         False
-        
+
         Directory pattern:
-        
+
         >>> pattern = YTIgnorePattern("__pycache__/", Path("/project"))
         >>> pattern.matches(Path("/project/__pycache__/module.pyc"))
         True
         >>> pattern.matches(Path("/project/src/__pycache__/module.pyc"))
         True
-        
+
         Recursive wildcard:
-        
+
         >>> pattern = YTIgnorePattern("**/*.log", Path("/project"))
         >>> pattern.matches(Path("/project/src/debug.log"))
         True
         >>> pattern.matches(Path("/project/debug.log"))
         False  # Requires at least one directory level
-        
+
         Rooted pattern:
-        
+
         >>> pattern = YTIgnorePattern("/build", Path("/project"))
         >>> pattern.matches(Path("/project/build"))
         True
@@ -75,10 +75,10 @@ class YTIgnorePattern:
         self.is_negation = is_negation
         self.is_directory = pattern.endswith("/")
         self.is_rooted = pattern.startswith("/")
-        
+
         if self.is_directory:
             self.pattern = pattern[:-1]
-        
+
         if self.is_rooted:
             self.pattern = self.pattern.lstrip("/")
 
@@ -89,7 +89,7 @@ class YTIgnorePattern:
         """Compile pattern into a matching function."""
         # Pattern is already stripped of leading slash and trailing slash
         pattern = self.pattern
-        
+
         # Handle ** for recursive matching
         if "**" in pattern:
             # Convert ** to regex equivalent
@@ -136,7 +136,7 @@ class YTIgnorePattern:
             else:
                 # Use fnmatch for standard wildcards
                 pattern = fnmatch.translate(pattern)
-        
+
         # If pattern was rooted (started with /), only match at root level
         # This means the path should NOT have any leading directory components
         if self.is_rooted:
@@ -168,7 +168,7 @@ class YTIgnorePattern:
 
         # Convert to string with forward slashes
         path_str = str(rel_path).replace("\\", "/")
-        
+
         # If pattern is rooted, only match paths at root level (no subdirectories)
         if self.is_rooted and "/" in path_str:
             # Rooted patterns should not match in subdirectories
@@ -208,11 +208,11 @@ class YTIgnorePattern:
 class YTIgnoreMatcher:
     """
     Matches file paths against .ytignore patterns.
-    
+
     This class loads .ytignore files from the specified directory and all parent
     directories up to the filesystem root, then provides methods to check if files
     should be ignored based on the loaded patterns.
-    
+
     Patterns follow .gitignore syntax:
     - `*.pyc` - matches any file ending in .pyc
     - `__pycache__/` - matches any __pycache__ directory
@@ -220,19 +220,19 @@ class YTIgnoreMatcher:
     - `!important.py` - negates a previous ignore pattern
     - `/build` - matches only at root level (not in subdirectories)
     - `src/*.log` - matches .log files in src/ but not src/subdir/
-    
+
     Examples:
         Basic usage:
-        
+
         >>> from pathlib import Path
         >>> matcher = YTIgnoreMatcher(Path("/project"))
         >>> matcher.should_ignore(Path("/project/test.pyc"))
         True
         >>> matcher.should_ignore(Path("/project/main.py"))
         False
-        
+
         With custom .ytignore file:
-        
+
         >>> # Create a .ytignore file
         >>> project_dir = Path("/tmp/myproject")
         >>> project_dir.mkdir(exist_ok=True)
@@ -242,9 +242,9 @@ class YTIgnoreMatcher:
         True
         >>> matcher.should_ignore(project_dir / "module.py")
         False
-        
+
         Negation patterns:
-        
+
         >>> # Ignore all .log files except important.log
         >>> (project_dir / ".ytignore").write_text("*.log\\n!important.log\\n")
         >>> matcher = YTIgnoreMatcher(project_dir)
@@ -358,18 +358,18 @@ class YTIgnoreMatcher:
 def should_ignore_file(file_path: Path, base_dir: Path) -> bool:
     """
     Convenience function to check if a file should be ignored.
-    
+
     This is a shorthand for creating a YTIgnoreMatcher and checking a single file.
     For checking multiple files, create a YTIgnoreMatcher instance directly to
     avoid reloading .ytignore files for each check.
-    
+
     Args:
         file_path: Path to the file to check
         base_dir: Base directory for .ytignore lookup
-    
+
     Returns:
         True if the file should be ignored
-        
+
     Examples:
         >>> from pathlib import Path
         >>> # Assuming .ytignore contains "*.pyc"

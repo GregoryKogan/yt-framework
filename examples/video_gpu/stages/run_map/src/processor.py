@@ -148,6 +148,7 @@ def process_single_video(
     # Initialize S3 clients
     # Read secrets from environment (passed from pipeline, not loaded into global env)
     import os
+
     secrets = {
         "S3_ENDPOINT": os.environ.get("S3_ENDPOINT", ""),
         "S3_DOWNLOAD_ACCESS_KEY": os.environ.get("S3_DOWNLOAD_ACCESS_KEY", ""),

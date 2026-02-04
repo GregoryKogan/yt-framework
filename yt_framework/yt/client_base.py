@@ -30,19 +30,27 @@ class OperationResources:
 
     def __post_init__(self):
         if self.memory_gb is None or self.memory_gb <= 0:
-            raise ValueError(f"memory_gb must be set to a positive integer, got {self.memory_gb}")
+            raise ValueError(
+                f"memory_gb must be set to a positive integer, got {self.memory_gb}"
+            )
         if self.cpu_limit is None or self.cpu_limit <= 0:
-            raise ValueError(f"cpu_limit must be set to a positive integer, got {self.cpu_limit}")
+            raise ValueError(
+                f"cpu_limit must be set to a positive integer, got {self.cpu_limit}"
+            )
         if self.gpu_limit is None or self.gpu_limit < 0:
-            raise ValueError(f"gpu_limit must be set to a non-negative integer, got {self.gpu_limit}")
+            raise ValueError(
+                f"gpu_limit must be set to a non-negative integer, got {self.gpu_limit}"
+            )
         if self.job_count is None or self.job_count <= 0:
-            raise ValueError(f"job_count must be set to a positive integer, got {self.job_count}")
-        
+            raise ValueError(
+                f"job_count must be set to a positive integer, got {self.job_count}"
+            )
+
 
 class BaseYTClient(ABC):
     """
     Abstract base class for YT client implementations.
-    
+
     Defines the interface that both production and development clients must implement.
     """
 
@@ -65,7 +73,9 @@ class BaseYTClient(ABC):
     def create_path(
         self,
         path: str,
-        node_type: Literal["table", "file", "map_node", "list_node", "document"] = "map_node",
+        node_type: Literal[
+            "table", "file", "map_node", "list_node", "document"
+        ] = "map_node",
     ) -> None:
         """Create a path in YT."""
         pass
@@ -99,16 +109,16 @@ class BaseYTClient(ABC):
     def _get_table_columns(self, table_path: str) -> List[str]:
         """
         Get column names from a table by reading one row.
-        
+
         This is a helper method used internally by convenience methods.
         Subclasses should implement this method.
-        
+
         Args:
             table_path: Path to YT table
-            
+
         Returns:
             List of column names
-            
+
         Raises:
             ValueError: If table is empty or cannot be read
         """
@@ -133,7 +143,7 @@ class BaseYTClient(ABC):
     ) -> None:
         """
         Execute a YQL query on YT cluster.
-        
+
         Args:
             query: YQL query string to execute
             pool: YT pool name (default: 'default')
@@ -141,7 +151,7 @@ class BaseYTClient(ABC):
         pass
 
     # Convenience methods for common YQL operations
-    
+
     @abstractmethod
     def join_tables(
         self,
@@ -155,7 +165,7 @@ class BaseYTClient(ABC):
     ) -> Optional[str]:
         """
         Join two tables using YQL.
-        
+
         Args:
             left_table: Path to left table
             right_table: Path to right table
@@ -167,7 +177,7 @@ class BaseYTClient(ABC):
             how: Join type - "inner", "left", "right", or "full"
             select_columns: Optional list of columns to select (with table aliases)
             dry_run: If True, return the YQL query without executing
-        
+
         Returns:
             YQL query string if dry_run=True, None otherwise
         """
@@ -183,13 +193,13 @@ class BaseYTClient(ABC):
     ) -> Optional[str]:
         """
         Filter table rows using WHERE condition.
-        
+
         Args:
             input_table: Path to input table
             output_table: Path to output table
             condition: WHERE condition (e.g., "status = 'active' AND total > 100")
             dry_run: If True, return the YQL query without executing
-        
+
         Returns:
             YQL query string if dry_run=True, None otherwise
         """
@@ -205,13 +215,13 @@ class BaseYTClient(ABC):
     ) -> Optional[str]:
         """
         Select specific columns from a table.
-        
+
         Args:
             input_table: Path to input table
             output_table: Path to output table
             columns: List of column names to select
             dry_run: If True, return the YQL query without executing
-        
+
         Returns:
             YQL query string if dry_run=True, None otherwise
         """
@@ -228,7 +238,7 @@ class BaseYTClient(ABC):
     ) -> Optional[str]:
         """
         Group by columns and compute aggregations.
-        
+
         Args:
             input_table: Path to input table
             output_table: Path to output table
@@ -236,7 +246,7 @@ class BaseYTClient(ABC):
             aggregations: Dict mapping output column names to aggregation functions
                          e.g., {"order_count": "count", "total_amount": "sum"}
             dry_run: If True, return the YQL query without executing
-        
+
         Returns:
             YQL query string if dry_run=True, None otherwise
         """
@@ -251,12 +261,12 @@ class BaseYTClient(ABC):
     ) -> Optional[str]:
         """
         Union multiple tables.
-        
+
         Args:
             tables: List of table paths to union
             output_table: Path to output table
             dry_run: If True, return the YQL query without executing
-        
+
         Returns:
             YQL query string if dry_run=True, None otherwise
         """
@@ -272,13 +282,13 @@ class BaseYTClient(ABC):
     ) -> Optional[str]:
         """
         Get distinct rows from a table.
-        
+
         Args:
             input_table: Path to input table
             output_table: Path to output table
             columns: Optional list of columns to select (if None, selects all)
             dry_run: If True, return the YQL query without executing
-        
+
         Returns:
             YQL query string if dry_run=True, None otherwise
         """
@@ -295,16 +305,16 @@ class BaseYTClient(ABC):
     ) -> Optional[str]:
         """
         Sort table by columns.
-        
+
         WARNING: Sorting large tables can be expensive. Use with caution.
-        
+
         Args:
             input_table: Path to input table
             output_table: Path to output table
             order_by: Column(s) to sort by
             ascending: Sort direction (True for ASC, False for DESC)
             dry_run: If True, return the YQL query without executing
-        
+
         Returns:
             YQL query string if dry_run=True, None otherwise
         """
@@ -320,23 +330,25 @@ class BaseYTClient(ABC):
     ) -> Optional[str]:
         """
         Limit number of rows from a table.
-        
+
         Args:
             input_table: Path to input table
             output_table: Path to output table
             limit: Maximum number of rows to return
             dry_run: If True, return the YQL query without executing
-        
+
         Returns:
             YQL query string if dry_run=True, None otherwise
         """
         pass
 
     @abstractmethod
-    def upload_file(self, local_path: Path, yt_path: str, create_parent_dir: bool = False) -> None:
+    def upload_file(
+        self, local_path: Path, yt_path: str, create_parent_dir: bool = False
+    ) -> None:
         """
         Upload a file to YT.
-        
+
         Args:
             local_path: Local file path to upload
             yt_path: YT destination path
@@ -366,7 +378,7 @@ class BaseYTClient(ABC):
     ) -> Operation:
         """
         Run a map operation on YT.
-        
+
         Args:
             command: Command to execute (e.g., "python3 mapper.py")
             input_table: Input table path
@@ -387,11 +399,12 @@ class BaseYTClient(ABC):
         files: List[Tuple[str, str]],
         env: Dict[str, str],
         task_name: str,
-        *args, **kwargs,
+        *args,
+        **kwargs,
     ) -> Operation:
         """
         Run a vanilla operation on YT.
-        
+
         Args:
             command: Command to execute
             files: List of files to upload

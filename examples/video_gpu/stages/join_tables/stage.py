@@ -21,8 +21,8 @@ class JoinTablesStage(BaseStage):
                 "a.input_s3_path",
                 "a.meta",
                 "a.output_s3_path",
-                "b.bucket AS joined_bucket"
-            ]
+                "b.bucket AS joined_bucket",
+            ],
         )
 
         self.logger.info("Join completed successfully")

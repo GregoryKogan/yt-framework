@@ -27,7 +27,7 @@ from yt_framework.utils.ignore import YTIgnoreMatcher
 class YTProdClient(BaseYTClient):
     """
     Production YT client implementation.
-    
+
     Uses actual YTsaurus client for all operations.
     """
 
@@ -49,17 +49,23 @@ class YTProdClient(BaseYTClient):
 
         yt_proxy = secrets.get("YT_PROXY")
         if not yt_proxy:
-            raise ValueError("YT_PROXY is not set (check secrets.env or environment variables)")
+            raise ValueError(
+                "YT_PROXY is not set (check secrets.env or environment variables)"
+            )
 
         yt_token = secrets.get("YT_TOKEN")
         if not yt_token:
-            raise ValueError("YT_TOKEN is not set (check secrets.env or environment variables)")
+            raise ValueError(
+                "YT_TOKEN is not set (check secrets.env or environment variables)"
+            )
 
         self.client = YtClient(proxy=yt_proxy, token=yt_token)
         try:
             if "proxy" in self.client.config:
                 self.client.config["proxy"]["enable_proxy_discovery"] = False  # type: ignore[index]
-                self.logger.debug(f"YT Client initialized with proxy: {yt_proxy} (proxy discovery disabled)")
+                self.logger.debug(
+                    f"YT Client initialized with proxy: {yt_proxy} (proxy discovery disabled)"
+                )
             else:
                 self.logger.debug(f"YT Client initialized with proxy: {yt_proxy}")
         except Exception as e:
@@ -71,7 +77,9 @@ class YTProdClient(BaseYTClient):
     def create_path(
         self,
         path: str,
-        node_type: Literal["table", "file", "map_node", "list_node", "document"] = "map_node",
+        node_type: Literal[
+            "table", "file", "map_node", "list_node", "document"
+        ] = "map_node",
     ) -> None:
         """Create a path in YT."""
         try:
@@ -97,7 +105,7 @@ class YTProdClient(BaseYTClient):
         make_parents: bool = True,
     ) -> None:
         """Write rows to a YT table.
-        
+
         Args:
             table_path: YT table path
             rows: List of rows to write
@@ -144,8 +152,7 @@ class YTProdClient(BaseYTClient):
             # Type ignore needed because YT client's read_table has complex return types
             # but when called with JsonFormat(), it returns an iterable of dicts
             table_iterator = self.client.read_table(
-                TablePath(table_path), 
-                format=yt_format.JsonFormat()
+                TablePath(table_path), format=yt_format.JsonFormat()
             )
             results: List[Dict[str, Any]] = list(table_iterator)  # type: ignore[arg-type]
             self.logger.info(f"✓ Read {len(results)} rows")
@@ -167,18 +174,18 @@ class YTProdClient(BaseYTClient):
     def _get_table_columns(self, table_path: str) -> List[str]:
         """
         Get column names from a table.
-        
+
         Tries multiple methods:
         1. Get schema from table attributes (handles binary columns)
         2. Read one row from table
         3. Use YQL query with LIMIT 0 to infer schema (when reading fails due to binary columns)
-        
+
         Args:
             table_path: Path to YT table
-            
+
         Returns:
             List of column names (filtered to exclude internal YQL columns)
-            
+
         Raises:
             ValueError: If table is empty or cannot be read
         """
@@ -188,19 +195,27 @@ class YTProdClient(BaseYTClient):
             if attrs and isinstance(attrs, dict) and "schema" in attrs:  # type: ignore[operator]
                 schema = attrs["schema"]  # type: ignore[index]
                 if schema and isinstance(schema, list):
-                    columns = [col["name"] for col in schema if isinstance(col, dict) and "name" in col]
+                    columns = [
+                        col["name"]
+                        for col in schema
+                        if isinstance(col, dict) and "name" in col
+                    ]
                     # Filter out internal YQL columns like _other, _yql_column_*
                     columns = [col for col in columns if not col.startswith("_")]
                     if columns:
                         return columns
         except Exception as e:
-            self.logger.debug(f"Could not get schema from attributes: {e}, trying to read table")
-        
+            self.logger.debug(
+                f"Could not get schema from attributes: {e}, trying to read table"
+            )
+
         # Method 2: Try to read one row (may fail with binary columns)
         try:
             rows = self.read_table(table_path)
             if not rows:
-                raise ValueError(f"Table {table_path} is empty, cannot determine columns")
+                raise ValueError(
+                    f"Table {table_path} is empty, cannot determine columns"
+                )
             # Get column names from first row
             columns = list(rows[0].keys())
             # Filter out internal YQL columns like _other, _yql_column_*
@@ -212,29 +227,41 @@ class YTProdClient(BaseYTClient):
         except Exception as read_error:
             # Method 3: If reading fails (e.g., binary columns), use YQL to infer schema
             error_str = str(read_error)
-            if "Failed to decode string" in error_str or "encoding" in error_str.lower():
+            if (
+                "Failed to decode string" in error_str
+                or "encoding" in error_str.lower()
+            ):
                 temp_output = None
                 try:
-                    self.logger.debug("Reading failed due to binary columns, using YQL to infer schema")
+                    self.logger.debug(
+                        "Reading failed due to binary columns, using YQL to infer schema"
+                    )
                     # Use YQL to create a temporary table with LIMIT 0 to infer schema
                     # This doesn't read actual data, just infers the schema
                     import uuid
+
                     temp_output = f"{table_path}.temp_schema_{uuid.uuid4().hex[:8]}"
                     query = f"""PRAGMA yt.InferSchema = '1';
 INSERT INTO `{temp_output}` WITH TRUNCATE
 SELECT * FROM `{table_path}` LIMIT 0;"""
-                    
+
                     # Execute query to create temp table with schema
                     self.run_yql(query)
-                    
+
                     # Get schema from the temporary table
                     temp_attrs = self.client.get(temp_output, attributes=["schema"])  # type: ignore[assignment]
                     if temp_attrs and isinstance(temp_attrs, dict) and "schema" in temp_attrs:  # type: ignore[operator]
                         temp_schema = temp_attrs["schema"]  # type: ignore[index]
                         if temp_schema and isinstance(temp_schema, list):
-                            columns = [col["name"] for col in temp_schema if isinstance(col, dict) and "name" in col]
+                            columns = [
+                                col["name"]
+                                for col in temp_schema
+                                if isinstance(col, dict) and "name" in col
+                            ]
                             # Filter out internal YQL columns
-                            columns = [col for col in columns if not col.startswith("_")]
+                            columns = [
+                                col for col in columns if not col.startswith("_")
+                            ]
                             if columns:
                                 # Clean up temp table before returning
                                 if temp_output:
@@ -243,7 +270,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                                     except Exception:
                                         pass
                                 return columns
-                    
+
                     # Clean up temp table if we got here
                     if temp_output:
                         try:
@@ -258,7 +285,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                             self.client.remove(temp_output)
                         except Exception:
                             pass
-                
+
                 # If all methods fail, provide helpful error message
                 raise ValueError(
                     f"Table {table_path} contains binary columns that cannot be decoded. "
@@ -266,8 +293,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                     f"internal YQL columns like _yql_column_0. Please recreate the table with "
                     f"explicit column selection, or delete and recreate it. Original error: {read_error}"
                 ) from read_error
-            
-            raise ValueError(f"Failed to get table columns from {table_path}: {read_error}") from read_error
+
+            raise ValueError(
+                f"Failed to get table columns from {table_path}: {read_error}"
+            ) from read_error
 
     def run_yql(
         self,
@@ -276,7 +305,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
     ) -> None:
         """
         Execute a YQL query on YT cluster.
-        
+
         Args:
             query: YQL query string to execute
             pool: YT pool name (default: 'default')
@@ -322,7 +351,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
     ) -> Optional[str]:
         """Join two tables using YQL."""
         from yt_framework.yt.yql_builder import build_join_query
-        
+
         query = build_join_query(
             left_table=left_table,
             right_table=right_table,
@@ -331,10 +360,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             how=how,
             select_columns=select_columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -347,20 +376,20 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
     ) -> Optional[str]:
         """Filter table rows using WHERE condition."""
         from yt_framework.yt.yql_builder import build_filter_query
-        
+
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
-        
+
         query = build_filter_query(
             input_table=input_table,
             output_table=output_table,
             condition=condition,
             columns=columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -373,16 +402,16 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
     ) -> Optional[str]:
         """Select specific columns from a table."""
         from yt_framework.yt.yql_builder import build_select_query
-        
+
         query = build_select_query(
             input_table=input_table,
             output_table=output_table,
             columns=columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -396,17 +425,17 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
     ) -> Optional[str]:
         """Group by columns and compute aggregations."""
         from yt_framework.yt.yql_builder import build_group_by_query
-        
+
         query = build_group_by_query(
             input_table=input_table,
             output_table=output_table,
             group_by=group_by,
             aggregations=aggregations,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -418,20 +447,20 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
     ) -> Optional[str]:
         """Union multiple tables."""
         from yt_framework.yt.yql_builder import build_union_query
-        
+
         # Get columns from first table to avoid _other column issues
         # All tables in union should have the same columns
         columns = self._get_table_columns(tables[0])
-        
+
         query = build_union_query(
             tables=tables,
             output_table=output_table,
             columns=columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -444,16 +473,16 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
     ) -> Optional[str]:
         """Get distinct rows from a table."""
         from yt_framework.yt.yql_builder import build_distinct_query
-        
+
         query = build_distinct_query(
             input_table=input_table,
             output_table=output_table,
             columns=columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -467,10 +496,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
     ) -> Optional[str]:
         """Sort table by columns."""
         from yt_framework.yt.yql_builder import build_sort_query
-        
+
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
-        
+
         query = build_sort_query(
             input_table=input_table,
             output_table=output_table,
@@ -478,10 +507,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             columns=columns,
             ascending=ascending,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -494,27 +523,29 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
     ) -> Optional[str]:
         """Limit number of rows from a table."""
         from yt_framework.yt.yql_builder import build_limit_query
-        
+
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
-        
+
         query = build_limit_query(
             input_table=input_table,
             output_table=output_table,
             limit=limit,
             columns=columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
-    def upload_file(self, local_path: Path, yt_path: str, create_parent_dir: bool = False) -> None:
+    def upload_file(
+        self, local_path: Path, yt_path: str, create_parent_dir: bool = False
+    ) -> None:
         """
         Upload a file to YT.
-        
+
         Args:
             local_path: Local file path to upload
             yt_path: YT destination path
@@ -529,7 +560,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 if "/" in yt_path:
                     parent_dir = "/".join(yt_path.split("/")[:-1])
                     if parent_dir:
-                        self.logger.debug(f"Ensuring parent directory exists: {parent_dir}")
+                        self.logger.debug(
+                            f"Ensuring parent directory exists: {parent_dir}"
+                        )
                         self.create_path(parent_dir, node_type="map_node")
 
             with open(local_path, "rb") as f:
@@ -611,8 +644,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         try:
             file_paths = [
-                FilePath(yt_path, file_name=local_path) 
-                for yt_path, local_path in files
+                FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
 
             output_path = TablePath(output_table, append=False, schema=output_schema)
@@ -625,12 +657,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 .input_table_paths([input_table])
                 .output_table_paths([output_path])
             )
-            
+
             # Set pool tree if specified
             if resources.pool_tree:
                 spec_builder = spec_builder.pool_trees([resources.pool_tree])
                 self.logger.debug(f"Set pool tree to {resources.pool_tree}")
-            
+
             mapper_builder = (
                 spec_builder.begin_mapper()
                 .command(command)
@@ -650,7 +682,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             operation = self.client.run_operation(spec_builder, sync=False)
             if operation is None:
-                raise RuntimeError("Failed to submit operation: run_operation returned None")
+                raise RuntimeError(
+                    "Failed to submit operation: run_operation returned None"
+                )
 
             self.logger.info(f"Operation submitted: {operation.id}")
             return operation
@@ -678,8 +712,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         try:
             file_paths = [
-                FilePath(yt_path, file_name=local_path) 
-                for yt_path, local_path in files
+                FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
 
             spec_builder = (
@@ -688,15 +721,14 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 .resource_limits({"user_slots": resources.user_slots})
                 .max_failed_job_count(max_failed_jobs)
             )
-            
+
             # Set pool tree if specified
             if resources.pool_tree:
                 spec_builder = spec_builder.pool_trees([resources.pool_tree])
                 self.logger.debug(f"Set pool tree to {resources.pool_tree}")
-            
+
             task_builder = (
-                spec_builder
-                .begin_task(task_name)
+                spec_builder.begin_task(task_name)
                 .command(command)
                 .file_paths(file_paths)
                 .environment(env)
@@ -705,7 +737,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 .gpu_limit(resources.gpu_limit)
                 .job_count(resources.job_count)
             )
-            
+
             if resources.docker_image:
                 task_builder = task_builder.docker_image(resources.docker_image)
                 spec_builder.secure_vault({"docker_auth": docker_auth})
@@ -714,7 +746,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             operation = self.client.run_operation(spec_builder, sync=False)
             if operation is None:
-                raise RuntimeError("Failed to submit operation: run_operation returned None")
+                raise RuntimeError(
+                    "Failed to submit operation: run_operation returned None"
+                )
 
             self.logger.info(f"Operation submitted: {operation.id}")
             return operation

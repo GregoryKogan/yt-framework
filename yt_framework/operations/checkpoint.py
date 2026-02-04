@@ -33,7 +33,7 @@ def init_checkpoint_directory(
     # Get checkpoint-related config values from checkpoint_config
     checkpoint_base = checkpoint_config.get("checkpoint_base")
     local_checkpoint_path = checkpoint_config.get("local_checkpoint_path")
-    
+
     # model_name is still accessed from stage config job section
     model_name = None
     if "job" in context.config and context.config.job.get("model_name"):
@@ -70,12 +70,16 @@ def init_checkpoint_directory(
                         context.deps.yt_client.upload_file(
                             local_path, yt_checkpoint_path, create_parent_dir=True
                         )
-                        context.logger.debug(f"Checkpoint uploaded: {yt_checkpoint_path}")
+                        context.logger.debug(
+                            f"Checkpoint uploaded: {yt_checkpoint_path}"
+                        )
                     except Exception as e:
                         context.logger.error(f"Failed to upload checkpoint: {e}")
                         raise
             else:
-                context.logger.warning(f"Local checkpoint path does not exist: {local_path}")
+                context.logger.warning(
+                    f"Local checkpoint path does not exist: {local_path}"
+                )
 
         # Validate that required checkpoint exists in YT
         if model_name:
@@ -93,7 +97,9 @@ def init_checkpoint_directory(
 
             context.logger.debug(f"Required checkpoint verified: {yt_checkpoint_path}")
         else:
-            context.logger.debug("No model_name specified, skipping checkpoint validation")
+            context.logger.debug(
+                "No model_name specified, skipping checkpoint validation"
+            )
 
     except FileNotFoundError:
         raise  # Re-raise checkpoint validation errors

@@ -14,6 +14,7 @@ from typing import List, Tuple, Optional
 def _get_ytjobs_dir() -> Path:
     """Get ytjobs package directory dynamically."""
     import ytjobs
+
     return Path(ytjobs.__file__).parent
 
 
@@ -54,7 +55,9 @@ def build_stage_dependencies(
     if src_dir.exists():
         for py_file in src_dir.rglob("*.py"):
             rel_path = py_file.relative_to(src_dir)
-            yt_path = f"{build_folder}/stages/{stage_dir_name}/src/{rel_path}".replace("\\", "/")
+            yt_path = f"{build_folder}/stages/{stage_dir_name}/src/{rel_path}".replace(
+                "\\", "/"
+            )
             local_path = f"stages/{stage_dir_name}/src/{rel_path}".replace("\\", "/")
             dependency_files.append((yt_path, local_path))
             logger.debug(f"  Added stage file: {local_path}")

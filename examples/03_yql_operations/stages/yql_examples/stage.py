@@ -23,7 +23,7 @@ class YqlExamplesStage(BaseStage):
 
     def join_tables(self):
         log_header(self.logger, "YQL", "1. JOIN TABLES")
-        
+
         # Preview YQL query before execution
         query = self.deps.yt_client.join_tables(
             left_table=self.config.client.orders_table,
@@ -43,7 +43,7 @@ class YqlExamplesStage(BaseStage):
             dry_run=True,
         )
         self.logger.info(f"YQL preview (dry run):\n{query}")
-        
+
         # Simple join on single column
         self.deps.yt_client.join_tables(
             left_table=self.config.client.orders_table,
@@ -65,7 +65,7 @@ class YqlExamplesStage(BaseStage):
 
     def filter_table(self):
         log_header(self.logger, "YQL", "2. FILTER TABLE")
-        
+
         # Preview YQL query before execution
         query = self.deps.yt_client.filter_table(
             input_table=self.config.client.orders_table,
@@ -74,7 +74,7 @@ class YqlExamplesStage(BaseStage):
             dry_run=True,
         )
         self.logger.info(f"YQL preview (dry run):\n{query}")
-        
+
         self.deps.yt_client.filter_table(
             input_table=self.config.client.orders_table,
             output_table=self.config.client.output.filtered,
@@ -85,7 +85,7 @@ class YqlExamplesStage(BaseStage):
 
     def select_columns(self):
         log_header(self.logger, "YQL", "3. SELECT COLUMNS")
-        
+
         # Preview YQL query before execution
         query = self.deps.yt_client.select_columns(
             input_table=self.config.client.users_table,
@@ -94,7 +94,7 @@ class YqlExamplesStage(BaseStage):
             dry_run=True,
         )
         self.logger.info(f"YQL preview (dry run):\n{query}")
-        
+
         self.deps.yt_client.select_columns(
             input_table=self.config.client.users_table,
             output_table=self.config.client.output.selected,
@@ -104,7 +104,7 @@ class YqlExamplesStage(BaseStage):
 
     def group_by_aggregate(self):
         log_header(self.logger, "YQL", "4. GROUP BY AGGREGATE")
-        
+
         # Preview YQL query before execution
         query = self.deps.yt_client.group_by_aggregate(
             input_table=self.config.client.orders_table,
@@ -117,7 +117,7 @@ class YqlExamplesStage(BaseStage):
             dry_run=True,
         )
         self.logger.info(f"YQL preview (dry run):\n{query}")
-        
+
         self.deps.yt_client.group_by_aggregate(
             input_table=self.config.client.orders_table,
             output_table=self.config.client.output.aggregated,
@@ -128,25 +128,35 @@ class YqlExamplesStage(BaseStage):
             },
         )
         self.logger.info("Aggregated orders by user_id")
-        
+
         # Read and display results
-        results = list(self.deps.yt_client.read_table(self.config.client.output.aggregated))
+        results = list(
+            self.deps.yt_client.read_table(self.config.client.output.aggregated)
+        )
         for row in results:
-            self.logger.info(f"  User {row['user_id']}: {row['order_count']} orders, total: {row['total_amount']}")
+            self.logger.info(
+                f"  User {row['user_id']}: {row['order_count']} orders, total: {row['total_amount']}"
+            )
 
     def union_tables(self):
         log_header(self.logger, "YQL", "5. UNION TABLES")
-        
+
         # Preview YQL query before execution
         query = self.deps.yt_client.union_tables(
-            tables=[self.config.client.orders_table, self.config.client.archive_orders_table],
+            tables=[
+                self.config.client.orders_table,
+                self.config.client.archive_orders_table,
+            ],
             output_table=self.config.client.output.united,
             dry_run=True,
         )
         self.logger.info(f"YQL preview (dry run):\n{query}")
-        
+
         self.deps.yt_client.union_tables(
-            tables=[self.config.client.orders_table, self.config.client.archive_orders_table],
+            tables=[
+                self.config.client.orders_table,
+                self.config.client.archive_orders_table,
+            ],
             output_table=self.config.client.output.united,
         )
         row_count = self.deps.yt_client.row_count(self.config.client.output.united)
@@ -154,7 +164,7 @@ class YqlExamplesStage(BaseStage):
 
     def distinct(self):
         log_header(self.logger, "YQL", "6. DISTINCT")
-        
+
         # Preview YQL query before execution
         query = self.deps.yt_client.distinct(
             input_table=self.config.client.users_table,
@@ -163,18 +173,20 @@ class YqlExamplesStage(BaseStage):
             dry_run=True,
         )
         self.logger.info(f"YQL preview (dry run):\n{query}")
-        
+
         self.deps.yt_client.distinct(
             input_table=self.config.client.users_table,
             output_table=self.config.client.output.distinct,
             columns=["city"],
         )
-        cities = list(self.deps.yt_client.read_table(self.config.client.output.distinct))
+        cities = list(
+            self.deps.yt_client.read_table(self.config.client.output.distinct)
+        )
         self.logger.info(f"Distinct cities: {[c['city'] for c in cities]}")
 
     def sort_table(self):
         log_header(self.logger, "YQL", "7. SORT TABLE")
-        
+
         # Preview YQL query before execution
         query = self.deps.yt_client.sort_table(
             input_table=self.config.client.orders_table,
@@ -184,7 +196,7 @@ class YqlExamplesStage(BaseStage):
             dry_run=True,
         )
         self.logger.info(f"YQL preview (dry run):\n{query}")
-        
+
         self.deps.yt_client.sort_table(
             input_table=self.config.client.orders_table,
             output_table=self.config.client.output.sorted,
@@ -195,7 +207,7 @@ class YqlExamplesStage(BaseStage):
 
     def limit_table(self):
         log_header(self.logger, "YQL", "8. LIMIT TABLE")
-        
+
         # Preview YQL query before execution
         query = self.deps.yt_client.limit_table(
             input_table=self.config.client.output.sorted,
@@ -204,7 +216,7 @@ class YqlExamplesStage(BaseStage):
             dry_run=True,
         )
         self.logger.info(f"YQL preview (dry run):\n{query}")
-        
+
         self.deps.yt_client.limit_table(
             input_table=self.config.client.output.sorted,
             output_table=self.config.client.output.limited,
@@ -213,4 +225,6 @@ class YqlExamplesStage(BaseStage):
         top3 = list(self.deps.yt_client.read_table(self.config.client.output.limited))
         self.logger.info("Top 3 orders by amount:")
         for order in top3:
-            self.logger.info(f"  Order {order['order_id']}: {order['product']} - {order['amount']}")
+            self.logger.info(
+                f"  Order {order['order_id']}: {order['product']} - {order['amount']}"
+            )

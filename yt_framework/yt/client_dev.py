@@ -45,7 +45,7 @@ class _DevOperation:
 class YTDevClient(BaseYTClient):
     """
     Development YT client implementation.
-    
+
     Uses local file system for all operations, simulating YT behavior.
     Tables are stored as .jsonl files in .dev/ directory.
     """
@@ -92,7 +92,9 @@ class YTDevClient(BaseYTClient):
     def create_path(
         self,
         path: str,
-        node_type: Literal["table", "file", "map_node", "list_node", "document"] = "map_node",
+        node_type: Literal[
+            "table", "file", "map_node", "list_node", "document"
+        ] = "map_node",
     ) -> None:
         """Create a path in YT (no-op in dev mode)."""
         pass
@@ -100,7 +102,7 @@ class YTDevClient(BaseYTClient):
     def exists(self, path: str) -> bool:
         """
         Check if a path exists in YT.
-        
+
         In dev mode, always returns True (assumes files exist locally).
         """
         return True
@@ -152,23 +154,25 @@ class YTDevClient(BaseYTClient):
     def _get_table_columns(self, table_path: str) -> List[str]:
         """
         Get column names from a table by reading one row.
-        
+
         In dev mode, tables are stored as JSONL files, so binary columns are less likely.
         This implementation matches the production client structure for consistency.
-        
+
         Args:
             table_path: Path to YT table
-            
+
         Returns:
             List of column names (filtered to exclude internal YQL columns)
-            
+
         Raises:
             ValueError: If table is empty or cannot be read
         """
         try:
             rows = self.read_table(table_path)
             if not rows:
-                raise ValueError(f"Table {table_path} is empty, cannot determine columns")
+                raise ValueError(
+                    f"Table {table_path} is empty, cannot determine columns"
+                )
             # Get column names from first row
             columns = list(rows[0].keys())
             # Filter out internal YQL columns like _other, _yql_column_*
@@ -188,7 +192,7 @@ class YTDevClient(BaseYTClient):
     ) -> None:
         """
         Execute a YQL query locally using DuckDB simulation.
-        
+
         Args:
             query: YQL query string to execute
             pool: YT pool name (default: 'default')
@@ -196,27 +200,24 @@ class YTDevClient(BaseYTClient):
         self.logger.info("Executing YQL query (dev mode - DuckDB simulation)")
         self.logger.debug(f"Pool: {pool}")
         self.logger.debug(f"Query:\n{query}")
-        
+
         from yt_framework.yt.dev_simulator import (
             DuckDBSimulator,
             extract_table_references,
             extract_output_table,
         )
-        
+
         # Create DuckDB simulator
-        simulator = DuckDBSimulator(
-            dev_dir=self._dev_dir(),
-            logger=self.logger
-        )
-        
+        simulator = DuckDBSimulator(dev_dir=self._dev_dir(), logger=self.logger)
+
         try:
             # Extract table references
             input_tables = extract_table_references(query)
             output_table = extract_output_table(query)
-            
+
             self.logger.debug(f"Input tables: {input_tables}")
             self.logger.debug(f"Output table: {output_table}")
-            
+
             # Load input tables
             for table_path in input_tables:
                 local_path = self._table_local_path(table_path)
@@ -224,17 +225,17 @@ class YTDevClient(BaseYTClient):
                     simulator.load_table(table_path, local_path)
                 else:
                     self.logger.warning(f"Input table not found: {local_path}")
-            
+
             # Execute query
             results, _ = simulator.execute_yql(query)
-            
+
             # Save results if output table specified
             if output_table and results is not None:
                 self.write_table(output_table, results, append=False)
                 self.logger.info(f"Wrote {len(results)} rows to {output_table}")
-            
+
             self.logger.info("✓ YQL query executed successfully")
-            
+
         except Exception as e:
             self.logger.error(f"Failed to execute YQL query in dev mode: {e}")
             raise
@@ -255,7 +256,7 @@ class YTDevClient(BaseYTClient):
     ) -> Optional[str]:
         """Join two tables using YQL (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_join_query
-        
+
         query = build_join_query(
             left_table=left_table,
             right_table=right_table,
@@ -264,10 +265,10 @@ class YTDevClient(BaseYTClient):
             how=how,
             select_columns=select_columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -280,20 +281,20 @@ class YTDevClient(BaseYTClient):
     ) -> Optional[str]:
         """Filter table rows using WHERE condition (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_filter_query
-        
+
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
-        
+
         query = build_filter_query(
             input_table=input_table,
             output_table=output_table,
             condition=condition,
             columns=columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -306,16 +307,16 @@ class YTDevClient(BaseYTClient):
     ) -> Optional[str]:
         """Select specific columns from a table (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_select_query
-        
+
         query = build_select_query(
             input_table=input_table,
             output_table=output_table,
             columns=columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -329,17 +330,17 @@ class YTDevClient(BaseYTClient):
     ) -> Optional[str]:
         """Group by columns and compute aggregations (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_group_by_query
-        
+
         query = build_group_by_query(
             input_table=input_table,
             output_table=output_table,
             group_by=group_by,
             aggregations=aggregations,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -351,20 +352,20 @@ class YTDevClient(BaseYTClient):
     ) -> Optional[str]:
         """Union multiple tables (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_union_query
-        
+
         # Get columns from first table to avoid _other column issues
         # All tables in union should have the same columns
         columns = self._get_table_columns(tables[0])
-        
+
         query = build_union_query(
             tables=tables,
             output_table=output_table,
             columns=columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -377,16 +378,16 @@ class YTDevClient(BaseYTClient):
     ) -> Optional[str]:
         """Get distinct rows from a table (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_distinct_query
-        
+
         query = build_distinct_query(
             input_table=input_table,
             output_table=output_table,
             columns=columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -400,10 +401,10 @@ class YTDevClient(BaseYTClient):
     ) -> Optional[str]:
         """Sort table by columns (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_sort_query
-        
+
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
-        
+
         query = build_sort_query(
             input_table=input_table,
             output_table=output_table,
@@ -411,10 +412,10 @@ class YTDevClient(BaseYTClient):
             columns=columns,
             ascending=ascending,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
@@ -427,27 +428,29 @@ class YTDevClient(BaseYTClient):
     ) -> Optional[str]:
         """Limit number of rows from a table (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_limit_query
-        
+
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
-        
+
         query = build_limit_query(
             input_table=input_table,
             output_table=output_table,
             limit=limit,
             columns=columns,
         )
-        
+
         if dry_run:
             return query
-        
+
         self.run_yql(query)
         return None
 
-    def upload_file(self, local_path: Path, yt_path: str, create_parent_dir: bool = False) -> None:
+    def upload_file(
+        self, local_path: Path, yt_path: str, create_parent_dir: bool = False
+    ) -> None:
         """
         Upload a file to YT (no-op in dev mode).
-        
+
         Args:
             local_path: Local file path to upload
             yt_path: YT destination path
@@ -476,7 +479,7 @@ class YTDevClient(BaseYTClient):
     ) -> Operation:
         """Run a map operation locally using subprocess."""
         assert self.pipeline_dir is not None
-        
+
         self.logger.info("Submitting map operation")
         self.logger.info(f"  Input: {input_table}")
         self.logger.info(f"  Output: {output_table}")
@@ -492,7 +495,7 @@ class YTDevClient(BaseYTClient):
 
         # Setup environment
         env_merged = self._setup_map_environment(env)
-    
+
         logs_path = self._dev_dir() / f"{self._table_basename(output_table)}.log"
         with (
             open(sandbox_input) as fin,
@@ -535,7 +538,7 @@ class YTDevClient(BaseYTClient):
         sandbox_dir = self._dev_dir() / f"{task_name}_sandbox"
         sandbox_dir.mkdir(parents=True, exist_ok=True)
         self._upload_files(files, sandbox_dir)
-        
+
         # Copy config.yaml to the correct location in sandbox if it exists
         # config.yaml dependency has local_name="config.yaml" but should be at stages/{task_name}/config.yaml
         stage_config_source = self.pipeline_dir / "stages" / task_name / "config.yaml"
@@ -552,6 +555,7 @@ class YTDevClient(BaseYTClient):
         if "/build/" in command:
             # Extract the path after /build/ and use it as local path
             import re
+
             # Split command into parts and find the /build/ part
             # Command format: "python3 //tmp/examples/05_vanilla_operation/build/stages/run_vanilla/src/vanilla.py"
             # We want to extract: "stages/run_vanilla/src/vanilla.py"
@@ -561,19 +565,27 @@ class YTDevClient(BaseYTClient):
                 local_path = parts[1].strip()
                 # Replace the entire YT path with the local path
                 # Match pattern: //anything/build/local_path
-                yt_path_pattern = r'//[^/\s]+(?:/[^/\s]+)*/build/' + re.escape(local_path.split()[0])
+                yt_path_pattern = r"//[^/\s]+(?:/[^/\s]+)*/build/" + re.escape(
+                    local_path.split()[0]
+                )
                 local_command = re.sub(yt_path_pattern, local_path.split()[0], command)
                 if local_command != command:
-                    self.logger.debug(f"  Dev: converted command: {command} -> {local_command}")
+                    self.logger.debug(
+                        f"  Dev: converted command: {command} -> {local_command}"
+                    )
                 else:
                     # Fallback: simple string replacement
                     yt_full_path = "/build/".join(parts)
                     if yt_full_path in command:
-                        local_command = command.replace(yt_full_path, local_path.split()[0])
-                        self.logger.debug(f"  Dev: converted command (fallback): {command} -> {local_command}")
+                        local_command = command.replace(
+                            yt_full_path, local_path.split()[0]
+                        )
+                        self.logger.debug(
+                            f"  Dev: converted command (fallback): {command} -> {local_command}"
+                        )
 
         logs_path = self._dev_dir() / f"{task_name}.log"
-        
+
         # Set up environment with JOB_CONFIG_PATH pointing to the config file in sandbox
         env_merged = self._build_env(env)
         config_path_in_sandbox = sandbox_dir / "stages" / task_name / "config.yaml"
@@ -581,8 +593,10 @@ class YTDevClient(BaseYTClient):
             env_merged["JOB_CONFIG_PATH"] = str(config_path_in_sandbox)
             self.logger.debug(f"  Dev: JOB_CONFIG_PATH={config_path_in_sandbox}")
         else:
-            self.logger.warning(f"  Dev: config file not found at {config_path_in_sandbox}")
-        
+            self.logger.warning(
+                f"  Dev: config file not found at {config_path_in_sandbox}"
+            )
+
         self.logger.info(f"  Dev: sandbox={sandbox_dir}")
         self.logger.info(f"  Dev: stderr={logs_path}")
         with open(logs_path, "w") as ferr:
@@ -598,29 +612,31 @@ class YTDevClient(BaseYTClient):
 
     def _build_env(self, env: Dict[str, str]) -> Dict[str, str]:
         """Build environment variables for subprocess."""
-        
+
         # Set PYTHONPATH to include pipeline dir
         env_merged = {**os.environ, **(env or {})}
         pp_parts = [str(self.pipeline_dir)]
 
         # Add yt_framework to PYTHONPATH
         import yt_framework
+
         yt_framework_dir = Path(yt_framework.__file__).parent
         if yt_framework_dir.parent not in [Path(p) for p in pp_parts]:
             pp_parts.append(str(yt_framework_dir.parent))
-        
+
         # Add ytjobs to PYTHONPATH
         import ytjobs
+
         ytjobs_dir = Path(ytjobs.__file__).parent
         if ytjobs_dir.parent not in [Path(p) for p in pp_parts]:
             pp_parts.append(str(ytjobs_dir.parent))
-        
+
         if env_merged.get("PYTHONPATH"):
             pp_parts.append(env_merged["PYTHONPATH"])
         env_merged["PYTHONPATH"] = os.pathsep.join(pp_parts)
 
         return env_merged
-    
+
     def _upload_files(self, files: List[Tuple[str, str]], sandbox_dir: Path) -> None:
         """Upload files to sandbox directory."""
         assert self.pipeline_dir is not None
@@ -628,30 +644,39 @@ class YTDevClient(BaseYTClient):
         # Try to get local checkpoint path from stage config for checkpoint files
         local_checkpoint_path = self._get_local_checkpoint_path()
         if local_checkpoint_path:
-            self.logger.debug(f"  Dev: local_checkpoint_path available: {local_checkpoint_path}")
+            self.logger.debug(
+                f"  Dev: local_checkpoint_path available: {local_checkpoint_path}"
+            )
 
         for file_info in files:
             yt_path, local_name = file_info
             copied = False
-            
+
             # Handle checkpoint files - copy from local_checkpoint_path if available
             # Match if either the yt_path filename or local_name matches the checkpoint filename
             if local_checkpoint_path:
                 checkpoint_filename = Path(local_checkpoint_path).name
                 yt_filename = Path(yt_path).name
                 # Check if this is a checkpoint file (matches by filename)
-                if checkpoint_filename == yt_filename or checkpoint_filename == local_name:
+                if (
+                    checkpoint_filename == yt_filename
+                    or checkpoint_filename == local_name
+                ):
                     checkpoint_path = Path(local_checkpoint_path)
                     if checkpoint_path.exists():
                         # Use the expected local_name in sandbox (from dependency)
                         dest_file = sandbox_dir / local_name
                         dest_file.parent.mkdir(parents=True, exist_ok=True)
-                        self.logger.info(f"  Dev: copying checkpoint {checkpoint_path} -> {dest_file}")
+                        self.logger.info(
+                            f"  Dev: copying checkpoint {checkpoint_path} -> {dest_file}"
+                        )
                         shutil.copy2(checkpoint_path, dest_file)
                         copied = True
                     else:
-                        self.logger.warning(f"  Dev: checkpoint path does not exist: {checkpoint_path}")
-            
+                        self.logger.warning(
+                            f"  Dev: checkpoint path does not exist: {checkpoint_path}"
+                        )
+
             # Handle build files (code.tar.gz, etc.)
             if not copied and (".build" in yt_path or yt_path.endswith(".tar.gz")):
                 # Try to find the file in .build directory
@@ -663,10 +688,12 @@ class YTDevClient(BaseYTClient):
                     if source_file.exists():
                         dest_file = sandbox_dir / local_name
                         dest_file.parent.mkdir(parents=True, exist_ok=True)
-                        self.logger.debug(f"  Dev: copying {source_file} -> {dest_file}")
+                        self.logger.debug(
+                            f"  Dev: copying {source_file} -> {dest_file}"
+                        )
                         shutil.copy2(source_file, dest_file)
                         copied = True
-            
+
             # Handle regular stage files and ytjobs files
             # local_name is like "stages/run_vanilla/src/vanilla.py" or "ytjobs/..."
             if not copied:
@@ -683,105 +710,117 @@ class YTDevClient(BaseYTClient):
                     if local_name.startswith("ytjobs/"):
                         try:
                             import ytjobs
+
                             ytjobs_dir = Path(ytjobs.__file__).parent
                             ytjobs_rel_path = local_name.replace("ytjobs/", "")
                             source_file = ytjobs_dir / ytjobs_rel_path
                             if source_file.exists():
                                 dest_file = sandbox_dir / local_name
                                 dest_file.parent.mkdir(parents=True, exist_ok=True)
-                                self.logger.debug(f"  Dev: copying ytjobs {source_file} -> {dest_file}")
+                                self.logger.debug(
+                                    f"  Dev: copying ytjobs {source_file} -> {dest_file}"
+                                )
                                 shutil.copy2(source_file, dest_file)
                                 copied = True
                         except ImportError:
                             pass
-            
+
             if not copied:
-                self.logger.debug(f"  Dev: skipping file {yt_path} -> {local_name} (not found locally)")
-
-    def _prepare_map_sandbox(
-            self, input_table: str, output_table: str
-        ) -> Tuple[Path, Path, Path]:
-            """Prepare sandbox directory and input/output file paths."""
-            assert self.pipeline_dir is not None
-            
-            input_path = self._table_local_path(input_table)
-
-            if not input_path.exists():
-                raise FileNotFoundError(
-                    f"Dev: input table file not found: {input_path}. "
-                    "Create it (e.g. run a previous stage or add .jsonl manually)."
+                self.logger.debug(
+                    f"  Dev: skipping file {yt_path} -> {local_name} (not found locally)"
                 )
 
-            self._dev_dir().mkdir(parents=True, exist_ok=True)
-            
-            # Create sandbox directory
-            sandbox_dir = self._dev_dir() / f"sandbox_{self._table_basename(input_table)}->{self._table_basename(output_table)}"
-            sandbox_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Setup input/output files in sandbox
-            sandbox_input = sandbox_dir / "input.jsonl"
-            sandbox_output = sandbox_dir / "output.jsonl"
-            shutil.copy2(input_path, sandbox_input)
-            
-            self.logger.info(f"  Dev: sandbox={sandbox_dir}")
-            self.logger.info(f"  Dev: stdin={sandbox_input}, stdout={sandbox_output}")
-            
-            return sandbox_dir, sandbox_input, sandbox_output
+    def _prepare_map_sandbox(
+        self, input_table: str, output_table: str
+    ) -> Tuple[Path, Path, Path]:
+        """Prepare sandbox directory and input/output file paths."""
+        assert self.pipeline_dir is not None
+
+        input_path = self._table_local_path(input_table)
+
+        if not input_path.exists():
+            raise FileNotFoundError(
+                f"Dev: input table file not found: {input_path}. "
+                "Create it (e.g. run a previous stage or add .jsonl manually)."
+            )
+
+        self._dev_dir().mkdir(parents=True, exist_ok=True)
+
+        # Create sandbox directory
+        sandbox_dir = (
+            self._dev_dir()
+            / f"sandbox_{self._table_basename(input_table)}->{self._table_basename(output_table)}"
+        )
+        sandbox_dir.mkdir(parents=True, exist_ok=True)
+
+        # Setup input/output files in sandbox
+        sandbox_input = sandbox_dir / "input.jsonl"
+        sandbox_output = sandbox_dir / "output.jsonl"
+        shutil.copy2(input_path, sandbox_input)
+
+        self.logger.info(f"  Dev: sandbox={sandbox_dir}")
+        self.logger.info(f"  Dev: stdin={sandbox_input}, stdout={sandbox_output}")
+
+        return sandbox_dir, sandbox_input, sandbox_output
 
     def _setup_map_environment(self, env: Dict[str, str]) -> Dict[str, str]:
         """Setup environment variables for map operation."""
         env_merged = self._build_env(env)
-        
+
         # Try to setup checkpoint config from stage config
         # This attempts to find stage config by looking for stages directory
         # If found, sets JOB_CONFIG_PATH and CHECKPOINT_FILE env vars
         self._setup_checkpoint_config(env_merged)
-        
+
         return env_merged
 
     def _find_checkpoint_in_config(self, stage_config) -> Optional[str]:
         """
         Find checkpoint local_checkpoint_path in stage config.
-        
+
         Searches through all operations in client.operations dynamically,
         then falls back to client.local_checkpoint_path (legacy).
-        
+
         Args:
             stage_config: OmegaConf DictConfig for the stage
-            
+
         Returns:
             Local checkpoint path string if found, None otherwise
         """
         from omegaconf import OmegaConf
-        
+
         # First, try legacy path
-        local_checkpoint = OmegaConf.select(stage_config, "client.local_checkpoint_path")
+        local_checkpoint = OmegaConf.select(
+            stage_config, "client.local_checkpoint_path"
+        )
         if local_checkpoint:
             return str(local_checkpoint)
-        
+
         # Then, iterate over all operations dynamically
         operations = OmegaConf.select(stage_config, "client.operations")
         if operations:
             for op_name in operations.keys():
-                checkpoint_path = f"client.operations.{op_name}.checkpoint.local_checkpoint_path"
+                checkpoint_path = (
+                    f"client.operations.{op_name}.checkpoint.local_checkpoint_path"
+                )
                 local_checkpoint = OmegaConf.select(stage_config, checkpoint_path)
                 if local_checkpoint:
                     return str(local_checkpoint)
-        
+
         return None
 
     def _get_local_checkpoint_path(self) -> Optional[str]:
         """Get local checkpoint path from stage config if available."""
         assert self.pipeline_dir is not None
-        
+
         # Try to find stage config by scanning stages directory
         stages_dir = self.pipeline_dir / "stages"
         if not stages_dir.exists():
             return None
-        
+
         try:
             from omegaconf import OmegaConf
-            
+
             # Try to find a stage config with checkpoint configuration
             # Check all stage configs, not just the first one
             for stage_dir in stages_dir.iterdir():
@@ -790,64 +829,82 @@ class YTDevClient(BaseYTClient):
                     if stage_config_path.exists():
                         try:
                             stage_config = OmegaConf.load(stage_config_path)
-                            local_checkpoint = self._find_checkpoint_in_config(stage_config)
+                            local_checkpoint = self._find_checkpoint_in_config(
+                                stage_config
+                            )
                             if local_checkpoint:
                                 checkpoint_path = Path(local_checkpoint).resolve()
                                 if checkpoint_path.exists():
-                                    self.logger.debug(f"  Dev: found local_checkpoint_path: {checkpoint_path}")
+                                    self.logger.debug(
+                                        f"  Dev: found local_checkpoint_path: {checkpoint_path}"
+                                    )
                                     return str(checkpoint_path)
                         except Exception as e:
                             # Continue to next stage config
-                            self.logger.debug(f"  Dev: error reading {stage_config_path}: {e}")
+                            self.logger.debug(
+                                f"  Dev: error reading {stage_config_path}: {e}"
+                            )
                             continue
         except Exception as e:
             self.logger.debug(f"  Dev: error scanning stages directory: {e}")
-        
+
         return None
 
     def _setup_checkpoint_config(self, env_merged: Dict[str, str]) -> None:
         """Setup checkpoint config from stage config if available."""
         assert self.pipeline_dir is not None
-        
+
         # Try to find stage config by scanning stages directory
         # This is a best-effort approach since we no longer have mapper_script path
         stages_dir = self.pipeline_dir / "stages"
         if not stages_dir.exists():
             return
-        
+
         # Look for any stage config that might be relevant
         # In practice, the calling code should set JOB_CONFIG_PATH if needed
         # This is a fallback for backward compatibility
         try:
             from omegaconf import OmegaConf
-            
+
             # Try to find a stage config (use first one found as fallback)
             for stage_dir in stages_dir.iterdir():
                 if stage_dir.is_dir():
                     stage_config_path = stage_dir / "config.yaml"
                     if stage_config_path.exists():
                         env_merged["JOB_CONFIG_PATH"] = str(stage_config_path)
-                        
+
                         try:
                             stage_config = OmegaConf.load(stage_config_path)
                             # Find checkpoint path dynamically (searches all operations)
-                            local_checkpoint = self._find_checkpoint_in_config(stage_config)
+                            local_checkpoint = self._find_checkpoint_in_config(
+                                stage_config
+                            )
                             # Get model_name from job.model_name (used as checkpoint filename)
-                            model_name = OmegaConf.select(stage_config, "job.model_name")
-                            
+                            model_name = OmegaConf.select(
+                                stage_config, "job.model_name"
+                            )
+
                             if local_checkpoint:
                                 checkpoint_path = Path(local_checkpoint).resolve()
                                 if checkpoint_path.exists():
                                     # Set CHECKPOINT_FILE to the filename (not full path) since the file
                                     # will be copied to the sandbox directory and processor expects it there
-                                    checkpoint_filename = model_name or checkpoint_path.name
+                                    checkpoint_filename = (
+                                        model_name or checkpoint_path.name
+                                    )
                                     env_merged["CHECKPOINT_FILE"] = checkpoint_filename
-                                    self.logger.info(f"  Dev: checkpoint file set to: {checkpoint_filename} (from {checkpoint_path})")
+                                    self.logger.info(
+                                        f"  Dev: checkpoint file set to: {checkpoint_filename} (from {checkpoint_path})"
+                                    )
                                 else:
-                                    self.logger.warning(f"  Dev: local_checkpoint_path not found: {checkpoint_path}")
+                                    self.logger.warning(
+                                        f"  Dev: local_checkpoint_path not found: {checkpoint_path}"
+                                    )
                         except Exception as e:
-                            self.logger.warning(f"  Dev: failed to load checkpoint config: {e}")
-                        
+                            self.logger.warning(
+                                f"  Dev: failed to load checkpoint config: {e}"
+                            )
+
                         # Only use first found config as fallback
                         break
         except Exception as e:

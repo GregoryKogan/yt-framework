@@ -17,7 +17,9 @@ class CreateTableStage(BaseStage):
             rows=rows,
         )
 
-        self.logger.info(f"Created table: {len(rows)} rows | {self.config.client.output_table}")
+        self.logger.info(
+            f"Created table: {len(rows)} rows | {self.config.client.output_table}"
+        )
 
         result = list(self.deps.yt_client.read_table(self.config.client.output_table))
         self.logger.info(f"Verified: read {len(result)} rows back")

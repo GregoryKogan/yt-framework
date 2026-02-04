@@ -27,7 +27,9 @@ class CreateTableStage(BaseStage):
         )
 
         if not paths:
-            self.logger.warning("No files found in S3 - pipeline may have no work to do")
+            self.logger.warning(
+                "No files found in S3 - pipeline may have no work to do"
+            )
             return debug
         self.logger.info(f"Found {len(paths)} files")
 
@@ -39,6 +41,8 @@ class CreateTableStage(BaseStage):
             output_table=self.config.client.paths_table,
             logger=self.logger,
         )
-        self.logger.info(f"Saved {len(paths)} paths to {self.config.client.paths_table}")
+        self.logger.info(
+            f"Saved {len(paths)} paths to {self.config.client.paths_table}"
+        )
 
         return debug

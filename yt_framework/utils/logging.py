@@ -93,7 +93,9 @@ def setup_logging(
     return logger
 
 
-def log_header(logger: logging.Logger, title: str, context: Optional[str] = None) -> None:
+def log_header(
+    logger: logging.Logger, title: str, context: Optional[str] = None
+) -> None:
     """
     Log a compact section header in format: [Title] context.
 

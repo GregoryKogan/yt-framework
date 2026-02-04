@@ -21,7 +21,7 @@ class SetupDataStage(BaseStage):
         ]
         self.deps.yt_client.write_table(self.config.client.users_table, users)
         self.logger.info(f"Created users table: {self.config.client.users_table}")
-    
+
     def create_orders_table(self):
         orders = [
             {"order_id": 1, "user_id": 1, "product": "Laptop", "amount": 1000},
@@ -38,5 +38,9 @@ class SetupDataStage(BaseStage):
             {"order_id": 100, "user_id": 1, "product": "Phone", "amount": 800},
             {"order_id": 101, "user_id": 4, "product": "Tablet", "amount": 600},
         ]
-        self.deps.yt_client.write_table(self.config.client.archive_orders_table, archive_orders)
-        self.logger.info(f"Created archive orders table: {self.config.client.archive_orders_table}")
+        self.deps.yt_client.write_table(
+            self.config.client.archive_orders_table, archive_orders
+        )
+        self.logger.info(
+            f"Created archive orders table: {self.config.client.archive_orders_table}"
+        )

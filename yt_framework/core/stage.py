@@ -29,6 +29,7 @@ else:
 @dataclass
 class StageContext:
     """Stage context."""
+
     name: str
     config: DictConfig
     stage_dir: Path
@@ -92,7 +93,9 @@ class BaseStage(ABC):
         loaded_config = OmegaConf.load(config_path)
         # Ensure it's a DictConfig (not ListConfig)
         if not isinstance(loaded_config, DictConfig):
-            raise ValueError(f"Stage config file must contain a dictionary, got {type(loaded_config).__name__}")
+            raise ValueError(
+                f"Stage config file must contain a dictionary, got {type(loaded_config).__name__}"
+            )
         self.config = cast(DictConfig, loaded_config)
 
     @property

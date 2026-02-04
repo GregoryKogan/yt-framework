@@ -21,13 +21,13 @@ from ytjobs.config import get_config_path
 def main():
     # Load configuration from config.yaml (uploaded with the code)
     config = OmegaConf.load(get_config_path())
-    
+
     multiplier = config.job.multiplier
     prefix = config.job.prefix
 
     for line in sys.stdin:
         row = json.loads(line)
-        
+
         output_row = {
             "id": row["id"],
             "original_text": row["text"],
@@ -35,7 +35,7 @@ def main():
             "original_value": row["value"],
             "processed_value": row["value"] * multiplier,
         }
-        
+
         print(json.dumps(output_row), flush=True)
 
 

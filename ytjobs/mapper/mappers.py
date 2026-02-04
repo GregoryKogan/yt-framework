@@ -104,9 +104,13 @@ class BatchMapper:
             **kwargs: Additional keyword arguments to pass to processing_func
         """
         if self.batch_size is None:
-            self._process_all_rows(processing_func, redirect_processing_output, **kwargs)
+            self._process_all_rows(
+                processing_func, redirect_processing_output, **kwargs
+            )
         else:
-            self._process_in_batches(processing_func, redirect_processing_output, **kwargs)
+            self._process_in_batches(
+                processing_func, redirect_processing_output, **kwargs
+            )
 
     def _process_all_rows(
         self,
@@ -157,7 +161,11 @@ class BatchMapper:
             # Process batch when it reaches batch_size
             if len(batch) >= self.batch_size:
                 self._process_batch(
-                    batch, batch_count, processing_func, redirect_processing_output, **kwargs
+                    batch,
+                    batch_count,
+                    processing_func,
+                    redirect_processing_output,
+                    **kwargs,
                 )
                 batch = []
                 batch_count += 1
@@ -165,7 +173,11 @@ class BatchMapper:
         # Process remaining rows
         if batch:
             self._process_batch(
-                batch, batch_count, processing_func, redirect_processing_output, **kwargs
+                batch,
+                batch_count,
+                processing_func,
+                redirect_processing_output,
+                **kwargs,
             )
 
     def _read_all_rows(self) -> List[Any]:
@@ -192,7 +204,9 @@ class BatchMapper:
     ) -> None:
         """Process a single batch."""
         try:
-            process_and_write_results(processing_func, batch, redirect_processing_output, **kwargs)
+            process_and_write_results(
+                processing_func, batch, redirect_processing_output, **kwargs
+            )
         except Exception as e:
             log_error(
                 {

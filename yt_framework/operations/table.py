@@ -52,9 +52,9 @@ def read_table(
         List of rows as dictionaries
     """
     logger.info(f"Reading results from {table_path}")
-    
+
     results = list(yt_client.read_table(table_path))
-    
+
     logger.info(f"Read {len(results)} rows")
     return results
 
@@ -75,12 +75,12 @@ def download_table(
         logger: Logger instance
     """
     logger.info(f"Downloading table {table_path} to {output_file}")
-    
+
     rows = yt_client.read_table(table_path)
-    
+
     with open(output_file, "w") as f:
         for row in rows:
             f.write(json.dumps(row) + "\n")
-    
+
     row_count = sum(1 for _ in open(output_file))
     logger.info(f"✓ Downloaded {row_count} rows → {output_file}")

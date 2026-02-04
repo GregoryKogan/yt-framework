@@ -22,8 +22,10 @@ class ListS3Stage(BaseStage):
             bucket=self.config.client.input_bucket,
             prefix=self.config.client.input_prefix,
             logger=self.logger,
-            extension=self.config.client.get("file_extension"),  # Optional: filter by extension
-            max_files=self.config.client.get("max_files"),       # Optional: limit results
+            extension=self.config.client.get(
+                "file_extension"
+            ),  # Optional: filter by extension
+            max_files=self.config.client.get("max_files"),  # Optional: limit results
         )
 
         if not paths:
@@ -40,6 +42,8 @@ class ListS3Stage(BaseStage):
             logger=self.logger,
         )
 
-        self.logger.info(f"Saved {len(paths)} paths to {self.config.client.output_table}")
+        self.logger.info(
+            f"Saved {len(paths)} paths to {self.config.client.output_table}"
+        )
 
         return debug

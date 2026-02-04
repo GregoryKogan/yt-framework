@@ -42,5 +42,7 @@ def create_yt_client(
     else:
         _pipeline_dir: Optional[Path] = None
         if pipeline_dir is not None:
-            _pipeline_dir = Path(pipeline_dir) if isinstance(pipeline_dir, str) else pipeline_dir
+            _pipeline_dir = (
+                Path(pipeline_dir) if isinstance(pipeline_dir, str) else pipeline_dir
+            )
         return YTDevClient(logger=_logger, pipeline_dir=_pipeline_dir)

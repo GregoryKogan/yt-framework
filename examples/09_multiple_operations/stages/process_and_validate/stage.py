@@ -40,5 +40,5 @@ class ProcessAndValidateStage(BaseStage):
         self.logger.info("Validate operation completed")
 
         self.logger.info("Both operations completed successfully")
-        
+
         return debug

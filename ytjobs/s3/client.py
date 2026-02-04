@@ -77,7 +77,9 @@ class S3Client:
         self.logger.debug(f"S3 client initialized: {endpoint}")
 
     @staticmethod
-    def create(secrets: Dict[str, str], client_type: Literal["download", "upload"] = "download") -> "S3Client":
+    def create(
+        secrets: Dict[str, str], client_type: Literal["download", "upload"] = "download"
+    ) -> "S3Client":
         """
         Create S3 client from secrets dictionary.
 
