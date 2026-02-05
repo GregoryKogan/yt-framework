@@ -74,7 +74,7 @@ Contributions come in many forms:
    YT_TOKEN=your-yt-token
    ```
 
-   See [Configuration Guide](docs/configuration/index.md#secrets-management) for more details.
+   See [Configuration Guide](docs/configuration/secrets.md) for more details.
 
 5. **Verify installation**:
 
@@ -378,7 +378,7 @@ test: add tests for new feature
 
 ### Pull Request Process
 
-** Pull requests without up-to-date documentation will not be merged.**
+**Pull requests without up-to-date documentation will not be merged.**
 
 If your changes affect user-facing functionality, APIs, configuration, or behavior, you must update the relevant documentation. This includes:
 

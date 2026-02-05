@@ -17,7 +17,7 @@ debugging
 
 - [Pipeline Issues](pipeline.md) - Problems with pipeline setup, stages, and configuration
 - [Operation Issues](operations.md) - Issues with Map, Vanilla, YQL, S3, Docker, and Checkpoint operations
-- [Configuration Issues](configuration/index.md) - Dev mode and Prod mode specific problems
+- [Configuration Issues](configuration.md) - Dev mode and Prod mode specific problems
 - [Debugging Guide](debugging.md) - Debugging tips, getting help, and prevention strategies
 
 ## Common Error Patterns
@@ -53,7 +53,7 @@ Most issues fall into these categories:
 If you're new to troubleshooting:
 
 1. Start with [Pipeline Issues](pipeline.md) if your pipeline won't run
-2. Check [Configuration Issues](configuration/index.md) for mode-specific problems
+2. Check [Configuration Issues](configuration.md) for mode-specific problems
 3. Review [Operation Issues](operations.md) for operation-specific errors
 4. Use [Debugging Guide](debugging.md) for advanced troubleshooting
 
