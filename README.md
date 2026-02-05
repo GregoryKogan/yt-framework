@@ -1,7 +1,7 @@
 # YT Framework
 
 ![GitHub License](https://img.shields.io/github/license/GregoryKogan/yt-framework)
-![PyPI - Version](https://img.shields.io/pypi/v/yt_framework)
+[![PyPI - Version](https://img.shields.io/pypi/v/yt_framework)](https://pypi.org/project/yt-framework/)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/yt_framework)
 
 A powerful Python framework for building and executing data processing pipelines on YTsaurus (YT) clusters. YT Framework simplifies pipeline development with automatic stage discovery, seamless dev/prod mode switching, and comprehensive support for YT operations.
@@ -28,7 +28,7 @@ For local development, source documentation is available in the [`docs/`](docs/)
 
 ### For Users
 
-Install from PyPI:
+Install from [PyPI](https://pypi.org/project/yt-framework/):
 
 ```bash
 pip install yt-framework

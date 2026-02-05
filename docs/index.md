@@ -39,9 +39,17 @@ YT Framework is a Python framework designed to simplify the development and exec
 - Access to YTsaurus cluster (for production mode)
 - YT credentials (for production mode)
 
+### Install from PyPI
+
+For most users, install the package from PyPI:
+
+```bash
+pip install yt-framework
+```
+
 ### Install from Source
 
-For local development, install the package in editable mode:
+For local development or contributing, install the package in editable mode:
 
 ```bash
 pip install -e .
