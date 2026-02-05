@@ -99,3 +99,14 @@ The `examples/` directory contains comprehensive examples demonstrating all fram
 - Python 3.11+
 - YTsaurus cluster access (for production mode)
 - YT credentials (for production mode)
+
+### YT Cluster Requirements
+
+When running pipelines in production mode, code from `ytjobs` executes on YT cluster nodes. The cluster's Docker image (default or custom) must include:
+
+- **Python 3.11+**
+- **ytsaurus-client** >= 0.13.0 (for checkpoint operations)
+- **boto3** == 1.35.99 (for S3 operations)
+- **botocore** == 1.35.99 (auto-installed with boto3)
+
+**Important:** Ensure your cluster's default Docker image satisfies these dependencies, or always use custom Docker images for your pipelines. See [Cluster Requirements](https://yt-framework.readthedocs.io/en/latest/configuration/cluster-requirements.html) and [Custom Docker Images](https://yt-framework.readthedocs.io/en/latest/advanced/docker.html) for details.

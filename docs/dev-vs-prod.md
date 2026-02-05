@@ -147,6 +147,12 @@ Prod mode executes operations on the actual YT cluster:
 - **Code Upload**: Code is packaged and uploaded to YT
 - **YQL Operations**: Executed using YT's YQL engine
 
+```{warning}
+**Cluster Dependencies Required**
+
+In prod mode, `ytjobs` code executes on YT cluster nodes. The cluster's Docker image must include required dependencies or you must use custom Docker images. See [Cluster Requirements](configuration/cluster-requirements.md) for details.
+```
+
 ### Configuration (prod)
 
 Set mode in pipeline config:
@@ -454,6 +460,7 @@ Always test your pipeline in prod mode with a small dataset before running on pr
 
 ## Next Steps
 
+- Understand [Cluster Requirements](configuration/cluster-requirements.md) for production mode dependencies
 - Learn about [Configuration](configuration/index.md) management
 - Explore [Operations](operations/) for different operation types
 - Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for mode-specific examples

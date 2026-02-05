@@ -39,6 +39,16 @@ YT Framework is a Python framework designed to simplify the development and exec
 - Access to YTsaurus cluster (for production mode)
 - YT credentials (for production mode)
 
+#### YT Cluster Requirements
+
+```{warning}
+**Cluster Docker Image Dependencies**
+
+Code from `ytjobs` executes on YT cluster nodes in production mode. The cluster's Docker image (default or custom) must include required dependencies for your operations to run successfully.
+```
+
+See [Cluster Requirements](configuration/cluster-requirements.md) for detailed information about cluster dependencies and how to verify compatibility.
+
 ### Install from PyPI
 
 For most users, install the package from PyPI:

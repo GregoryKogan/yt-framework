@@ -5,6 +5,7 @@ YT Framework uses YAML files for configuration and environment files for secrets
 ```{toctree}
 :maxdepth: 1
 
+cluster-requirements
 secrets
 advanced
 ../dev-vs-prod
@@ -18,6 +19,12 @@ Configuration is organized into multiple files:
 - **Pipeline config** (`configs/config.yaml`): Pipeline-level settings
 - **Stage configs** (`stages/<stage_name>/config.yaml`): Stage-specific settings
 - **Secrets** (`configs/secrets.env`): Credentials and sensitive data
+
+```{warning}
+**YT Cluster Requirements**
+
+In production mode, `ytjobs` code executes on YT cluster nodes. Ensure your cluster's Docker image includes required dependencies or use custom Docker images. See [Cluster Requirements](cluster-requirements.md) for details.
+```
 
 ## Pipeline Configuration
 
@@ -198,6 +205,7 @@ client:
 
 ## Next Steps
 
+- Understand [Cluster Requirements](cluster-requirements.md) for production mode dependencies
 - Learn about [Secrets Management](secrets.md) for credentials
 - Explore [Advanced Configuration](advanced.md) for multiple configs and merging
 - Check [Dev vs Prod](../dev-vs-prod.md) for mode-specific configuration
