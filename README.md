@@ -17,13 +17,12 @@ A powerful Python framework for building and executing data processing pipelines
 - **Checkpoint Management**: Built-in support for ML model checkpoints
 - **Configuration Management**: Flexible YAML-based configuration with multiple config support
 
-## Quick Links
+## Documentation
 
-- **[Installation & Quick Start](docs/index.md#installation)** - Get up and running in minutes
-- **[Pipelines & Stages](docs/pipelines-and-stages.md)** - Core concepts and architecture
-- **[Operations Guide](docs/operations/)** - Map, Vanilla, YQL, and S3 operations
-- **[Advanced Topics](docs/advanced/)** - Docker, checkpoints, code upload, and more
-- **[Examples](examples/)** - Complete working examples for every feature
+**Full documentation available at: [yt-framework.readthedocs.io](https://yt-framework.readthedocs.io/en/latest/)**  
+**[Examples](examples/)** - Complete working examples for most features
+
+For local development, source documentation is available in the [`docs/`](docs/) directory.
 
 ## Installation
 
@@ -32,7 +31,7 @@ A powerful Python framework for building and executing data processing pipelines
 Install from PyPI:
 
 ```bash
-pip install yt_framework
+pip install yt-framework
 ```
 
 ### For Developers and Contributors
@@ -43,7 +42,7 @@ Install in editable mode from source:
 pip install -e .
 ```
 
-See [Installation Guide](docs/index.md#installation) for prerequisites and detailed setup instructions.
+See [Installation Guide](https://yt-framework.readthedocs.io/en/latest/#installation) for prerequisites and detailed setup instructions.
 
 ## Quick Start
 
@@ -77,7 +76,7 @@ Create your first pipeline in 3 steps:
            return debug
    ```
 
-See [Quick Start Guide](docs/index.md#quick-start) for complete example.
+See [Quick Start Guide](https://yt-framework.readthedocs.io/en/latest/#quick-start) for complete example.
 
 ## Examples
 
@@ -94,19 +93,6 @@ The `examples/` directory contains comprehensive examples demonstrating all fram
 - **[09_multiple_operations](examples/09_multiple_operations/)** - Combining operations in one stage
 - **[environment_log](examples/environment_log/)** - Comprehensive environment logging
 - **[video_gpu](examples/video_gpu/)** - GPU processing workflows
-
-## Documentation
-
-Full documentation is available in the [`docs/`](docs/) directory:
-
-- **[Main Documentation](docs/index.md)** - Installation, quick start, and overview
-- **[Pipelines & Stages](docs/pipelines-and-stages.md)** - Core architecture
-- **[Configuration](docs/configuration/index.md)** - Config files and secrets management
-- **[Dev vs Prod](docs/dev-vs-prod.md)** - Development and production modes
-- **[Operations](docs/operations/)** - Map, Vanilla, YQL, S3 operations
-- **[Advanced Topics](docs/advanced/)** - Docker, checkpoints, code upload
-- **[API Reference](docs/reference/api.md)** - Complete API documentation
-- **[Troubleshooting](docs/troubleshooting/index.md)** - Common issues and solutions
 
 ## Requirements
 
