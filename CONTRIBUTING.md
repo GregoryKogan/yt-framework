@@ -74,7 +74,7 @@ Contributions come in many forms:
    YT_TOKEN=your-yt-token
    ```
 
-   See [Configuration Guide](docs/configuration.md#secrets-management) for more details.
+   See [Configuration Guide](docs/configuration/index.md#secrets-management) for more details.
 
 5. **Verify installation**:
 
@@ -270,9 +270,9 @@ done
 Documentation lives in the `docs/` directory:
 
 - **Main docs**: `docs/index.md` - Installation and quick start
-- **Guides**: `docs/pipelines-and-stages.md`, `docs/configuration.md`, etc.
+- **Guides**: `docs/pipelines-and-stages.md`, `docs/configuration/index.md`, etc.
 - **API Reference**: `docs/reference/api.md`
-- **Troubleshooting**: `docs/troubleshooting.md`
+- **Troubleshooting**: `docs/troubleshooting/index.md`
 
 When adding features:
 
@@ -378,6 +378,15 @@ test: add tests for new feature
 
 ### Pull Request Process
 
+** Pull requests without up-to-date documentation will not be merged.**
+
+If your changes affect user-facing functionality, APIs, configuration, or behavior, you must update the relevant documentation. This includes:
+
+- User guides in `docs/`
+- API reference in `docs/reference/api.md`
+- Example code and README files
+- Inline code documentation (docstrings)
+
 1. **Update your branch** with the latest changes from main:
 
    ```bash
@@ -391,7 +400,7 @@ test: add tests for new feature
 
 3. **Test your changes** using dev mode and examples
 
-4. **Update documentation** if needed
+4. **Update documentation** if needed (see [Documentation](#documentation) section)
 
 5. **Create a pull request** on GitHub with:
    - Clear title and description
@@ -432,7 +441,7 @@ For questions or concerns, contact the maintainers:
 
 ### Getting Help
 
-- Check the [Troubleshooting Guide](docs/troubleshooting.md) for common issues
+- Check the [Troubleshooting Guide](docs/troubleshooting/index.md) for common issues
 - Review existing [Examples](examples/) for usage patterns
 - Open an issue for bugs or feature requests
 - Contact maintainers for questions

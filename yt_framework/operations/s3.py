@@ -1,8 +1,7 @@
 """
-S3 Operations
-=============
-
 Operations for working with S3 data in pipelines.
+
+This module provides functions for integrating S3 storage with YT Framework pipelines.
 """
 
 import logging
@@ -71,6 +70,9 @@ def save_s3_paths_to_table(
         paths: List of S3 file paths
         output_table: YT table path
         logger: Logger instance
+
+    Returns:
+        None
     """
     logger.info(f"Saving {len(paths)} paths to YT table: {output_table}")
 

@@ -71,7 +71,7 @@ client:
         cpu_limit: 1
 ```
 
-See [Example: 09_multiple_operations](../../examples/09_multiple_operations/) for complete example.
+See [Example: 09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/) for complete example.
 
 ## Use Cases
 
@@ -485,4 +485,4 @@ class ProcessWithValidationStage(BaseStage):
 
 - Learn about [Map Operations](../operations/map.md)
 - Explore [Vanilla Operations](../operations/vanilla.md)
-- Check out [Example: 09_multiple_operations](../../examples/09_multiple_operations/) for complete example
+- Check out [Example: 09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/) for complete example

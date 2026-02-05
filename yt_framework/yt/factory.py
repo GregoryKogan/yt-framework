@@ -29,10 +29,22 @@ def create_yt_client(
         pipeline_dir: Pipeline directory (required for dev mode)
         secrets: Optional dictionary containing YT credentials. Required only for prod mode.
                 Expected keys:
-                - YT_PROXY
-                - YT_TOKEN
+                - YT_PROXY: YTsaurus proxy URL
+                - YT_TOKEN: YTsaurus authentication token
+                
     Returns:
         BaseYTClient instance (YTProdClient or YTDevClient)
+        
+    Raises:
+        ValueError: If secrets are required for prod mode but not provided.
+        
+    Example:
+        >>> # Dev mode (local filesystem simulation)
+        >>> client = create_yt_client(mode="dev", pipeline_dir=Path("."))
+        >>> 
+        >>> # Prod mode (real YT cluster)
+        >>> secrets = {"YT_PROXY": "my-proxy", "YT_TOKEN": "my-token"}
+        >>> client = create_yt_client(mode="prod", secrets=secrets)
     """
     _logger = logger or logging.getLogger(__name__)
     if mode == "prod":

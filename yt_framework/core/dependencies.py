@@ -32,17 +32,32 @@ class StageDependencies(Protocol):
 
     @property
     def yt_client(self) -> BaseYTClient:
-        """YT client for operations."""
+        """YT client for operations.
+        
+        Returns:
+            BaseYTClient: YT client instance (either YTDevClient or YTProdClient)
+                for performing table operations, running map/vanilla jobs, etc.
+        """
         ...
 
     @property
     def pipeline_config(self) -> DictConfig:
-        """Pipeline-level configuration (contains build_folder and secrets)."""
+        """Pipeline-level configuration (contains build_folder and secrets).
+        
+        Returns:
+            DictConfig: OmegaConf configuration object containing pipeline-wide
+                settings like mode, build_folder, and other pipeline parameters.
+        """
         ...
 
     @property
     def configs_dir(self) -> Path:
-        """Directory containing secrets.env and other config files."""
+        """Directory containing secrets.env and other config files.
+        
+        Returns:
+            Path: Absolute path to the configs directory where secrets.env
+                and other configuration files are stored.
+        """
         ...
 
 
@@ -53,6 +68,13 @@ class PipelineStageDependencies:
 
     Used by BasePipeline to inject dependencies into stages.
     This class is instantiated by the pipeline and passed to each stage.
+    
+    Attributes:
+        yt_client: YT client instance for performing operations on YTsaurus cluster
+            or local filesystem (dev mode).
+        pipeline_config: Pipeline-level configuration containing mode, build_folder,
+            and other pipeline-wide settings.
+        configs_dir: Path to directory containing secrets.env and configuration files.
     """
 
     yt_client: BaseYTClient

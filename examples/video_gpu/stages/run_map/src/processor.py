@@ -6,7 +6,7 @@ from functools import partial
 import sys
 
 sys.path.insert(0, ".")
-from ytjobs.video.utils import (
+from stages.run_map.src.video_utils import (
     extract_frame,
     get_video_frame_count,
     encode_image,

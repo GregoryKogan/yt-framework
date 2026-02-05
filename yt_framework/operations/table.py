@@ -73,6 +73,9 @@ def download_table(
         table_path: YT table path
         output_file: Local file path for output
         logger: Logger instance
+
+    Returns:
+        None
     """
     logger.info(f"Downloading table {table_path} to {output_file}")
 

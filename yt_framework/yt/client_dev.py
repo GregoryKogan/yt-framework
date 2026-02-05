@@ -96,7 +96,15 @@ class YTDevClient(BaseYTClient):
             "table", "file", "map_node", "list_node", "document"
         ] = "map_node",
     ) -> None:
-        """Create a path in YT (no-op in dev mode)."""
+        """Create a path in YT (no-op in dev mode).
+        
+        Args:
+            path: YT path to create (not used in dev mode).
+            node_type: Type of node to create (not used in dev mode).
+            
+        Returns:
+            None
+        """
         pass
 
     def exists(self, path: str) -> bool:
@@ -104,6 +112,12 @@ class YTDevClient(BaseYTClient):
         Check if a path exists in YT.
 
         In dev mode, always returns True (assumes files exist locally).
+
+        Args:
+            path: YT path to check.
+
+        Returns:
+            bool: Always True in dev mode.
         """
         return True
 
@@ -114,7 +128,24 @@ class YTDevClient(BaseYTClient):
         append: bool = False,
         replication_factor: int = 1,
     ) -> None:
-        """Write rows to a YT table (saves as local .jsonl file)."""
+        """Write rows to a YT table (saves as local .jsonl file).
+        
+        In dev mode, tables are stored as JSONL files in the .dev directory.
+        Each row is written as a JSON object on a single line.
+        
+        Args:
+            table_path: YT table path (e.g., "//tmp/my_table").
+            rows: List of dictionaries representing table rows.
+            append: If True, append to existing file; otherwise overwrite.
+            replication_factor: Not used in dev mode (kept for API compatibility).
+            
+        Returns:
+            None
+            
+        Example:
+            >>> client.write_table("//tmp/data", [{"id": 1, "name": "Alice"}])
+            >>> # Creates .dev/data.jsonl with: {"id":1,"name":"Alice"}\\n
+        """
         mode_str = "append" if append else "overwrite"
         self.logger.info(f"Writing {len(rows)} rows → {table_path} ({mode_str})")
 
@@ -125,7 +156,15 @@ class YTDevClient(BaseYTClient):
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
     def read_table(self, table_path: str) -> List[Dict[str, Any]]:
-        """Read rows from a YT table (reads from local .jsonl file)."""
+        """Read rows from a YT table (reads from local .jsonl file).
+        
+        Args:
+            table_path: YT table path (e.g., "//tmp/my_table").
+            
+        Returns:
+            List[Dict[str, Any]]: List of dictionaries representing table rows.
+                                  Returns empty list if file doesn't exist.
+        """
         self.logger.info(f"Reading table: {table_path}")
 
         p = self._table_local_path(table_path)
@@ -142,7 +181,14 @@ class YTDevClient(BaseYTClient):
         return results
 
     def row_count(self, table_path: str) -> int:
-        """Get number of rows in a YT table (counts lines in local .jsonl file)."""
+        """Get number of rows in a YT table (counts lines in local .jsonl file).
+        
+        Args:
+            table_path: YT table path (e.g., "//tmp/my_table").
+            
+        Returns:
+            int: Number of non-empty lines in the JSONL file. Returns 0 if file doesn't exist.
+        """
         p = self._table_local_path(table_path)
         if not p.exists():
             return 0
@@ -461,7 +507,16 @@ class YTDevClient(BaseYTClient):
     def upload_directory(
         self, local_dir: Path, yt_dir: str, pattern: str = "*"
     ) -> List[str]:
-        """Upload a directory to YT (no-op in dev mode)."""
+        """Upload a directory to YT (no-op in dev mode).
+        
+        Args:
+            local_dir: Local directory path to upload.
+            yt_dir: YT destination directory path.
+            pattern: File pattern to match (not used in dev mode).
+            
+        Returns:
+            List[str]: Empty list in dev mode.
+        """
         self.logger.debug(f"Dev: upload_directory no-op {local_dir} → {yt_dir}")
         return []
 
@@ -477,7 +532,36 @@ class YTDevClient(BaseYTClient):
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
     ) -> Operation:
-        """Run a map operation locally using subprocess."""
+        """Run a map operation locally using subprocess.
+        
+        In dev mode, executes the mapper script locally with input/output tables
+        as JSONL files. The command is executed in a temporary sandbox directory
+        with all dependencies available.
+        
+        Args:
+            command: Command to execute (typically bash command with script path).
+            input_table: Input YT table path (read from local JSONL).
+            output_table: Output YT table path (written to local JSONL).
+            files: List of (yt_path, local_path) tuples for dependencies.
+            resources: Operation resource configuration (not fully used in dev mode).
+            env: Environment variables dictionary.
+            output_schema: Optional output table schema (not used in dev mode).
+            max_failed_jobs: Maximum failed jobs allowed (not used in dev mode).
+            docker_auth: Optional Docker authentication (not used in dev mode).
+            
+        Returns:
+            Operation: Mock operation object that simulates YT operation.
+            
+        Example:
+            >>> op = client.run_map(
+            ...     command="python3 mapper.py",
+            ...     input_table="//tmp/input",
+            ...     output_table="//tmp/output",
+            ...     files=[],
+            ...     resources=OperationResources(),
+            ...     env={}
+            ... )
+        """
         assert self.pipeline_dir is not None
 
         self.logger.info("Submitting map operation")
@@ -527,7 +611,21 @@ class YTDevClient(BaseYTClient):
         task_name: str = "main",
         **kwargs,
     ) -> Operation:
-        """Run a vanilla operation locally using subprocess."""
+        """Run a vanilla operation locally using subprocess.
+        
+        In dev mode, executes the vanilla script locally in a temporary sandbox
+        directory with all dependencies available. No input/output tables are involved.
+        
+        Args:
+            command: Command to execute (typically bash command with script path).
+            files: List of (yt_path, local_path) tuples for dependencies.
+            env: Environment variables dictionary.
+            task_name: Task name for logging (default: "main").
+            **kwargs: Additional arguments (not used in dev mode).
+            
+        Returns:
+            Operation: Mock operation object that simulates YT operation.
+        """
         self.logger.info("Submitting vanilla operation")
         self.logger.info(f"  Command: {command}")
         self.logger.info(f"  Task: {task_name}")

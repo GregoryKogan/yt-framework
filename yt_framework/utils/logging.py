@@ -31,8 +31,15 @@ class ColoredFormatter(logging.Formatter):
         "CRITICAL": "🚨",
     }
 
-    def format(self, record):
-        """Format log record with colors and icons."""
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record with colors and icons.
+        
+        Args:
+            record: Log record to format.
+            
+        Returns:
+            str: Formatted log message with ANSI color codes and icons.
+        """
         # Add color
         levelname = record.levelname
         if levelname in self.COLORS:
@@ -138,10 +145,23 @@ def log_config(
     """
     Log configuration in a readable format.
 
+    Automatically masks sensitive values (keys containing 'secret' or 'key')
+    by showing only the last 4 characters.
+
     Args:
         logger: Logger instance
-        config_dict: Configuration dictionary
+        config_dict: Configuration dictionary to log
         title: Title for the configuration section
+
+    Returns:
+        None
+
+    Example:
+        >>> config = {"api_key": "secret12345", "mode": "dev"}
+        >>> log_config(logger, config)
+        [Configuration]
+            api_key: ***2345
+            mode: dev
     """
     log_header(logger, title)
     for key, value in config_dict.items():

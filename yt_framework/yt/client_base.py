@@ -19,6 +19,26 @@ if TYPE_CHECKING:
 
 @dataclass
 class OperationResources:
+    """Resource configuration for YT operations.
+    
+    This dataclass defines the computational resources allocated to YT operations
+    like map and vanilla jobs. Note that in configuration files, use `memory_limit_gb`
+    (not `memory_gb`) - the framework automatically maps this field.
+    
+    Attributes:
+        pool: YT pool name for resource allocation (default: "default").
+        pool_tree: Optional pool tree name (default: None).
+        docker_image: Optional Docker image name for containerized execution (default: None).
+        memory_gb: Memory allocation in GB (default: 4). In config files, use `memory_limit_gb`.
+        cpu_limit: CPU cores allocated (default: 2).
+        gpu_limit: Number of GPUs allocated (default: 0).
+        job_count: Number of parallel jobs (default: 1).
+        user_slots: Optional user slots limit (default: None).
+        
+    Raises:
+        ValueError: If memory_gb, cpu_limit, or job_count are not positive integers,
+                   or if gpu_limit is negative.
+    """
     pool: str = "default"
     pool_tree: Optional[str] = None
     docker_image: Optional[str] = None
@@ -77,12 +97,26 @@ class BaseYTClient(ABC):
             "table", "file", "map_node", "list_node", "document"
         ] = "map_node",
     ) -> None:
-        """Create a path in YT."""
+        """
+        Create a path in YT.
+
+        Args:
+            path: YT path to create
+            node_type: Type of node to create (default: "map_node")
+        """
         pass
 
     @abstractmethod
     def exists(self, path: str) -> bool:
-        """Check if a path exists in YT."""
+        """
+        Check if a path exists in YT.
+
+        Args:
+            path: YT path to check
+
+        Returns:
+            True if path exists, False otherwise
+        """
         pass
 
     @abstractmethod
@@ -93,17 +127,44 @@ class BaseYTClient(ABC):
         append: bool = False,
         replication_factor: int = 1,
     ) -> None:
-        """Write rows to a YT table."""
+        """
+        Write rows to a YT table.
+
+        Args:
+            table_path: YT table path
+            rows: List of dictionaries representing table rows
+            append: If True, append to existing table (default: False)
+            replication_factor: Replication factor for the table (default: 1)
+            
+        Note:
+            Subclasses may accept additional parameters (e.g., make_parents in YTProdClient).
+        """
         pass
 
     @abstractmethod
     def read_table(self, table_path: str) -> List[Dict[str, Any]]:
-        """Read rows from a YT table."""
+        """
+        Read rows from a YT table.
+
+        Args:
+            table_path: YT table path
+
+        Returns:
+            List of dictionaries representing table rows
+        """
         pass
 
     @abstractmethod
     def row_count(self, table_path: str) -> int:
-        """Get number of rows in a YT table."""
+        """
+        Get number of rows in a YT table.
+
+        Args:
+            table_path: YT table path
+
+        Returns:
+            Number of rows in the table
+        """
         pass
 
     def _get_table_columns(self, table_path: str) -> List[str]:
@@ -147,6 +208,9 @@ class BaseYTClient(ABC):
         Args:
             query: YQL query string to execute
             pool: YT pool name (default: 'default')
+
+        Raises:
+            Exception: If query execution fails
         """
         pass
 
@@ -360,7 +424,20 @@ class BaseYTClient(ABC):
     def upload_directory(
         self, local_dir: Path, yt_dir: str, pattern: str = "*"
     ) -> List[str]:
-        """Upload a directory to YT."""
+        """
+        Upload a directory to YT.
+
+        Recursively uploads all files from a local directory to a YT directory,
+        respecting .ytignore patterns if present.
+
+        Args:
+            local_dir: Local directory path to upload
+            yt_dir: YT destination directory path
+            pattern: File pattern to match (default: "*" for all files)
+
+        Returns:
+            List of uploaded YT file paths
+        """
         pass
 
     @abstractmethod
@@ -406,10 +483,15 @@ class BaseYTClient(ABC):
         Run a vanilla operation on YT.
 
         Args:
-            command: Command to execute
-            files: List of files to upload
-            env: Environment variables
-            task_name: Task name
+            command: Command to execute (e.g., "python3 vanilla.py")
+            files: List of (yt_path, local_path) tuples for files to upload
+            env: Environment variables dictionary
+            task_name: Task name for the operation
+            *args: Additional positional arguments (implementation-specific)
+            **kwargs: Additional keyword arguments. Common kwargs include:
+                - resources: OperationResources instance (pool, memory, CPU, GPU, etc.)
+                - docker_auth: Optional Docker authentication dictionary
+                - max_failed_jobs: Maximum number of failed jobs before operation fails
 
         Returns:
             Operation object

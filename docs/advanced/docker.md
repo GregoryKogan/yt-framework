@@ -2,6 +2,12 @@
 
 YT Framework supports custom Docker images for operations that require special dependencies, GPU support, or custom environments.
 
+```{note}
+**When Custom Docker is Required**
+
+Custom Docker images are essential if your YT cluster's default Docker image doesn't include the dependencies required by `ytjobs` (Python 3.11+, ytsaurus-client, boto3, omegaconf). See [Cluster Requirements](configuration/cluster-requirements.md) for details about cluster dependencies and when to use custom Docker images.
+```
+
 ## Overview
 
 Custom Docker images allow you to:
@@ -10,6 +16,7 @@ Custom Docker images allow you to:
 - Use GPU-enabled environments
 - Customize the execution environment
 - Ensure consistent environments across operations
+- **Ensure required `ytjobs` dependencies are available** (if default cluster image lacks them)
 
 **Key points:**
 
@@ -17,8 +24,15 @@ Custom Docker images allow you to:
 - Image must be compatible with YT cluster
 - GPU support requires GPU-enabled images
 - Docker authentication supported
+- **Can solve cluster dependency issues** - use custom images if default cluster image lacks required packages
 
 ## When to Use Custom Docker
+
+### Cluster Dependencies
+
+If your YT cluster's default Docker image doesn't include required `ytjobs` dependencies (Python 3.11+, ytsaurus-client, boto3), you must use custom Docker images. This is the most common reason for using custom Docker images.
+
+See [Cluster Requirements](configuration/cluster-requirements.md) for complete details about required dependencies.
 
 ### GPU Workloads
 
@@ -294,7 +308,7 @@ if __name__ == "__main__":
     main()
 ```
 
-See [Example: 07_custom_docker](../../examples/07_custom_docker/) for complete example.
+See [Example: 07_custom_docker](https://github.com/GregoryKogan/yt-framework/tree/main/examples/07_custom_docker/) for complete example.
 
 ## Best Practices
 
@@ -408,8 +422,9 @@ RUN apt-get update && apt-get install -y \
     imagemagick \
     && rm -rf /var/lib/apt/lists/*
 
+# Install any custom Python dependencies your tools need
 RUN pip install --no-cache-dir \
-    opencv-python>=4.5.0
+    your-custom-package>=1.0.0
 ```
 
 ## Troubleshooting
@@ -445,6 +460,7 @@ RUN pip install --no-cache-dir \
 
 ## Next Steps
 
+- Understand [Cluster Requirements](configuration/cluster-requirements.md) for required dependencies
 - Learn about [Checkpoints](checkpoints.md) for model files
 - Explore [Code Upload](code-upload.md) for code packaging
-- Check out [Example: 07_custom_docker](../../examples/07_custom_docker/) for complete example
+- Check out [Example: 07_custom_docker](https://github.com/GregoryKogan/yt-framework/tree/main/examples/07_custom_docker/) for complete example

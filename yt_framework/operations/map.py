@@ -1,8 +1,7 @@
 """
-Map Operations
-==============
-
 High-level orchestration for YT map operations.
+
+This module provides functions for running map operations on YTsaurus clusters.
 """
 
 import logging
@@ -26,6 +25,15 @@ from .common import (
 
 @dataclass
 class MapOperationData:
+    """Data container for map operation configuration.
+    
+    Attributes:
+        mapper_path: Path to mapper.py script in YT (or bash wrapper if tar mode).
+        dependencies: List of (yt_path, local_path) tuples for files to upload.
+        environment: Environment variables dictionary (secrets only).
+        docker_auth: Optional Docker authentication dictionary for private registries.
+        command: Optional command to execute (used in tar archive mode).
+    """
     mapper_path: str
     dependencies: List[Tuple[str, str]]
     environment: Dict[str, str]

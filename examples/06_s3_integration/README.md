@@ -65,4 +65,4 @@ client:
 ## Next Steps
 
 - See [04_map_operation](../04_map_operation/) for processing S3 files
-- See [Configuration Guide](../../docs/configuration.md) for secrets management
+- See [Configuration Guide](../../docs/configuration/index.md) for secrets management

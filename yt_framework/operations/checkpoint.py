@@ -26,6 +26,9 @@ def init_checkpoint_directory(
         context: Stage context (provides deps, logger)
         checkpoint_config: Checkpoint-specific config (from client.operations.<op>.checkpoint)
 
+    Returns:
+        None
+
     Raises:
         FileNotFoundError: If required checkpoint not found in YT
         Exception: If checkpoint initialization fails
