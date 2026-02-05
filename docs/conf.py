@@ -52,9 +52,14 @@ html_theme = 'pydata_sphinx_theme'
 html_theme_options = {
     "github_url": "https://github.com/GregoryKogan/yt-framework",
     "show_toc_level": 2,
-    "navigation_depth": 3,
-    "show_nav_level": 1,
+    "navigation_depth": 4,
+    "show_nav_level": 2,
     "header_links_before_dropdown": 5,
+    "sidebar_secondary_items": ["page-toc"],
+    "use_edit_page_button": False,
+    "logo": {
+        "text": "YT Framework",
+    },
 }
 
 html_title = "YT Framework"

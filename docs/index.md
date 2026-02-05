@@ -2,6 +2,55 @@
 
 Welcome to the YT Framework documentation! This guide will help you get started with building data processing pipelines on YTsaurus.
 
+```{toctree}
+:maxdepth: 2
+:caption: Getting Started
+:hidden:
+
+configuration/index
+configuration/secrets
+configuration/advanced
+dev-vs-prod
+pipelines-and-stages
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Operations
+:hidden:
+
+operations/index
+operations/map
+operations/vanilla
+operations/yql
+operations/s3
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Advanced Topics
+:hidden:
+
+advanced/index
+advanced/code-upload
+advanced/docker
+advanced/checkpoints
+advanced/multiple-operations
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Reference
+:hidden:
+
+reference/api
+troubleshooting/index
+troubleshooting/pipeline
+troubleshooting/operations
+troubleshooting/configuration
+troubleshooting/debugging
+```
+
 ## Introduction
 
 YT Framework is a Python framework designed to simplify the development and execution of data processing pipelines on YTsaurus (YT) clusters. It provides:
@@ -272,48 +321,3 @@ The `examples/` directory contains complete working examples:
 - **[video_gpu](https://github.com/GregoryKogan/yt-framework/tree/main/examples/video_gpu/)** - GPU processing
 
 Each example includes a README explaining what it demonstrates.
-
-```{toctree}
-:maxdepth: 2
-:caption: Getting Started
-
-configuration/index
-configuration/secrets
-configuration/advanced
-dev-vs-prod
-pipelines-and-stages
-```
-
-```{toctree}
-:maxdepth: 2
-:caption: Operations
-
-operations/index
-operations/map
-operations/vanilla
-operations/yql
-operations/s3
-```
-
-```{toctree}
-:maxdepth: 2
-:caption: Advanced Topics
-
-advanced/index
-advanced/code-upload
-advanced/docker
-advanced/checkpoints
-advanced/multiple-operations
-```
-
-```{toctree}
-:maxdepth: 2
-:caption: Reference
-
-reference/api
-troubleshooting/index
-troubleshooting/pipeline
-troubleshooting/operations
-troubleshooting/configuration
-troubleshooting/debugging
-```
