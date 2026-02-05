@@ -4,6 +4,12 @@ Map operations process each row of a table independently, making them perfect fo
 
 ## Overview
 
+```{tip}
+**When to Use Map Operations**
+
+Use map operations for row-by-row transformations, filtering, data enrichment, or any task that processes each table row independently.
+```
+
 A **map operation** takes an input table, processes each row through a mapper script, and writes results to an output table. The operation runs in parallel across multiple jobs on the YT cluster (or sequentially in dev mode).
 
 **Key characteristics:**
@@ -12,6 +18,12 @@ A **map operation** takes an input table, processes each row through a mapper sc
 - Parallel execution (multiple jobs)
 - Input/output tables required
 - Custom code execution (mapper.py)
+
+```{warning}
+**Mapper Script Requirements**
+
+Your mapper script must read from stdin and write to stdout. Each line is a JSON-encoded row. Make sure to flush output after each row.
+```
 
 ## Quick Start
 

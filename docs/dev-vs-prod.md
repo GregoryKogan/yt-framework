@@ -4,10 +4,22 @@ YT Framework supports two execution modes: **dev** (development) and **prod** (p
 
 ## Overview
 
+```{tip}
+**Start with Dev Mode**
+
+Always develop and test your pipelines in dev mode first. It's faster, doesn't require YT credentials, and makes debugging easier.
+```
+
 - **Dev Mode**: Simulates YT operations locally using the file system. Perfect for development, testing, and debugging.
 - **Prod Mode**: Executes operations on the actual YT cluster. Used for production workloads.
 
 Both modes use the same code and configuration, making it easy to develop locally and deploy to production.
+
+```{warning}
+**Credentials Required for Prod Mode**
+
+Production mode requires YT credentials in `configs/secrets.env`. Make sure to set up credentials before running in prod mode.
+```
 
 ## Dev Mode
 
@@ -221,6 +233,58 @@ YQL operations execute on YT cluster:
 - ❌ Costs cluster resources
 - ❌ Harder to debug (remote execution)
 
+## Quick Comparison
+
+```{tab-set}
+```{tab-item} Configuration
+**Dev Mode:**
+```yaml
+pipeline:
+  mode: "dev"
+```
+
+**Prod Mode:**
+```yaml
+pipeline:
+  mode: "prod"
+  build_folder: "//tmp/my_pipeline/build"
+```
+
+```{tab-item} Credentials
+**Dev Mode:**
+- No credentials required
+- Works offline
+
+**Prod Mode:**
+- Requires `configs/secrets.env`
+- Must have YT cluster access
+```
+
+```{tab-item} Performance
+**Dev Mode:**
+- Fast iteration
+- Limited by local resources
+- Sequential execution
+
+**Prod Mode:**
+- Distributed processing
+- Scales with cluster size
+- Parallel execution
+```
+
+```{tab-item} Debugging
+**Dev Mode:**
+- Files in `.dev/` directory
+- Immediate error feedback
+- Easy to inspect
+
+**Prod Mode:**
+- YT web UI for logs
+- Remote debugging
+- Requires cluster access
+```
+```
+
 ## Switching Between Modes
 
 Switching between modes is simple - just change the `mode` setting:
@@ -233,6 +297,12 @@ pipeline:
 # Production
 pipeline:
   mode: "prod"
+```
+
+```{note}
+**Same Code, Different Execution**
+
+The same code and configuration work in both modes. The framework handles the differences automatically.
 ```
 
 **Important considerations:**
@@ -362,14 +432,29 @@ While the framework tries to abstract away differences, some leak through:
 
 ## Best Practices
 
+```{tip}
+**Development Workflow**
+
+1. Develop and test in dev mode
+2. Validate in prod mode with small dataset
+3. Deploy to production with full dataset
+```
+
 1. **Develop in dev mode**: Faster iteration and debugging
 2. **Test in prod mode**: Validate before production deployment
 3. **Use same configs**: Keep dev and prod configs similar
 4. **Monitor resources**: Check resource usage in prod mode
 5. **Version control**: Track config changes between modes
 
+```{warning}
+**Test Before Production**
+
+Always test your pipeline in prod mode with a small dataset before running on production data. This helps catch mode-specific issues early.
+```
+
 ## Next Steps
 
-- Learn about [Configuration](configuration.md) management
+- Learn about [Configuration](configuration/index.md) management
 - Explore [Operations](operations/) for different operation types
 - Check out [Examples](../examples/) for mode-specific examples
+- Review [Troubleshooting](troubleshooting/configuration.md) for mode-specific issues

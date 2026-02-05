@@ -42,6 +42,12 @@ python -c "import yt_framework; print(yt_framework.__version__)"
 
 ### Configuration Setup
 
+```{warning}
+**Secrets Required for Production Mode**
+
+Production mode requires YT credentials. Make sure to set up `secrets.env` before running in prod mode.
+```
+
 After installation, you'll need to set up your YT credentials for production mode. Create a `secrets.env` file in your pipeline's `configs/` directory:
 
 ```bash
@@ -60,7 +66,7 @@ S3_UPLOAD_ACCESS_KEY=your-upload-access-key
 S3_UPLOAD_SECRET_KEY=your-upload-secret-key
 ```
 
-See [Configuration Guide](configuration.md#secrets-management) for more details.
+See [Secrets Management](configuration/secrets.md) for more details.
 
 ## Quick Start
 
@@ -145,7 +151,7 @@ In dev mode, the table will be created as `my_first_pipeline/.dev/data.jsonl`. I
 ### Next Steps
 
 - Learn about [Pipelines and Stages](pipelines-and-stages.md)
-- Explore [Configuration](configuration.md) options
+- Explore [Configuration](configuration/index.md) options
 - Understand [Dev vs Prod modes](dev-vs-prod.md)
 - Check out [Examples](../examples/) for more complex scenarios
 
@@ -163,6 +169,12 @@ See [Pipelines and Stages](pipelines-and-stages.md) for details.
 
 ### Dev vs Prod Modes
 
+```{tip}
+**Start with Dev Mode**
+
+Always develop and test your pipelines in dev mode first. It's faster, doesn't require YT credentials, and makes debugging easier.
+```
+
 - **Dev Mode**: Simulates YT operations locally using file system. Tables are stored as `.jsonl` files in `.dev/` directory. Perfect for development and testing.
 - **Prod Mode**: Executes operations on actual YT cluster. Requires YT credentials and cluster access.
 
@@ -176,7 +188,7 @@ Configuration is managed through YAML files:
 - **Stage configs** (`stages/<stage_name>/config.yaml`): Stage-specific settings
 - **Secrets** (`configs/secrets.env`): Credentials and sensitive data
 
-See [Configuration Guide](configuration.md) for details.
+See [Configuration Guide](configuration/index.md) for details.
 
 ## Operations
 
@@ -241,7 +253,7 @@ Run multiple operations in a single stage.
 ## Reference
 
 - [API Reference](reference/api.md) - Complete API documentation
-- [Troubleshooting](troubleshooting.md) - Common issues and solutions
+- [Troubleshooting](troubleshooting/index.md) - Common issues and solutions
 
 ## Examples
 
@@ -261,13 +273,13 @@ The `examples/` directory contains complete working examples:
 
 Each example includes a README explaining what it demonstrates.
 
-## Documentation Contents
-
 ```{toctree}
 :maxdepth: 2
 :caption: Getting Started
 
-configuration
+configuration/index
+configuration/secrets
+configuration/advanced
 dev-vs-prod
 pipelines-and-stages
 ```
@@ -276,6 +288,7 @@ pipelines-and-stages
 :maxdepth: 2
 :caption: Operations
 
+operations/index
 operations/map
 operations/vanilla
 operations/yql
@@ -286,6 +299,7 @@ operations/s3
 :maxdepth: 2
 :caption: Advanced Topics
 
+advanced/index
 advanced/code-upload
 advanced/docker
 advanced/checkpoints
@@ -297,5 +311,9 @@ advanced/multiple-operations
 :caption: Reference
 
 reference/api
-troubleshooting
+troubleshooting/index
+troubleshooting/pipeline
+troubleshooting/operations
+troubleshooting/configuration
+troubleshooting/debugging
 ```

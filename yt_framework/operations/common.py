@@ -13,7 +13,14 @@ from yt_framework.utils.env import load_secrets
 
 
 def _construct_command(script_path: str) -> str:
-    """Construct command from script path."""
+    """Construct command from script path.
+    
+    Args:
+        script_path: Path to the script file (either .sh or .py).
+        
+    Returns:
+        str: Command string to execute the script (bash for .sh, python3 for .py).
+    """
     if script_path.endswith(".sh"):
         return f"bash {script_path}"
     else:

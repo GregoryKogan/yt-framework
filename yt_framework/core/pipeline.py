@@ -1,7 +1,4 @@
 """
-Base Pipeline Class
-==================
-
 Provides common functionality for all pipelines, including code upload methods,
 CLI entry point, and stage execution.
 
@@ -77,6 +74,12 @@ class BasePipeline:
             config: Configuration object (OmegaConf DictConfig)
             pipeline_dir: Path to pipeline directory
             log_level: Logging level
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If pipeline directory does not exist.
         """
         self.config = config
         self.pipeline_dir = Path(pipeline_dir).resolve()
@@ -118,6 +121,9 @@ class BasePipeline:
         2. Initialize custom clients (e.g., S3 client, database connections, etc.)
 
         This method is called automatically after base initialization.
+
+        Returns:
+            None
         """
         pass
 
@@ -127,6 +133,9 @@ class BasePipeline:
 
         Args:
             registry: StageRegistry instance with registered stages
+
+        Returns:
+            None
         """
         self._stage_registry = registry
 
@@ -181,6 +190,12 @@ class BasePipeline:
         Args:
             build_folder: Optional YT build folder path. If None, uses
                          config.pipeline.build_folder
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If build_folder is required but not provided in config.
         """
         # Check if any stages need code execution
         if not self._stages_need_code_execution():
@@ -227,6 +242,13 @@ class BasePipeline:
         4. Pass context between stages
 
         Override this method only if you need completely custom execution flow.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If no enabled_stages found in config or unknown stage name.
+            AttributeError: If stage registry is not set in setup().
         """
         # Upload code once
         self.upload_code()
@@ -288,6 +310,12 @@ class BasePipeline:
         - Config file loading
         - Pipeline instantiation
         - Error handling and exit codes
+
+        Args:
+            argv: Optional command-line arguments. If None, uses sys.argv.
+
+        Returns:
+            None (exits with code 0 on success, 1 on failure)
 
         Usage:
             python pipeline.py
@@ -392,6 +420,9 @@ class DefaultPipeline(BasePipeline):
 
         Looks for all stage.py files in stages/*/ subdirectories and
         automatically imports and registers any BaseStage subclasses found.
+
+        Returns:
+            None
         """
         from yt_framework.core.discovery import discover_stages
 

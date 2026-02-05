@@ -177,13 +177,23 @@ class DuckDBSimulator:
         results = self.execute_query(sql)
         return results, output_table
 
-    def close(self):
-        """Close DuckDB connection."""
+    def close(self) -> None:
+        """Close DuckDB connection.
+        
+        Returns:
+            None
+        """
         if hasattr(self, "conn"):
             self.conn.close()
 
-    def __del__(self):
-        """Cleanup on deletion."""
+    def __del__(self) -> None:
+        """Cleanup on deletion.
+        
+        Automatically closes DuckDB connection when simulator is garbage collected.
+        
+        Returns:
+            None
+        """
         self.close()
 
 

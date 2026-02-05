@@ -21,7 +21,15 @@ def load_env_file(env_path: Path) -> Dict[str, str]:
         env_path: Path to the .env file
 
     Returns:
-        Dictionary of loaded environment variables (key -> value)
+        Dictionary of loaded environment variables (key -> value).
+        Returns empty dict if file doesn't exist or cannot be read.
+
+    Raises:
+        UserWarning: If file doesn't exist or cannot be parsed (non-fatal).
+
+    Example:
+        >>> env_vars = load_env_file(Path("configs/secrets.env"))
+        >>> print(env_vars.get("YT_TOKEN"))
     """
     env_vars = {}
 
@@ -57,7 +65,15 @@ def load_secrets(secrets_dir: Path, env_file: str = "secrets.env") -> Dict[str, 
         env_file: Name of the environment file (default: "secrets.env")
 
     Returns:
-        Dictionary of loaded secrets (key -> value)
+        Dictionary of loaded secrets (key -> value).
+        Returns empty dict if file doesn't exist or cannot be read.
+
+    Raises:
+        UserWarning: If file doesn't exist or cannot be parsed (non-fatal).
+
+    Example:
+        >>> secrets = load_secrets(Path("configs"))
+        >>> yt_token = secrets.get("YT_TOKEN")
     """
     secrets_path = secrets_dir / env_file
     return load_env_file(secrets_path)

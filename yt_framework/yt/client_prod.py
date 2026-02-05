@@ -81,7 +81,18 @@ class YTProdClient(BaseYTClient):
             "table", "file", "map_node", "list_node", "document"
         ] = "map_node",
     ) -> None:
-        """Create a path in YT."""
+        """Create a path in YT.
+        
+        Args:
+            path: YT path to create.
+            node_type: Type of node to create (default: "map_node").
+            
+        Returns:
+            None
+            
+        Raises:
+            Exception: If path creation fails.
+        """
         try:
             self.client.create(node_type, path, recursive=True, ignore_existing=True)
         except Exception as e:
@@ -89,7 +100,17 @@ class YTProdClient(BaseYTClient):
             raise
 
     def exists(self, path: str) -> bool:
-        """Check if a path exists in YT."""
+        """Check if a path exists in YT.
+        
+        Args:
+            path: YT path to check.
+            
+        Returns:
+            bool: True if path exists, False otherwise.
+            
+        Raises:
+            Exception: If check fails.
+        """
         try:
             return self.client.exists(path)
         except Exception as e:
@@ -145,7 +166,17 @@ class YTProdClient(BaseYTClient):
             raise
 
     def read_table(self, table_path: str) -> List[Dict[str, Any]]:
-        """Read rows from a YT table."""
+        """Read rows from a YT table.
+        
+        Args:
+            table_path: YT table path to read.
+            
+        Returns:
+            List[Dict[str, Any]]: List of dictionaries representing table rows.
+            
+        Raises:
+            Exception: If table read fails.
+        """
         self.logger.info(f"Reading table: {table_path}")
 
         try:
@@ -162,7 +193,17 @@ class YTProdClient(BaseYTClient):
             raise
 
     def row_count(self, table_path: str) -> int:
-        """Get number of rows in a YT table."""
+        """Get number of rows in a YT table.
+        
+        Args:
+            table_path: YT table path.
+            
+        Returns:
+            int: Number of rows in the table.
+            
+        Raises:
+            Exception: If row count query fails.
+        """
         try:
             count = self.client.row_count(table_path)
             self.logger.debug(f"Row count: {count}")
@@ -633,7 +674,29 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
     ) -> Operation:
-        """Run a map operation on YT."""
+        """Run a map operation on YT cluster.
+        
+        Submits a map operation that processes each row of the input table independently
+        and writes results to the output table. The operation runs on the YT cluster
+        with the specified resources and dependencies.
+        
+        Args:
+            command: Command to execute (typically bash command with script path).
+            input_table: Input YT table path.
+            output_table: Output YT table path.
+            files: List of (yt_path, local_path) tuples for dependencies.
+            resources: Operation resource configuration (memory, CPU, GPU, etc.).
+            env: Environment variables dictionary.
+            output_schema: Optional output table schema for typed output.
+            max_failed_jobs: Maximum failed jobs allowed before operation fails.
+            docker_auth: Optional Docker authentication for private registries.
+            
+        Returns:
+            Operation: YT operation object that can be monitored and waited on.
+            
+        Raises:
+            Exception: If operation submission fails.
+        """
         self.logger.info("Submitting map operation")
         self.logger.info(f"  Input: {input_table}")
         self.logger.info(f"  Output: {output_table}")

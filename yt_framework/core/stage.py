@@ -28,7 +28,15 @@ else:
 
 @dataclass
 class StageContext:
-    """Stage context."""
+    """Stage context containing all stage-related information.
+    
+    Attributes:
+        name: Stage name (automatically detected from directory name).
+        config: Stage-specific configuration loaded from config.yaml.
+        stage_dir: Path to the stage directory (stages/<stage_name>/).
+        logger: Logger instance for stage logging.
+        deps: Injected dependencies (yt_client, pipeline_config, configs_dir).
+    """
 
     name: str
     config: DictConfig
@@ -75,6 +83,13 @@ class BaseStage(ABC):
         Args:
             deps: Injected dependencies (yt_client, pipeline_config, configs_dir)
             logger: Logger instance for stage logging
+
+        Returns:
+            None
+
+        Raises:
+            FileNotFoundError: If config.yaml file is not found in stage directory.
+            ValueError: If config.yaml does not contain a dictionary.
         """
         self.deps = deps
         self.logger = logger
@@ -100,7 +115,11 @@ class BaseStage(ABC):
 
     @property
     def stage_dir(self) -> Path:
-        """Path to the stage directory."""
+        """Path to the stage directory.
+        
+        Returns:
+            Path: Absolute path to the stage directory (stages/<stage_name>/).
+        """
         return Path(inspect.getfile(self.__class__)).parent
 
     @abstractmethod
@@ -109,17 +128,24 @@ class BaseStage(ABC):
         Execute the stage.
 
         Args:
-            context: Shared context dictionary from previous stages
-                     Contains results from earlier stages
+            debug: Shared context dictionary from previous stages.
+                   Contains results from earlier stages. Can be empty dict
+                   for the first stage.
 
         Returns:
-            Dictionary with stage results to be merged into context
+            DebugContext: Dictionary with stage results to be merged into context
+                         and passed to the next stage.
         """
         pass
 
     @property
     def context(self) -> StageContext:
-        """Stage context."""
+        """Stage context containing all stage-related information.
+        
+        Returns:
+            StageContext: Dataclass instance with name, config, stage_dir,
+                         logger, and deps attributes.
+        """
         return StageContext(
             name=self.name,
             config=self.config,

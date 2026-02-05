@@ -4,6 +4,12 @@ Vanilla operations run standalone jobs without input/output tables. They're perf
 
 ## Overview
 
+```{tip}
+**When to Use Vanilla Operations**
+
+Use vanilla operations for setup tasks, cleanup, validation, or any work that doesn't require processing table rows. Perfect for initialization and maintenance tasks.
+```
+
 A **vanilla operation** executes a standalone script on the YT cluster (or locally in dev mode). Unlike map operations, vanilla operations:
 
 - Don't process table rows
@@ -17,6 +23,12 @@ A **vanilla operation** executes a standalone script on the YT cluster (or local
 - Single job (no parallelism)
 - No table I/O required
 - Custom code execution (vanilla.py)
+
+```{note}
+**Vanilla vs Map**
+
+Use vanilla when you don't need table I/O. Use map when you need to process table rows. Vanilla is simpler but less parallelizable.
+```
 
 ## Quick Start
 

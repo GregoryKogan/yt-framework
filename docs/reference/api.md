@@ -1,6 +1,27 @@
 # API Reference
 
-This page provides detailed API documentation for all YT Framework modules.
+This page provides detailed API documentation for all YT Framework modules. All documentation is automatically generated from Python docstrings.
+
+```{tip}
+**Exploring the API**
+
+Use the navigation sidebar to jump to specific modules. Each module includes classes, functions, and their complete documentation with parameters, return types, and examples.
+```
+
+## Module Overview
+
+YT Framework is organized into several key modules:
+
+- **Core**: Pipeline, stage, registry, and discovery functionality
+- **Operations**: Map, vanilla, YQL, S3, and table operations
+- **YT**: YT client implementations (dev and prod)
+- **Utils**: Logging, environment, and utility functions
+
+```{note}
+**Auto-Generated Documentation**
+
+This documentation is automatically generated from Python docstrings. For the most up-to-date information, check the source code or use Python's `help()` function.
+```
 
 ## Core Modules
 

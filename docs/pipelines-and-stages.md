@@ -15,6 +15,12 @@ A **pipeline** is a collection of stages that execute in sequence. The pipeline 
 
 ### DefaultPipeline
 
+```{tip}
+**Use DefaultPipeline**
+
+`DefaultPipeline` is recommended for most use cases. It automatically discovers stages, reducing boilerplate and making your code cleaner.
+```
+
 `DefaultPipeline` automatically discovers and registers stages from the `stages/` directory. This is the recommended approach for most use cases.
 
 **Usage:**
@@ -208,6 +214,12 @@ class Stage2(BaseStage):
         return debug
 ```
 
+```{warning}
+**Context Size Limits**
+
+The context is a simple dictionary. Use it for small amounts of data (metadata, counts, flags). For large datasets, use YT tables instead.
+```
+
 **Important:** The context is a simple dictionary. Use it for small amounts of data. For large datasets, use YT tables instead.
 
 ### Stage Configuration
@@ -270,6 +282,12 @@ stages:
     - validate_output
 ```
 
+```{note}
+**Sequential Execution**
+
+Stages are executed sequentially. If a stage fails, the pipeline stops. Make sure each stage handles errors appropriately.
+```
+
 Stages are executed sequentially. If a stage fails, the pipeline stops.
 
 ### Multiple Stages Example
@@ -287,6 +305,7 @@ See [Example: 02_multi_stage_pipeline](../examples/02_multi_stage_pipeline/) for
 
 ## Next Steps
 
-- Learn about [Configuration](configuration.md) management
+- Learn about [Configuration](configuration/index.md) management
 - Understand [Dev vs Prod](dev-vs-prod.md) modes
 - Explore [Operations](operations/) for different operation types
+- Review [Examples](../examples/) for complete pipeline examples
