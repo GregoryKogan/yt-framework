@@ -2,6 +2,15 @@
 
 YT Framework uses YAML files for configuration and environment files for secrets. Understanding the configuration system is essential for building effective pipelines.
 
+```{toctree}
+:maxdepth: 1
+
+secrets
+advanced
+../dev-vs-prod
+../pipelines-and-stages
+```
+
 ## Configuration Files
 
 Configuration is organized into multiple files:

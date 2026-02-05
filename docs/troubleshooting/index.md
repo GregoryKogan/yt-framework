@@ -4,6 +4,15 @@ Common issues and solutions for YT Framework pipelines.
 
 This troubleshooting guide is organized by category to help you quickly find solutions to common problems.
 
+```{toctree}
+:maxdepth: 1
+
+pipeline
+operations
+configuration
+debugging
+```
+
 ## Quick Navigation
 
 - [Pipeline Issues](pipeline.md) - Problems with pipeline setup, stages, and configuration

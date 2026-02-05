@@ -2,6 +2,15 @@
 
 YT Framework supports several types of operations for processing data on YTsaurus clusters.
 
+```{toctree}
+:maxdepth: 1
+
+map
+vanilla
+yql
+s3
+```
+
 ## Operation Types
 
 ```{card-grid} 2

@@ -2,6 +2,15 @@
 
 Advanced features and techniques for complex YT Framework pipelines.
 
+```{toctree}
+:maxdepth: 1
+
+code-upload
+docker
+checkpoints
+multiple-operations
+```
+
 ## Advanced Features
 
 ```{card-grid} 2
