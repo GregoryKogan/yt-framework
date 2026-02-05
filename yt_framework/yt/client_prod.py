@@ -81,7 +81,18 @@ class YTProdClient(BaseYTClient):
             "table", "file", "map_node", "list_node", "document"
         ] = "map_node",
     ) -> None:
-        """Create a path in YT."""
+        """Create a path in YT.
+        
+        Args:
+            path: YT path to create.
+            node_type: Type of node to create (default: "map_node").
+            
+        Returns:
+            None
+            
+        Raises:
+            Exception: If path creation fails.
+        """
         try:
             self.client.create(node_type, path, recursive=True, ignore_existing=True)
         except Exception as e:
@@ -89,7 +100,17 @@ class YTProdClient(BaseYTClient):
             raise
 
     def exists(self, path: str) -> bool:
-        """Check if a path exists in YT."""
+        """Check if a path exists in YT.
+        
+        Args:
+            path: YT path to check.
+            
+        Returns:
+            bool: True if path exists, False otherwise.
+            
+        Raises:
+            Exception: If check fails.
+        """
         try:
             return self.client.exists(path)
         except Exception as e:
@@ -108,10 +129,10 @@ class YTProdClient(BaseYTClient):
 
         Args:
             table_path: YT table path
-            rows: List of rows to write
-            append: If True, append rows to the table
-            replication_factor: Replication factor for the table
-            make_parents: If True, create parent directories if they don't exist
+            rows: List of dictionaries representing table rows
+            append: If True, append to existing table (default: False)
+            replication_factor: Replication factor for the table (default: 1)
+            make_parents: If True, create parent directories if they don't exist (default: True)
         """
         mode_str = "append" if append else "overwrite"
         self.logger.info(f"Writing {len(rows)} rows → {table_path} ({mode_str})")
@@ -145,7 +166,17 @@ class YTProdClient(BaseYTClient):
             raise
 
     def read_table(self, table_path: str) -> List[Dict[str, Any]]:
-        """Read rows from a YT table."""
+        """Read rows from a YT table.
+        
+        Args:
+            table_path: YT table path to read.
+            
+        Returns:
+            List[Dict[str, Any]]: List of dictionaries representing table rows.
+            
+        Raises:
+            Exception: If table read fails.
+        """
         self.logger.info(f"Reading table: {table_path}")
 
         try:
@@ -162,7 +193,17 @@ class YTProdClient(BaseYTClient):
             raise
 
     def row_count(self, table_path: str) -> int:
-        """Get number of rows in a YT table."""
+        """Get number of rows in a YT table.
+        
+        Args:
+            table_path: YT table path.
+            
+        Returns:
+            int: Number of rows in the table.
+            
+        Raises:
+            Exception: If row count query fails.
+        """
         try:
             count = self.client.row_count(table_path)
             self.logger.debug(f"Row count: {count}")
@@ -309,6 +350,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         Args:
             query: YQL query string to execute
             pool: YT pool name (default: 'default')
+
+        Raises:
+            Exception: If query execution fails
         """
         self.logger.info("Executing YQL query on YT cluster")
         self.logger.debug(f"Pool: {pool}")
@@ -349,7 +393,24 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         select_columns: Optional[List[str]] = None,
         dry_run: bool = False,
     ) -> Optional[str]:
-        """Join two tables using YQL."""
+        """
+        Join two tables using YQL.
+
+        Args:
+            left_table: Path to left table
+            right_table: Path to right table
+            output_table: Path to output table
+            on: Join key(s) - column name(s) to join on
+                - str: Same column name on both sides (e.g., "user_id")
+                - List[str]: Multiple columns with same names (e.g., ["user_id", "region"])
+                - Dict[str, str]: Different column names (e.g., {"left": "input_s3_path", "right": "path"})
+            how: Join type - "inner", "left", "right", or "full"
+            select_columns: Optional list of columns to select (with table aliases)
+            dry_run: If True, return the YQL query without executing
+
+        Returns:
+            YQL query string if dry_run=True, None otherwise
+        """
         from yt_framework.yt.yql_builder import build_join_query
 
         query = build_join_query(
@@ -374,7 +435,18 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         condition: str,
         dry_run: bool = False,
     ) -> Optional[str]:
-        """Filter table rows using WHERE condition."""
+        """
+        Filter table rows using WHERE condition.
+
+        Args:
+            input_table: Path to input table
+            output_table: Path to output table
+            condition: WHERE condition (e.g., "status = 'active' AND total > 100")
+            dry_run: If True, return the YQL query without executing
+
+        Returns:
+            YQL query string if dry_run=True, None otherwise
+        """
         from yt_framework.yt.yql_builder import build_filter_query
 
         # Get columns from input table to avoid _other column issues
@@ -400,7 +472,18 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         columns: List[str],
         dry_run: bool = False,
     ) -> Optional[str]:
-        """Select specific columns from a table."""
+        """
+        Select specific columns from a table.
+
+        Args:
+            input_table: Path to input table
+            output_table: Path to output table
+            columns: List of column names to select
+            dry_run: If True, return the YQL query without executing
+
+        Returns:
+            YQL query string if dry_run=True, None otherwise
+        """
         from yt_framework.yt.yql_builder import build_select_query
 
         query = build_select_query(
@@ -423,7 +506,20 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         aggregations: Dict[str, Union[str, Tuple[str, str]]],
         dry_run: bool = False,
     ) -> Optional[str]:
-        """Group by columns and compute aggregations."""
+        """
+        Group by columns and compute aggregations.
+
+        Args:
+            input_table: Path to input table
+            output_table: Path to output table
+            group_by: Column(s) to group by
+            aggregations: Dict mapping output column names to aggregation functions
+                         e.g., {"order_count": "count", "total_amount": "sum"}
+            dry_run: If True, return the YQL query without executing
+
+        Returns:
+            YQL query string if dry_run=True, None otherwise
+        """
         from yt_framework.yt.yql_builder import build_group_by_query
 
         query = build_group_by_query(
@@ -445,7 +541,17 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_table: str,
         dry_run: bool = False,
     ) -> Optional[str]:
-        """Union multiple tables."""
+        """
+        Union multiple tables.
+
+        Args:
+            tables: List of table paths to union
+            output_table: Path to output table
+            dry_run: If True, return the YQL query without executing
+
+        Returns:
+            YQL query string if dry_run=True, None otherwise
+        """
         from yt_framework.yt.yql_builder import build_union_query
 
         # Get columns from first table to avoid _other column issues
@@ -471,7 +577,18 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         columns: Optional[List[str]] = None,
         dry_run: bool = False,
     ) -> Optional[str]:
-        """Get distinct rows from a table."""
+        """
+        Get distinct rows from a table.
+
+        Args:
+            input_table: Path to input table
+            output_table: Path to output table
+            columns: Optional list of columns to select (if None, selects all)
+            dry_run: If True, return the YQL query without executing
+
+        Returns:
+            YQL query string if dry_run=True, None otherwise
+        """
         from yt_framework.yt.yql_builder import build_distinct_query
 
         query = build_distinct_query(
@@ -494,7 +611,21 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         ascending: bool = True,
         dry_run: bool = False,
     ) -> Optional[str]:
-        """Sort table by columns."""
+        """
+        Sort table by columns.
+
+        WARNING: Sorting large tables can be expensive. Use with caution.
+
+        Args:
+            input_table: Path to input table
+            output_table: Path to output table
+            order_by: Column(s) to sort by
+            ascending: Sort direction (True for ASC, False for DESC)
+            dry_run: If True, return the YQL query without executing
+
+        Returns:
+            YQL query string if dry_run=True, None otherwise
+        """
         from yt_framework.yt.yql_builder import build_sort_query
 
         # Get columns from input table to avoid _other column issues
@@ -521,7 +652,18 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         limit: int,
         dry_run: bool = False,
     ) -> Optional[str]:
-        """Limit number of rows from a table."""
+        """
+        Limit number of rows from a table.
+
+        Args:
+            input_table: Path to input table
+            output_table: Path to output table
+            limit: Maximum number of rows to return
+            dry_run: If True, return the YQL query without executing
+
+        Returns:
+            YQL query string if dry_run=True, None otherwise
+        """
         from yt_framework.yt.yql_builder import build_limit_query
 
         # Get columns from input table to avoid _other column issues
@@ -580,7 +722,23 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
     def upload_directory(
         self, local_dir: Path, yt_dir: str, pattern: str = "*"
     ) -> List[str]:
-        """Upload a directory to YT."""
+        """
+        Upload a directory to YT cluster.
+
+        Recursively uploads all files from a local directory to a YT directory,
+        respecting .ytignore patterns if present.
+
+        Args:
+            local_dir: Local directory path to upload
+            yt_dir: YT destination directory path
+            pattern: File pattern to match (default: "*" for all files)
+
+        Returns:
+            List of uploaded YT file paths
+
+        Raises:
+            Exception: If directory upload fails
+        """
         self.logger.info(f"Uploading directory {local_dir} → {yt_dir}")
 
         # Create YT directory
@@ -633,7 +791,29 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
     ) -> Operation:
-        """Run a map operation on YT."""
+        """Run a map operation on YT cluster.
+        
+        Submits a map operation that processes each row of the input table independently
+        and writes results to the output table. The operation runs on the YT cluster
+        with the specified resources and dependencies.
+        
+        Args:
+            command: Command to execute (typically bash command with script path).
+            input_table: Input YT table path.
+            output_table: Output YT table path.
+            files: List of (yt_path, local_path) tuples for dependencies.
+            resources: Operation resource configuration (memory, CPU, GPU, etc.).
+            env: Environment variables dictionary.
+            output_schema: Optional output table schema for typed output.
+            max_failed_jobs: Maximum failed jobs allowed before operation fails.
+            docker_auth: Optional Docker authentication for private registries.
+            
+        Returns:
+            Operation: YT operation object that can be monitored and waited on.
+            
+        Raises:
+            Exception: If operation submission fails.
+        """
         self.logger.info("Submitting map operation")
         self.logger.info(f"  Input: {input_table}")
         self.logger.info(f"  Output: {output_table}")
@@ -703,7 +883,26 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         docker_auth: Optional[Dict[str, str]] = None,
         max_failed_jobs: int = 1,
     ) -> Operation:
-        """Run a vanilla operation on YT."""
+        """Run a vanilla operation on YT cluster.
+        
+        Submits a vanilla operation that runs a standalone job without input/output tables.
+        The operation runs on the YT cluster with the specified resources and dependencies.
+        
+        Args:
+            command: Command to execute (typically bash command with script path).
+            files: List of (yt_path, local_path) tuples for dependencies.
+            env: Environment variables dictionary.
+            task_name: Task name for the operation.
+            resources: Operation resource configuration (memory, CPU, GPU, etc.).
+            docker_auth: Optional Docker authentication for private registries.
+            max_failed_jobs: Maximum failed jobs allowed before operation fails.
+            
+        Returns:
+            Operation: YT operation object that can be monitored and waited on.
+            
+        Raises:
+            Exception: If operation submission fails.
+        """
         self.logger.info("Submitting vanilla operation")
         self.logger.info(f"  Task Name: {task_name}")
         self.logger.info(f"  Command: {command}")

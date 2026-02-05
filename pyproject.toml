@@ -45,8 +45,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/GregoryKogan/yt-framework"
 Repository = "https://github.com/GregoryKogan/yt-framework"
+Documentation = "https://yt-framework.readthedocs.io/en/latest/"
 Issues = "https://github.com/GregoryKogan/yt-framework/issues"
 
 [project.optional-dependencies]

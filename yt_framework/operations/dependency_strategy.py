@@ -71,7 +71,28 @@ class TarArchiveDependencyBuilder:
         stage_config: DictConfig,
         logger: logging.Logger,
     ) -> Tuple[str, List[Tuple[str, str]], Optional[str]]:
-        """Build dependencies using tar archive strategy."""
+        """Build dependencies using tar archive strategy.
+        
+        Creates a tar archive deployment where all code is packaged into a single
+        code.tar.gz file. Generates a bootstrap command that extracts the archive
+        and executes the appropriate wrapper script.
+        
+        Args:
+            operation_type: Type of operation ('map' or 'vanilla').
+            stage_dir: Path to stage directory containing src/ folder.
+            build_folder: YT build folder path where archive will be stored.
+            operation_config: Operation-specific config (from client.operations.map/vanilla).
+            stage_config: Full stage config (for accessing job.model_name for checkpoints).
+            logger: Logger instance for logging dependency preparation.
+            
+        Returns:
+            Tuple containing:
+            - script_path: Placeholder path to script in YT (not used when command provided).
+            - dependencies: List of (yt_path, local_path) tuples including:
+              * code.tar.gz archive
+              * Optional checkpoint file if configured
+            - command: Bootstrap command string that extracts archive and runs wrapper.
+        """
 
         from yt_framework.utils import log_header
 

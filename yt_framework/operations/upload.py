@@ -177,6 +177,9 @@ def _create_unified_wrapper_script(
         operation_type: Type of operation ('map' or 'vanilla')
         build_dir: Local build directory path
         logger: Logger instance
+
+    Returns:
+        None
     """
     # Determine script to execute
     if operation_type == "map":
@@ -237,6 +240,9 @@ def _create_wrappers_for_stage(
         stage_dir: Path to stage directory
         build_dir: Local build directory path
         logger: Logger instance
+
+    Returns:
+        None
     """
     src_dir = stage_dir / "src"
 
@@ -341,6 +347,9 @@ def create_code_archive(
         build_dir: Local build directory path
         archive_path: Path where the archive should be created
         logger: Logger instance
+
+    Returns:
+        None
     """
     log_header(logger, "Code Archive", f"Creating archive: {archive_path}")
 
@@ -372,6 +381,9 @@ def upload_code_archive(
         archive_path: Local path to the tar.gz archive
         build_folder: YT build folder path
         logger: Logger instance
+
+    Returns:
+        None
     """
     log_header(logger, "Uploading Code Archive to YT")
     logger.info(f"Build folder: {build_folder}")
@@ -435,6 +447,9 @@ def upload_code_as_archive(
         logger: Logger instance
         build_code_dir: Optional path to local build directory. If None, creates
                        a directory inside pipeline_dir
+
+    Returns:
+        None
     """
     log_header(
         logger, "Code Upload", f"Tar archive mode | Build folder: {build_folder}"
@@ -495,6 +510,9 @@ def upload_all_code(
         logger: Logger instance
         build_code_dir: Optional path to local build directory. If None, creates
                        a directory inside pipeline_dir
+
+    Returns:
+        None
     """
     upload_code_as_archive(
         yt_client=yt_client,

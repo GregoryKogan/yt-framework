@@ -23,7 +23,26 @@ from pathlib import Path
 import yt.wrapper as yt
 
 
-def main():
+def main() -> None:
+    """
+    Main entry point for archive extraction and upload script.
+    
+    This function is executed as a standalone YT vanilla job. It:
+    1. Downloads the archive from YT (or uses local file if provided)
+    2. Extracts it to local filesystem
+    3. Uploads extracted files to YT build folder
+    
+    Environment variables required:
+        YT_BUILD_FOLDER: YT path to build folder
+        YT_ARCHIVE_PATH: YT path to archive file
+        ARCHIVE_LOCAL_NAME: Local filename of archive in sandbox (default: code.tar.gz)
+    
+    Returns:
+        None (exits with code 0 on success, 1 on failure)
+        
+    Raises:
+        SystemExit: If required environment variables are missing or operations fail.
+    """
     yt_build_folder = os.environ.get("YT_BUILD_FOLDER")
     yt_archive_path = os.environ.get("YT_ARCHIVE_PATH")
     archive_local_name = os.environ.get("ARCHIVE_LOCAL_NAME", "code.tar.gz")

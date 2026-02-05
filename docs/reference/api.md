@@ -1,6 +1,27 @@
 # API Reference
 
-This page provides detailed API documentation for all YT Framework modules.
+This page provides detailed API documentation for all YT Framework modules. All documentation is automatically generated from Python docstrings.
+
+```{tip}
+**Exploring the API**
+
+Use the navigation sidebar to jump to specific modules. Each module includes classes, functions, and their complete documentation with parameters, return types, and examples.
+```
+
+## Module Overview
+
+YT Framework is organized into several key modules:
+
+- **Core**: Pipeline, stage, registry, and discovery functionality
+- **Operations**: Map, vanilla, YQL, S3, and table operations
+- **YT**: YT client implementations (dev and prod)
+- **Utils**: Logging, environment, and utility functions
+
+```{note}
+**Auto-Generated Documentation**
+
+This documentation is automatically generated from Python docstrings. For the most up-to-date information, check the source code or use Python's `help()` function.
+```
 
 ## Core Modules
 
@@ -62,17 +83,27 @@ This page provides detailed API documentation for all YT Framework modules.
 
 ### YQL Operations
 
-```{eval-rst}
-.. automodule:: yt_framework.operations.table
-   :members:
-   :undoc-members:
-   :show-inheritance:
+YQL operations are methods on the YT client. See the YT Client sections below for `join_tables`, `filter_table`, `select_columns`, `group_by_aggregate`, `union_tables`, `distinct`, `sort_table`, and `limit_table` methods.
+
+```{note}
+**YQL Operations Location**
+
+YQL operations are implemented as methods on `BaseYTClient` and its subclasses (`YTDevClient` and `YTProdClient`). They are not in a separate operations module. See the YT Client sections below for complete documentation.
 ```
 
 ### S3 Operations
 
 ```{eval-rst}
 .. automodule:: yt_framework.operations.s3
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+### Table Operations
+
+```{eval-rst}
+.. automodule:: yt_framework.operations.table
    :members:
    :undoc-members:
    :show-inheritance:

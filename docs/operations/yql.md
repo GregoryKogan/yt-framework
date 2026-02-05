@@ -4,6 +4,12 @@ YQL (YTsaurus Query Language) operations provide a high-level interface for tabl
 
 ## Overview
 
+```{tip}
+**When to Use YQL Operations**
+
+Use YQL operations for SQL-like table manipulations (joins, filters, aggregations). They're more efficient than custom Python code for these operations and don't require writing mapper scripts.
+```
+
 YQL operations use YT's distributed query engine to perform table operations. They're perfect for:
 
 - Joining multiple tables
@@ -18,6 +24,12 @@ YQL operations use YT's distributed query engine to perform table operations. Th
 - Efficient distributed execution
 - No custom code required
 - Dry run support for query preview
+
+```{note}
+**YQL vs Map**
+
+Use YQL for SQL-like operations (joins, aggregations). Use map for custom Python logic per row. YQL is often faster for standard operations.
+```
 
 ## Available Operations
 
@@ -325,7 +337,7 @@ class YqlExamplesStage(BaseStage):
         return debug
 ```
 
-See [Example: 03_yql_operations](../../examples/03_yql_operations/) for a complete example with all operations.
+See [Example: 03_yql_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/03_yql_operations/) for a complete example with all operations.
 
 ## Configuration
 
@@ -455,4 +467,4 @@ top_n = self.deps.yt_client.limit_table(
 
 - Learn about [Map Operations](map.md) for row-by-row processing
 - Explore [S3 Operations](s3.md) for file integration
-- Check out [Examples](../../examples/) for more patterns
+- Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for more patterns

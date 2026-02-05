@@ -4,6 +4,12 @@ Map operations process each row of a table independently, making them perfect fo
 
 ## Overview
 
+```{tip}
+**When to Use Map Operations**
+
+Use map operations for row-by-row transformations, filtering, data enrichment, or any task that processes each table row independently.
+```
+
 A **map operation** takes an input table, processes each row through a mapper script, and writes results to an output table. The operation runs in parallel across multiple jobs on the YT cluster (or sequentially in dev mode).
 
 **Key characteristics:**
@@ -12,6 +18,12 @@ A **map operation** takes an input table, processes each row through a mapper sc
 - Parallel execution (multiple jobs)
 - Input/output tables required
 - Custom code execution (mapper.py)
+
+```{warning}
+**Mapper Script Requirements**
+
+Your mapper script must read from stdin and write to stdout. Each line is a JSON-encoded row. Make sure to flush output after each row.
+```
 
 ## Quick Start
 
@@ -82,7 +94,7 @@ if __name__ == "__main__":
     main()
 ```
 
-See [Example: 04_map_operation](../../examples/04_map_operation/) for a complete example.
+See [Example: 04_map_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/04_map_operation/) for a complete example.
 
 ## Mapper Script
 
@@ -335,7 +347,7 @@ class ProcessAndValidateStage(BaseStage):
         return debug
 ```
 
-See [Example: 09_multiple_operations](../../examples/09_multiple_operations/) for details.
+See [Example: 09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/) for details.
 
 ### GPU Processing
 
@@ -357,7 +369,7 @@ client:
         memory_limit_gb: 16
 ```
 
-See [Example: video_gpu](../../examples/video_gpu/) for GPU processing example.
+See [Example: video_gpu](https://github.com/GregoryKogan/yt-framework/tree/main/examples/video_gpu/) for GPU processing example.
 
 ### Checkpoint Usage
 
@@ -451,4 +463,4 @@ for line in sys.stdin:
 
 - Learn about [Vanilla Operations](vanilla.md)
 - Explore [Advanced Topics](../advanced/) (Docker, checkpoints)
-- Check out [Examples](../../examples/) for more patterns
+- Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for more patterns

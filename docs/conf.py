@@ -7,9 +7,9 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 project = 'YT Framework'
-copyright = '2026, Gregory Koganovsky, Artem Zavarzin'
-author = 'Gregory Koganovsky, Artem Zavarzin'
-release = 'v0.1.0'
+copyright = '2026, Artem Zavarzin, Gregory Koganovsky'
+author = 'Artem Zavarzin, Gregory Koganovsky'
+release = 'v1.0.1'
 
 # -- General configuration ---------------------------------------------------
 extensions = [
@@ -52,9 +52,14 @@ html_theme = 'pydata_sphinx_theme'
 html_theme_options = {
     "github_url": "https://github.com/GregoryKogan/yt-framework",
     "show_toc_level": 2,
-    "navigation_depth": 3,
-    "show_nav_level": 1,
-    "header_links_before_dropdown": 5,
+    "navigation_depth": 4,
+    "show_nav_level": 0,  # Show captions collapsed, expandable sections
+    "header_links_before_dropdown": 5,  # Keep some links in top nav
+    "sidebar_secondary_items": ["page-toc"],
+    "use_edit_page_button": False,
+    "logo": {
+        "text": "YT Framework",
+    },
 }
 
 html_title = "YT Framework"

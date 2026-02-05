@@ -9,12 +9,26 @@ from typing import List, Dict, Union, Optional, Tuple
 
 
 def _escape_table_name(table: str) -> str:
-    """Escape table name with backticks for YQL."""
+    """Escape table name with backticks for YQL.
+    
+    Args:
+        table: Table path (e.g., "//tmp/my_table").
+        
+    Returns:
+        str: Escaped table name (e.g., "`//tmp/my_table`").
+    """
     return f"`{table}`"
 
 
 def _format_column_list(columns: List[str]) -> str:
-    """Format column list for SELECT clause."""
+    """Format column list for SELECT clause.
+    
+    Args:
+        columns: List of column names or expressions (e.g., ["a.id", "b.name"]).
+        
+    Returns:
+        str: Formatted column list with indentation (e.g., "a.id,\n    b.name").
+    """
     return ",\n    ".join(columns)
 
 
@@ -23,13 +37,27 @@ def _format_join_conditions(
     left_alias: str = "a",
     right_alias: str = "b",
 ) -> str:
-    """Format JOIN ON conditions."""
+    """Format JOIN ON conditions.
+    
+    Args:
+        on: Join key specification:
+            - str: Single column name (same on both sides).
+            - List[str]: Multiple column names (same on both sides).
+            - Dict[str, str]: Different column names. Must use special keys "left" and "right"
+              where "left" maps to the left table column name and "right" maps to the right
+              table column name (e.g., {"left": "user_id", "right": "id"}).
+        left_alias: Alias for left table (default: "a").
+        right_alias: Alias for right table (default: "b").
+        
+    Returns:
+        str: Formatted JOIN condition (e.g., "a.id = b.id" or "a.user_id = b.id AND a.region = b.region_code").
+    """
     if isinstance(on, str):
         # Same column name on both sides
         return f"{left_alias}.{on} = {right_alias}.{on}"
     elif isinstance(on, dict):
-        # Different column names: {"left": "col1", "right": "col2"}
-        # or multiple pairs: {"left": ["col1", "col2"], "right": ["col3", "col4"]}
+        # Different column names: {"left": "user_id", "right": "id"}
+        # or multiple pairs: {"left": ["user_id", "region"], "right": ["id", "region_code"]}
         if isinstance(on.get("left"), list):
             # Multiple column pairs
             left_cols = on["left"]
@@ -49,7 +77,14 @@ def _format_join_conditions(
 
 
 def _format_group_by_list(group_by: Union[str, List[str]]) -> str:
-    """Format GROUP BY column list."""
+    """Format GROUP BY column list.
+    
+    Args:
+        group_by: Column name(s) to group by.
+        
+    Returns:
+        str: Formatted GROUP BY clause (e.g., "region" or "region, status").
+    """
     if isinstance(group_by, str):
         return group_by
     return ", ".join(group_by)
@@ -105,7 +140,16 @@ def _format_aggregations(
 def _format_order_by_list(
     order_by: Union[str, List[str]], ascending: bool = True
 ) -> str:
-    """Format ORDER BY column list."""
+    """Format ORDER BY column list.
+    
+    Args:
+        order_by: Column name(s) to sort by.
+        ascending: Sort direction (True for ASC, False for DESC). Applies to all columns.
+        
+    Returns:
+        str: Formatted ORDER BY clause (e.g., "id ASC" or "id ASC, name ASC").
+             All columns use the same sort direction (mixed directions not supported).
+    """
     direction = "ASC" if ascending else "DESC"
     if isinstance(order_by, str):
         return f"{order_by} {direction}"
