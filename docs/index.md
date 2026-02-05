@@ -5,7 +5,6 @@ Welcome to the YT Framework documentation! This guide will help you get started 
 ```{toctree}
 :maxdepth: 2
 :caption: Getting Started
-:hidden:
 
 configuration/index
 configuration/secrets
@@ -17,7 +16,6 @@ pipelines-and-stages
 ```{toctree}
 :maxdepth: 2
 :caption: Operations
-:hidden:
 
 operations/index
 operations/map
@@ -29,7 +27,6 @@ operations/s3
 ```{toctree}
 :maxdepth: 2
 :caption: Advanced Topics
-:hidden:
 
 advanced/index
 advanced/code-upload
@@ -41,7 +38,6 @@ advanced/multiple-operations
 ```{toctree}
 :maxdepth: 2
 :caption: Reference
-:hidden:
 
 reference/api
 troubleshooting/index
