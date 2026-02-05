@@ -260,3 +260,42 @@ The `examples/` directory contains complete working examples:
 - **[video_gpu](../examples/video_gpu/)** - GPU processing
 
 Each example includes a README explaining what it demonstrates.
+
+## Documentation Contents
+
+```{toctree}
+:maxdepth: 2
+:caption: Getting Started
+
+configuration
+dev-vs-prod
+pipelines-and-stages
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Operations
+
+operations/map
+operations/vanilla
+operations/yql
+operations/s3
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Advanced Topics
+
+advanced/code-upload
+advanced/docker
+advanced/checkpoints
+advanced/multiple-operations
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Reference
+
+reference/api
+troubleshooting
+```

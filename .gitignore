@@ -28,3 +28,13 @@ Thumbs.db
 
 # Checkpoints
 *.pt
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Sphinx documentation
+docs/_build/
+docs/_static/
+docs/_templates/
