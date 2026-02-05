@@ -5,11 +5,13 @@ import sys
 # Add project root to path for autodoc
 sys.path.insert(0, os.path.abspath('..'))
 
+import yt_framework
+
 # -- Project information -----------------------------------------------------
 project = 'YT Framework'
 copyright = '2026, Artem Zavarzin, Gregory Koganovsky'
 author = 'Artem Zavarzin, Gregory Koganovsky'
-release = 'v1.0.1'
+release = yt_framework.__version__
 
 # -- General configuration ---------------------------------------------------
 extensions = [
