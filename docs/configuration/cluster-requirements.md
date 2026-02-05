@@ -231,12 +231,6 @@ try:
     print(f"✓ omegaconf available: {omegaconf.__version__}")
 except ImportError:
     print("✗ omegaconf missing (recommended for config reading)")
-
-try:
-    import cv2
-    print(f"✓ opencv available: {cv2.__version__}")
-except ImportError:
-    print("✗ opencv missing")
 ```
 
 ### Common Issues

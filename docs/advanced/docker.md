@@ -422,8 +422,9 @@ RUN apt-get update && apt-get install -y \
     imagemagick \
     && rm -rf /var/lib/apt/lists/*
 
+# Install any custom Python dependencies your tools need
 RUN pip install --no-cache-dir \
-    opencv-python>=4.5.0
+    your-custom-package>=1.0.0
 ```
 
 ## Troubleshooting

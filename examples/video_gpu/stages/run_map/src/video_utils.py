@@ -1,8 +1,8 @@
 """
-Common Video Processing Utilities
-==================================
+Video Processing Utilities
+===========================
 
-Reusable functions for video processing across all pipelines.
+Video processing utilities for GPU video processing pipeline.
 """
 
 import cv2
