@@ -101,12 +101,12 @@ Full documentation is available in the [`docs/`](docs/) directory:
 
 - **[Main Documentation](docs/index.md)** - Installation, quick start, and overview
 - **[Pipelines & Stages](docs/pipelines-and-stages.md)** - Core architecture
-- **[Configuration](docs/configuration.md)** - Config files and secrets management
+- **[Configuration](docs/configuration/index.md)** - Config files and secrets management
 - **[Dev vs Prod](docs/dev-vs-prod.md)** - Development and production modes
 - **[Operations](docs/operations/)** - Map, Vanilla, YQL, S3 operations
 - **[Advanced Topics](docs/advanced/)** - Docker, checkpoints, code upload
 - **[API Reference](docs/reference/api.md)** - Complete API documentation
-- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+- **[Troubleshooting](docs/troubleshooting/index.md)** - Common issues and solutions
 
 ## Requirements
 

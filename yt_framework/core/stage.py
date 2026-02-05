@@ -64,9 +64,9 @@ class BaseStage(ABC):
                 # self.config is automatically loaded from stages/<stage_name>/config.yaml
                 # Access dependencies via self.deps.yt_client, self.deps.pipeline_config
 
-            def run(self, context: Dict) -> Dict:
+            def run(self, debug: DebugContext) -> DebugContext:
                 # Stage logic here
-                # Note: 'context' here is the shared data dict, NOT dependencies
+                # Note: 'debug' here is the shared data dict, NOT dependencies
                 return {"result": "value"}
     """
 

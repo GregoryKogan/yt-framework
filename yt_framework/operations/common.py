@@ -6,25 +6,11 @@ Shared utility functions used by multiple operation types.
 """
 
 import logging
+from pathlib import Path
 from typing import Dict, Optional, Any
 
 from omegaconf import DictConfig
 from yt_framework.utils.env import load_secrets
-
-
-def _construct_command(script_path: str) -> str:
-    """Construct command from script path.
-    
-    Args:
-        script_path: Path to the script file (either .sh or .py).
-        
-    Returns:
-        str: Command string to execute the script (bash for .sh, python3 for .py).
-    """
-    if script_path.endswith(".sh"):
-        return f"bash {script_path}"
-    else:
-        return f"python3 {script_path}"
 
 
 def _get_config_value_with_default(
@@ -65,11 +51,11 @@ def _get_config_value_with_default(
 
 
 def build_environment(
-    configs_dir,
+    configs_dir: Path,
     logger: logging.Logger,
 ) -> Dict[str, str]:
     """
-    Build environment variables for map operations.
+    Build environment variables for map and vanilla operations.
 
     Jobs read configuration from config.yaml, so only secrets are passed
     via environment variables.

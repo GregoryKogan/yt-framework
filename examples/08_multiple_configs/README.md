@@ -79,5 +79,5 @@ stages:
 
 ## Next Steps
 
-- See [Configuration Guide](../../docs/configuration.md) for configuration details
+- See [Configuration Guide](../../docs/configuration/index.md) for configuration details
 - See [Dev vs Prod](../../docs/dev-vs-prod.md) for mode differences

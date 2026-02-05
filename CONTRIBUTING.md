@@ -74,7 +74,7 @@ Contributions come in many forms:
    YT_TOKEN=your-yt-token
    ```
 
-   See [Configuration Guide](docs/configuration.md#secrets-management) for more details.
+   See [Configuration Guide](docs/configuration/index.md#secrets-management) for more details.
 
 5. **Verify installation**:
 
@@ -270,9 +270,9 @@ done
 Documentation lives in the `docs/` directory:
 
 - **Main docs**: `docs/index.md` - Installation and quick start
-- **Guides**: `docs/pipelines-and-stages.md`, `docs/configuration.md`, etc.
+- **Guides**: `docs/pipelines-and-stages.md`, `docs/configuration/index.md`, etc.
 - **API Reference**: `docs/reference/api.md`
-- **Troubleshooting**: `docs/troubleshooting.md`
+- **Troubleshooting**: `docs/troubleshooting/index.md`
 
 When adding features:
 
@@ -432,7 +432,7 @@ For questions or concerns, contact the maintainers:
 
 ### Getting Help
 
-- Check the [Troubleshooting Guide](docs/troubleshooting.md) for common issues
+- Check the [Troubleshooting Guide](docs/troubleshooting/index.md) for common issues
 - Review existing [Examples](examples/) for usage patterns
 - Open an issue for bugs or feature requests
 - Contact maintainers for questions

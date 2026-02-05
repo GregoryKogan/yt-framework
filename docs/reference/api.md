@@ -83,17 +83,27 @@ This documentation is automatically generated from Python docstrings. For the mo
 
 ### YQL Operations
 
-```{eval-rst}
-.. automodule:: yt_framework.operations.table
-   :members:
-   :undoc-members:
-   :show-inheritance:
+YQL operations are methods on the YT client. See the YT Client sections below for `join_tables`, `filter_table`, `select_columns`, `group_by_aggregate`, `union_tables`, `distinct`, `sort_table`, and `limit_table` methods.
+
+```{note}
+**YQL Operations Location**
+
+YQL operations are implemented as methods on `BaseYTClient` and its subclasses (`YTDevClient` and `YTProdClient`). They are not in a separate operations module. See the YT Client sections below for complete documentation.
 ```
 
 ### S3 Operations
 
 ```{eval-rst}
 .. automodule:: yt_framework.operations.s3
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+### Table Operations
+
+```{eval-rst}
+.. automodule:: yt_framework.operations.table
    :members:
    :undoc-members:
    :show-inheritance:

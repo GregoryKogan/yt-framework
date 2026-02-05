@@ -65,4 +65,4 @@ Logs comprehensive environment information to operation logs.
 ## Next Steps
 
 - See [05_vanilla_operation](../05_vanilla_operation/) for vanilla operations
-- See [Troubleshooting Guide](../../docs/troubleshooting.md) for debugging tips
+- See [Troubleshooting Guide](../../docs/troubleshooting/index.md) for debugging tips
