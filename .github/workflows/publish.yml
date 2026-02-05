@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*'  # e.g. v1.2.3
+  workflow_dispatch:
 
 jobs:
   publish:
