@@ -94,7 +94,7 @@ if __name__ == "__main__":
     main()
 ```
 
-See [Example: 04_map_operation](../../examples/04_map_operation/) for a complete example.
+See [Example: 04_map_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/04_map_operation/) for a complete example.
 
 ## Mapper Script
 
@@ -347,7 +347,7 @@ class ProcessAndValidateStage(BaseStage):
         return debug
 ```
 
-See [Example: 09_multiple_operations](../../examples/09_multiple_operations/) for details.
+See [Example: 09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/) for details.
 
 ### GPU Processing
 
@@ -369,7 +369,7 @@ client:
         memory_limit_gb: 16
 ```
 
-See [Example: video_gpu](../../examples/video_gpu/) for GPU processing example.
+See [Example: video_gpu](https://github.com/GregoryKogan/yt-framework/tree/main/examples/video_gpu/) for GPU processing example.
 
 ### Checkpoint Usage
 
@@ -463,4 +463,4 @@ for line in sys.stdin:
 
 - Learn about [Vanilla Operations](vanilla.md)
 - Explore [Advanced Topics](../advanced/) (Docker, checkpoints)
-- Check out [Examples](../../examples/) for more patterns
+- Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for more patterns

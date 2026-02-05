@@ -337,7 +337,7 @@ class YqlExamplesStage(BaseStage):
         return debug
 ```
 
-See [Example: 03_yql_operations](../../examples/03_yql_operations/) for a complete example with all operations.
+See [Example: 03_yql_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/03_yql_operations/) for a complete example with all operations.
 
 ## Configuration
 
@@ -467,4 +467,4 @@ top_n = self.deps.yt_client.limit_table(
 
 - Learn about [Map Operations](map.md) for row-by-row processing
 - Explore [S3 Operations](s3.md) for file integration
-- Check out [Examples](../../examples/) for more patterns
+- Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for more patterns

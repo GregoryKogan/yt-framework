@@ -402,4 +402,4 @@ This allows sharing code across pipelines or using monorepo structures.
 
 - Learn about [Docker Support](docker.md) for custom environments
 - Explore [Checkpoints](checkpoints.md) for model files
-- Check out [Examples](../../examples/) for code upload patterns
+- Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for code upload patterns

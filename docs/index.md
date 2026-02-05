@@ -153,7 +153,7 @@ In dev mode, the table will be created as `my_first_pipeline/.dev/data.jsonl`. I
 - Learn about [Pipelines and Stages](pipelines-and-stages.md)
 - Explore [Configuration](configuration/index.md) options
 - Understand [Dev vs Prod modes](dev-vs-prod.md)
-- Check out [Examples](../examples/) for more complex scenarios
+- Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for more complex scenarios
 
 ## Core Concepts
 
@@ -199,28 +199,28 @@ YT Framework supports several types of operations:
 Process each row of a table independently. Perfect for row-by-row transformations.
 
 - [Map Operations Guide](operations/map.md)
-- Example: [04_map_operation](../examples/04_map_operation/)
+- Example: [04_map_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/04_map_operation/)
 
 ### Vanilla Operations
 
 Run standalone jobs without input/output tables. Perfect for setup, cleanup, or validation tasks.
 
 - [Vanilla Operations Guide](operations/vanilla.md)
-- Example: [05_vanilla_operation](../examples/05_vanilla_operation/)
+- Example: [05_vanilla_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/05_vanilla_operation/)
 
 ### YQL Operations
 
 Perform table operations using YQL (YTsaurus Query Language). Includes joins, filters, aggregations, and more.
 
 - [YQL Operations Guide](operations/yql.md)
-- Example: [03_yql_operations](../examples/03_yql_operations/)
+- Example: [03_yql_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/03_yql_operations/)
 
 ### S3 Operations
 
 Integrate with S3 for file listing, downloading, and processing.
 
 - [S3 Operations Guide](operations/s3.md)
-- Example: [06_s3_integration](../examples/06_s3_integration/)
+- Example: [06_s3_integration](https://github.com/GregoryKogan/yt-framework/tree/main/examples/06_s3_integration/)
 
 ## Advanced Topics
 
@@ -235,7 +235,7 @@ Learn how the framework handles code packaging and deployment to YT cluster.
 Use custom Docker images for GPU workloads or special dependencies.
 
 - [Docker Guide](advanced/docker.md)
-- Example: [07_custom_docker](../examples/07_custom_docker/)
+- Example: [07_custom_docker](https://github.com/GregoryKogan/yt-framework/tree/main/examples/07_custom_docker/)
 
 ### Checkpoint Management
 
@@ -248,7 +248,7 @@ Handle ML model checkpoints for inference pipelines.
 Run multiple operations in a single stage.
 
 - [Multiple Operations Guide](advanced/multiple-operations.md)
-- Example: [09_multiple_operations](../examples/09_multiple_operations/)
+- Example: [09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/)
 
 ## Reference
 
@@ -259,17 +259,17 @@ Run multiple operations in a single stage.
 
 The `examples/` directory contains complete working examples:
 
-- **[01_hello_world](../examples/01_hello_world/)** - Basic pipeline
-- **[02_multi_stage_pipeline](../examples/02_multi_stage_pipeline/)** - Multiple stages
-- **[03_yql_operations](../examples/03_yql_operations/)** - YQL operations
-- **[04_map_operation](../examples/04_map_operation/)** - Map operation
-- **[05_vanilla_operation](../examples/05_vanilla_operation/)** - Vanilla operation
-- **[06_s3_integration](../examples/06_s3_integration/)** - S3 integration
-- **[07_custom_docker](../examples/07_custom_docker/)** - Custom Docker
-- **[08_multiple_configs](../examples/08_multiple_configs/)** - Multiple configs
-- **[09_multiple_operations](../examples/09_multiple_operations/)** - Multiple operations
-- **[environment_log](../examples/environment_log/)** - Environment logging
-- **[video_gpu](../examples/video_gpu/)** - GPU processing
+- **[01_hello_world](https://github.com/GregoryKogan/yt-framework/tree/main/examples/01_hello_world/)** - Basic pipeline
+- **[02_multi_stage_pipeline](https://github.com/GregoryKogan/yt-framework/tree/main/examples/02_multi_stage_pipeline/)** - Multiple stages
+- **[03_yql_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/03_yql_operations/)** - YQL operations
+- **[04_map_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/04_map_operation/)** - Map operation
+- **[05_vanilla_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/05_vanilla_operation/)** - Vanilla operation
+- **[06_s3_integration](https://github.com/GregoryKogan/yt-framework/tree/main/examples/06_s3_integration/)** - S3 integration
+- **[07_custom_docker](https://github.com/GregoryKogan/yt-framework/tree/main/examples/07_custom_docker/)** - Custom Docker
+- **[08_multiple_configs](https://github.com/GregoryKogan/yt-framework/tree/main/examples/08_multiple_configs/)** - Multiple configs
+- **[09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/)** - Multiple operations
+- **[environment_log](https://github.com/GregoryKogan/yt-framework/tree/main/examples/environment_log/)** - Environment logging
+- **[video_gpu](https://github.com/GregoryKogan/yt-framework/tree/main/examples/video_gpu/)** - GPU processing
 
 Each example includes a README explaining what it demonstrates.
 

@@ -56,7 +56,7 @@ my_pipeline/
         └── config.yaml
 ```
 
-See [Example: 01_hello_world](../examples/01_hello_world/) for a complete example.
+See [Example: 01_hello_world](https://github.com/GregoryKogan/yt-framework/tree/main/examples/01_hello_world/) for a complete example.
 
 ### BasePipeline
 
@@ -292,7 +292,7 @@ Stages are executed sequentially. If a stage fails, the pipeline stops.
 
 ### Multiple Stages Example
 
-See [Example: 02_multi_stage_pipeline](../examples/02_multi_stage_pipeline/) for a complete example with multiple stages and context passing.
+See [Example: 02_multi_stage_pipeline](https://github.com/GregoryKogan/yt-framework/tree/main/examples/02_multi_stage_pipeline/) for a complete example with multiple stages and context passing.
 
 ## Best Practices
 
@@ -308,4 +308,4 @@ See [Example: 02_multi_stage_pipeline](../examples/02_multi_stage_pipeline/) for
 - Learn about [Configuration](configuration/index.md) management
 - Understand [Dev vs Prod](dev-vs-prod.md) modes
 - Explore [Operations](operations/) for different operation types
-- Review [Examples](../examples/) for complete pipeline examples
+- Review [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for complete pipeline examples

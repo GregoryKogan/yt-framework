@@ -97,7 +97,7 @@ if __name__ == "__main__":
     main()
 ```
 
-See [Example: 05_vanilla_operation](../../examples/05_vanilla_operation/) for a complete example.
+See [Example: 05_vanilla_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/05_vanilla_operation/) for a complete example.
 
 ## Vanilla Script
 
@@ -381,7 +381,7 @@ def main():
     logger.info("Environment logged")
 ```
 
-See [Example: environment_log](../../examples/environment_log/) for comprehensive environment logging.
+See [Example: environment_log](https://github.com/GregoryKogan/yt-framework/tree/main/examples/environment_log/) for comprehensive environment logging.
 
 ## Advanced Topics
 
@@ -437,7 +437,7 @@ class ProcessAndValidateStage(BaseStage):
         return debug
 ```
 
-See [Example: 09_multiple_operations](../../examples/09_multiple_operations/) for details.
+See [Example: 09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/) for details.
 
 ### GPU Workloads
 
@@ -560,4 +560,4 @@ def main():
 
 - Learn about [Map Operations](map.md)
 - Explore [Advanced Topics](../advanced/) (Docker, checkpoints)
-- Check out [Examples](../../examples/) for more patterns
+- Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for more patterns

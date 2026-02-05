@@ -168,5 +168,5 @@ Common log patterns to look for:
 
 - Review [Configuration Guide](../configuration.md) for config issues
 - Check [Dev vs Prod](../dev-vs-prod.md) for mode-specific issues
-- Explore [Examples](../examples/) for working patterns
+- Explore [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for working patterns
 - Review [API Reference](../reference/api.md) for detailed API information

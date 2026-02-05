@@ -56,7 +56,7 @@ pipeline:
   build_folder: "//home/production/my_pipeline/build"
 ```
 
-See [Example: 08_multiple_configs](../../examples/08_multiple_configs/) for a complete example.
+See [Example: 08_multiple_configs](https://github.com/GregoryKogan/yt-framework/tree/main/examples/08_multiple_configs/) for a complete example.
 
 ## Configuration Merging
 

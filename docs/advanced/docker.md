@@ -294,7 +294,7 @@ if __name__ == "__main__":
     main()
 ```
 
-See [Example: 07_custom_docker](../../examples/07_custom_docker/) for complete example.
+See [Example: 07_custom_docker](https://github.com/GregoryKogan/yt-framework/tree/main/examples/07_custom_docker/) for complete example.
 
 ## Best Practices
 
@@ -447,4 +447,4 @@ RUN pip install --no-cache-dir \
 
 - Learn about [Checkpoints](checkpoints.md) for model files
 - Explore [Code Upload](code-upload.md) for code packaging
-- Check out [Example: 07_custom_docker](../../examples/07_custom_docker/) for complete example
+- Check out [Example: 07_custom_docker](https://github.com/GregoryKogan/yt-framework/tree/main/examples/07_custom_docker/) for complete example

@@ -244,6 +244,7 @@ pipeline:
 ```
 
 **Prod Mode:**
+
 ```yaml
 pipeline:
   mode: "prod"
@@ -282,7 +283,6 @@ pipeline:
 - YT web UI for logs
 - Remote debugging
 - Requires cluster access
-```
 ```
 
 ## Switching Between Modes
@@ -456,5 +456,5 @@ Always test your pipeline in prod mode with a small dataset before running on pr
 
 - Learn about [Configuration](configuration/index.md) management
 - Explore [Operations](operations/) for different operation types
-- Check out [Examples](../examples/) for mode-specific examples
+- Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for mode-specific examples
 - Review [Troubleshooting](troubleshooting/configuration.md) for mode-specific issues
