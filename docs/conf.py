@@ -7,9 +7,9 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 project = 'YT Framework'
-copyright = '2026, Gregory Koganovsky, Artem Zavarzin'
-author = 'Gregory Koganovsky, Artem Zavarzin'
-release = 'v0.1.0'
+copyright = '2026, Artem Zavarzin, Gregory Koganovsky'
+author = 'Artem Zavarzin, Gregory Koganovsky'
+release = 'v1.0.1'
 
 # -- General configuration ---------------------------------------------------
 extensions = [
