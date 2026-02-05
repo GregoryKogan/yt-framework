@@ -116,6 +116,6 @@ ValueError: build_folder not found
 
 ## See Also
 
-- [Configuration Guide](../configuration.md) - Complete configuration reference
+- [Configuration Guide](../configuration/index.md) - Complete configuration reference
 - [Pipelines and Stages](../pipelines-and-stages.md) - Understanding pipeline structure
 - [Operation Issues](operations.md) - Operation-specific problems

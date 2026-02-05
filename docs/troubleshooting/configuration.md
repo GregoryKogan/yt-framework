@@ -160,6 +160,6 @@ ConnectionError: Cannot connect to YT cluster
 
 ## See Also
 
-- [Configuration Guide](../configuration.md) - Complete configuration reference
+- [Configuration Guide](../configuration/index.md) - Complete configuration reference
 - [Dev vs Prod](../dev-vs-prod.md) - Understanding execution modes
-- [Secrets Management](../configuration.md#secrets-management) - Managing credentials
+- [Secrets Management](../configuration/secrets.md) - Managing credentials

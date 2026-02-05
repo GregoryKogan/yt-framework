@@ -24,7 +24,7 @@ def load_env_file(env_path: Path) -> Dict[str, str]:
         Dictionary of loaded environment variables (key -> value).
         Returns empty dict if file doesn't exist or cannot be read.
 
-    Raises:
+    Warns:
         UserWarning: If file doesn't exist or cannot be parsed (non-fatal).
 
     Example:
@@ -68,7 +68,7 @@ def load_secrets(secrets_dir: Path, env_file: str = "secrets.env") -> Dict[str, 
         Dictionary of loaded secrets (key -> value).
         Returns empty dict if file doesn't exist or cannot be read.
 
-    Raises:
+    Warns:
         UserWarning: If file doesn't exist or cannot be parsed (non-fatal).
 
     Example:

@@ -43,19 +43,21 @@ def _format_join_conditions(
         on: Join key specification:
             - str: Single column name (same on both sides).
             - List[str]: Multiple column names (same on both sides).
-            - Dict[str, str]: Different column names (e.g., {"left": "col1", "right": "col2"}).
+            - Dict[str, str]: Different column names. Must use special keys "left" and "right"
+              where "left" maps to the left table column name and "right" maps to the right
+              table column name (e.g., {"left": "user_id", "right": "id"}).
         left_alias: Alias for left table (default: "a").
         right_alias: Alias for right table (default: "b").
         
     Returns:
-        str: Formatted JOIN condition (e.g., "a.id = b.id" or "a.col1 = b.col2 AND a.col3 = b.col4").
+        str: Formatted JOIN condition (e.g., "a.id = b.id" or "a.user_id = b.id AND a.region = b.region_code").
     """
     if isinstance(on, str):
         # Same column name on both sides
         return f"{left_alias}.{on} = {right_alias}.{on}"
     elif isinstance(on, dict):
-        # Different column names: {"left": "col1", "right": "col2"}
-        # or multiple pairs: {"left": ["col1", "col2"], "right": ["col3", "col4"]}
+        # Different column names: {"left": "user_id", "right": "id"}
+        # or multiple pairs: {"left": ["user_id", "region"], "right": ["id", "region_code"]}
         if isinstance(on.get("left"), list):
             # Multiple column pairs
             left_cols = on["left"]
@@ -142,10 +144,11 @@ def _format_order_by_list(
     
     Args:
         order_by: Column name(s) to sort by.
-        ascending: Sort direction (True for ASC, False for DESC).
+        ascending: Sort direction (True for ASC, False for DESC). Applies to all columns.
         
     Returns:
-        str: Formatted ORDER BY clause (e.g., "id ASC" or "id ASC, name DESC").
+        str: Formatted ORDER BY clause (e.g., "id ASC" or "id ASC, name ASC").
+             All columns use the same sort direction (mixed directions not supported).
     """
     direction = "ASC" if ascending else "DESC"
     if isinstance(order_by, str):
