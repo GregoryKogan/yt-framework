@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yt_framework"
-version = "1.0.2"
+version = "1.1.0"
 description = "YTsaurus pipeline framework with utilities and common modules"
 readme = "README.md"
 requires-python = ">=3.11"

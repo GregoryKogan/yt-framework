@@ -57,6 +57,7 @@ class TextFormatter(logging.Formatter):
             "exc_info",
             "exc_text",
             "stack_info",
+            "taskName",
         }
 
         context_parts = []

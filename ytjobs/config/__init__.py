@@ -22,8 +22,7 @@ def get_config_path() -> Path:
     job_config_path = os.environ.get("JOB_CONFIG_PATH")
     if job_config_path:
         return Path(job_config_path)
-    else:
-        raise ValueError("JOB_CONFIG_PATH environment variable is not set")
+    raise ValueError("JOB_CONFIG_PATH environment variable is not set")
 
 
 __all__ = ["get_config_path"]

@@ -1,0 +1,10 @@
+job:
+  name: "YT Framework User"
+
+client:
+  operations:
+    vanilla:
+      max_failed_job_count: 1
+      resources:
+        memory_limit_gb: 2
+        cpu_limit: 1

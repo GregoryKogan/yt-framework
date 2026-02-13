@@ -23,10 +23,11 @@ import sys
 import argparse
 import logging
 import traceback
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Optional, Dict, Any, cast, TypeAlias
+from typing import Optional, Dict, Any, cast, TypeAlias, List
 
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import OmegaConf, DictConfig, ListConfig
 from yt_framework.yt.factory import create_yt_client
 from yt_framework.utils.logging import (
     setup_logging,
@@ -41,6 +42,45 @@ from yt_framework.operations.upload import upload_all_code
 
 
 DebugContext: TypeAlias = Dict[str, Any]
+
+
+def _normalize_upload_modules(raw: Any) -> List[str]:
+    """Normalize upload_modules config: accept list, tuple, or single string."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return [raw] if raw.strip() else []
+    if isinstance(raw, (list, tuple, ListConfig)):
+        return [str(m).strip() for m in raw if str(m).strip()]
+    raise ValueError(
+        "upload_modules must be a list of module names or a single string."
+    )
+
+
+def _normalize_upload_paths(raw: Any) -> List[Dict[str, str]]:
+    """Normalize upload_paths config: must be a list of {source, target?} mappings."""
+    if raw is None:
+        return []
+
+    if not isinstance(raw, (list, tuple, ListConfig)):
+        raise ValueError("upload_paths must be a list of {source, target?} dicts.")
+
+    normalized: List[Dict[str, str]] = []
+    for idx, element in enumerate(raw):
+        if isinstance(element, DictConfig):
+            element = OmegaConf.to_container(element, resolve=True)
+        if not isinstance(element, Mapping):
+            raise ValueError(
+                f"upload_paths[{idx}] must be a mapping with at least a 'source' key, "
+                f"got {type(element).__name__!r}."
+            )
+        if "source" not in element:
+            raise ValueError(
+                f"upload_paths[{idx}] is missing required 'source' key."
+            )
+        normalized.append({k: str(v) for k, v in element.items()})
+
+    return normalized
 
 
 class BasePipeline:
@@ -223,12 +263,22 @@ class BasePipeline:
                 # If relative path, make it relative to pipeline directory
                 build_code_dir = self.pipeline_dir / build_code_dir
 
+        # Get upload_modules and upload_paths from config
+        upload_modules = _normalize_upload_modules(
+            self.config.pipeline.get("upload_modules")
+        )
+        upload_paths = _normalize_upload_paths(
+            self.config.pipeline.get("upload_paths")
+        )
+
         upload_all_code(
             yt_client=self.yt,
             build_folder=build_folder,
             pipeline_dir=self.pipeline_dir,
             logger=self.logger,
             build_code_dir=build_code_dir,
+            upload_modules=upload_modules,
+            upload_paths=upload_paths,
         )
 
     def run(self) -> None:
