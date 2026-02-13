@@ -161,11 +161,11 @@ def _copy_module_to_build_dir(
     target_dir: Path,
     logger: logging.Logger,
 ) -> int:
-    """Copy an importable module/package to build directory.
+    """Copy an importable Python package to build directory.
 
-    For dotted module paths (e.g. my_package.submodule), copies the full
-    top-level package to preserve import structure. Respects .ytignore
-    patterns if present in the module directory.
+    Only packages (directories with __init__.py) are supported; single-file
+    modules are rejected. For dotted paths (e.g. my_package.submodule),
+    copies the full top-level package. Respects .ytignore in the source dir.
 
     Args:
         module_name: Python module name to import (e.g. my_package or my_package.sub)
@@ -192,12 +192,19 @@ def _copy_module_to_build_dir(
             "Only file-based packages are supported."
         )
 
-    file_path = Path(module.__file__).resolve()
-    source_dir = file_path.parent
-    if not source_dir.is_dir():
+    # Use __path__ for packages; reject single-file modules (which would copy
+    # the entire containing directory, e.g. site-packages)
+    if hasattr(module, "__path__"):
+        source_dir = Path(module.__path__[0]).resolve()
+        if not source_dir.is_dir():
+            raise ValueError(
+                f"Module '{module_name}' has invalid __path__: {source_dir} is not a directory."
+            )
+    else:
         raise ValueError(
-            f"Module '{module_name}' layout is unsupported: __file__ does not "
-            "point to a loadable file within a directory."
+            f"Module '{module_name}' is a single-file module, not a package. "
+            "upload_modules supports only packages (directories with __init__.py). "
+            "Single-file modules would copy the entire containing directory."
         )
 
     target_dir.mkdir(parents=True, exist_ok=True)
