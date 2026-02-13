@@ -1,0 +1,9 @@
+stages:
+  enabled_stages:
+    - use_custom
+
+pipeline:
+  mode: "dev"
+  build_folder: "//tmp/examples/10_custom_upload/build"
+  upload_paths:
+    - { source: "./lib/my_utils", target: "my_utils" }

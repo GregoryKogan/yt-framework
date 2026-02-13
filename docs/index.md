@@ -299,6 +299,7 @@ The `examples/` directory contains complete working examples:
 - **[07_custom_docker](https://github.com/GregoryKogan/yt-framework/tree/main/examples/07_custom_docker/)** - Custom Docker
 - **[08_multiple_configs](https://github.com/GregoryKogan/yt-framework/tree/main/examples/08_multiple_configs/)** - Multiple configs
 - **[09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/)** - Multiple operations
+- **[10_custom_upload](https://github.com/GregoryKogan/yt-framework/tree/main/examples/10_custom_upload/)** - Custom upload modules and paths
 - **[environment_log](https://github.com/GregoryKogan/yt-framework/tree/main/examples/environment_log/)** - Environment logging
 - **[video_gpu](https://github.com/GregoryKogan/yt-framework/tree/main/examples/video_gpu/)** - GPU processing
 
