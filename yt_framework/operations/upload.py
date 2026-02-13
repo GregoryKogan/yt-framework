@@ -17,6 +17,9 @@ from yt_framework.yt.client_base import BaseYTClient
 from omegaconf import OmegaConf
 from yt_framework.utils.ignore import YTIgnoreMatcher
 
+# Marker for the implicit ytjobs framework package in target conflict checks
+_IMPLICIT_YTJOBS_SOURCE = "implicit (framework)"
+
 
 def _get_ytjobs_dir() -> Path:
     """Get ytjobs package directory dynamically."""
@@ -111,24 +114,32 @@ def _validate_upload_config(
     targets: List[Tuple[str, str]] = []  # (target, source_description)
 
     # ytjobs is implicit
-    targets.append(("ytjobs", "implicit (framework)"))
+    targets.append(("ytjobs", _IMPLICIT_YTJOBS_SOURCE))
 
-    # upload_modules
+    # upload_modules (use top-level package as target; my_package.sub -> my_package)
     for mod in upload_modules or []:
-        targets.append((mod, f"upload_modules[{mod}]"))
+        top_level = mod.split(".")[0]
+        targets.append((top_level, f"upload_modules[{mod}]"))
 
-    # upload_paths
+    # upload_paths (validate source is within pipeline_dir)
+    pipeline_dir_resolved = pipeline_dir.resolve()
     for i, entry in enumerate(upload_paths or []):
         if "source" not in entry:
             raise ValueError("upload_paths entry missing required 'source' key.")
         source = entry.get("source", "")
+        resolved_path = (pipeline_dir / source).resolve()
+        if not resolved_path.is_relative_to(pipeline_dir_resolved):
+            raise ValueError(
+                f"upload_paths[{i}] source must be within pipeline directory: "
+                f"{resolved_path} (pipeline: {pipeline_dir_resolved})."
+            )
         target = entry.get("target")
         resolved_target = _resolve_upload_target(source, target, pipeline_dir)
         targets.append((resolved_target, f"upload_paths[{source}]"))
 
     # Check reserved
     for target, source_desc in targets:
-        if target in reserved and source_desc != "implicit (framework)":
+        if target in reserved and source_desc != _IMPLICIT_YTJOBS_SOURCE:
             raise ValueError(
                 f"Reserved target name '{target}' cannot be used. "
                 f"Reserved names: stages, ytjobs."
@@ -152,25 +163,43 @@ def _copy_module_to_build_dir(
 ) -> int:
     """Copy an importable module/package to build directory.
 
-    Respects .ytignore patterns if present in the module directory.
+    For dotted module paths (e.g. my_package.submodule), copies the full
+    top-level package to preserve import structure. Respects .ytignore
+    patterns if present in the module directory.
 
     Args:
-        module_name: Python module name to import
-        target_dir: Target directory in build
+        module_name: Python module name to import (e.g. my_package or my_package.sub)
+        target_dir: Target directory in build (top-level package name)
         logger: Logger instance
 
     Returns:
         Number of files copied
 
     Raises:
-        ValueError: If module cannot be imported
+        ValueError: If module cannot be imported or has unsupported layout
     """
+    top_level = module_name.split(".")[0]
     try:
-        module = importlib.import_module(module_name)
+        module = importlib.import_module(top_level)
     except ImportError as e:
-        raise ValueError(f"Failed to import module '{module_name}': {e}.") from e
+        raise ValueError(
+            f"Failed to import module '{module_name}' (top-level: {top_level}): {e}."
+        ) from e
 
-    source_dir = Path(module.__file__).parent
+    if getattr(module, "__file__", None) is None:
+        raise ValueError(
+            f"Module '{module_name}' has no __file__ (namespace or non-file package). "
+            "Only file-based packages are supported."
+        )
+
+    file_path = Path(module.__file__).resolve()
+    source_dir = file_path.parent
+    if not source_dir.is_dir():
+        raise ValueError(
+            f"Module '{module_name}' layout is unsupported: __file__ does not "
+            "point to a loadable file within a directory."
+        )
+
     target_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"Copying module {module_name} to {target_dir}...")
@@ -222,10 +251,17 @@ def _copy_path_to_build_dir(
         Number of files copied
 
     Raises:
+        ValueError: If source path escapes pipeline directory or is not a directory
         FileNotFoundError: If source does not exist
-        ValueError: If source is not a directory
     """
+    pipeline_dir_resolved = pipeline_dir.resolve()
     resolved = (pipeline_dir / source_path).resolve()
+
+    if not resolved.is_relative_to(pipeline_dir_resolved):
+        raise ValueError(
+            f"Upload path source must be within pipeline directory: {resolved} "
+            f"(pipeline: {pipeline_dir_resolved}). Paths like '../foo' are not allowed."
+        )
 
     if not resolved.exists():
         raise FileNotFoundError(
@@ -502,12 +538,14 @@ def build_code_locally(
         logger=logger,
     )
 
-    # Copy upload_modules
+    # Copy upload_modules (use top-level package name for target; dotted paths
+    # e.g. my_package.submodule become build_dir/my_package/ with full tree)
     module_files = 0
     for mod in upload_modules or []:
+        top_level = mod.split(".")[0]
         module_files += _copy_module_to_build_dir(
             module_name=mod,
-            target_dir=build_dir / mod,
+            target_dir=build_dir / top_level,
             logger=logger,
         )
 

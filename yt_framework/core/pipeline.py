@@ -24,9 +24,9 @@ import argparse
 import logging
 import traceback
 from pathlib import Path
-from typing import Optional, Dict, Any, cast, TypeAlias
+from typing import Optional, Dict, Any, cast, TypeAlias, List
 
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import OmegaConf, DictConfig, ListConfig
 from yt_framework.yt.factory import create_yt_client
 from yt_framework.utils.logging import (
     setup_logging,
@@ -41,6 +41,28 @@ from yt_framework.operations.upload import upload_all_code
 
 
 DebugContext: TypeAlias = Dict[str, Any]
+
+
+def _normalize_upload_modules(raw: Any) -> List[str]:
+    """Normalize upload_modules config: accept list, tuple, or single string."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return [raw] if raw.strip() else []
+    if isinstance(raw, (list, tuple, ListConfig)):
+        return [str(m).strip() for m in raw if str(m).strip()]
+    raise ValueError(
+        "upload_modules must be a list of module names or a single string."
+    )
+
+
+def _normalize_upload_paths(raw: Any) -> List[Dict[str, str]]:
+    """Normalize upload_paths config: must be a list of dicts."""
+    if raw is None:
+        return []
+    if not isinstance(raw, (list, tuple, ListConfig)):
+        raise ValueError("upload_paths must be a list of {source, target?} dicts.")
+    return [dict(e) for e in raw]
 
 
 class BasePipeline:
@@ -224,11 +246,12 @@ class BasePipeline:
                 build_code_dir = self.pipeline_dir / build_code_dir
 
         # Get upload_modules and upload_paths from config
-        upload_modules_raw = self.config.pipeline.get("upload_modules")
-        upload_modules = list(upload_modules_raw) if upload_modules_raw else []
-
-        upload_paths_raw = self.config.pipeline.get("upload_paths")
-        upload_paths = [dict(e) for e in upload_paths_raw] if upload_paths_raw else []
+        upload_modules = _normalize_upload_modules(
+            self.config.pipeline.get("upload_modules")
+        )
+        upload_paths = _normalize_upload_paths(
+            self.config.pipeline.get("upload_paths")
+        )
 
         upload_all_code(
             yt_client=self.yt,

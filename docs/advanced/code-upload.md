@@ -120,12 +120,12 @@ pipeline:
 
 **`upload_paths`** (optional): List of dicts with:
 
-- **`source`** (required): Path relative to pipeline directory, or absolute
+- **`source`** (required): Path relative to pipeline directory (or absolute, but must resolve within it)
 - **`target`** (optional): Directory name in the archive. Defaults to the last component of `source` (e.g., `./lib/ad_hoc` → `ad_hoc`)
 
 **Implicit:** The `ytjobs` package is always uploaded; you do not need to list it.
 
-**Path resolution:** All paths in `upload_paths` are resolved relative to the pipeline directory. Use resolved absolute paths in error messages for easier debugging.
+**Path resolution:** All paths in `upload_paths` are resolved relative to the pipeline directory. **Path containment:** The resolved path must stay within the pipeline directory—paths that escape (e.g., `../other_dir`) are rejected with a clear error.
 
 **`.ytignore`:** Applied to all upload sources (ytjobs, upload_modules, upload_paths). Place `.ytignore` in the source directory to exclude files.
 
