@@ -223,12 +223,21 @@ class BasePipeline:
                 # If relative path, make it relative to pipeline directory
                 build_code_dir = self.pipeline_dir / build_code_dir
 
+        # Get upload_modules and upload_paths from config
+        upload_modules_raw = self.config.pipeline.get("upload_modules")
+        upload_modules = list(upload_modules_raw) if upload_modules_raw else []
+
+        upload_paths_raw = self.config.pipeline.get("upload_paths")
+        upload_paths = [dict(e) for e in upload_paths_raw] if upload_paths_raw else []
+
         upload_all_code(
             yt_client=self.yt,
             build_folder=build_folder,
             pipeline_dir=self.pipeline_dir,
             logger=self.logger,
             build_code_dir=build_code_dir,
+            upload_modules=upload_modules,
+            upload_paths=upload_paths,
         )
 
     def run(self) -> None:
