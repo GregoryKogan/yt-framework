@@ -104,7 +104,6 @@ These modules require **no external dependencies** for basic functionality:
 - `ytjobs.config` - Configuration utilities (note: `omegaconf` recommended for reading config files)
 - `ytjobs.logging` - Logging utilities
 - `ytjobs.mapper` - Mapper utilities
-- `ytjobs.chatml` - ChatML formatting
 
 ### Feature-Specific Modules
 
