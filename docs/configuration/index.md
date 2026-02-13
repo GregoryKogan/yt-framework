@@ -82,6 +82,26 @@ pipeline:
 
 If not specified, uses the pipeline directory. Useful for monorepos or shared code.
 
+**`upload_modules`** (optional): List of Python module names to upload in addition to ytjobs.
+
+```yaml
+pipeline:
+  upload_modules: [my_package, company_utils]
+```
+
+Each module must be importable. The `ytjobs` package is always uploaded implicitly.
+
+**`upload_paths`** (optional): List of local directories to upload by path.
+
+```yaml
+pipeline:
+  upload_paths:
+    - { source: "./lib/shared", target: "shared" }
+    - { source: "./experiments/utils" }  # target defaults to "utils"
+```
+
+Paths are relative to the pipeline directory. Use `target` to set the directory name in the archive. See [Code Upload](../advanced/code-upload.md) for details.
+
 ## Stage Configuration
 
 Each stage has its own configuration file at `stages/<stage_name>/config.yaml`:
