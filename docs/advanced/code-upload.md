@@ -102,14 +102,49 @@ code.tar.gz (extracted contents)
 
 Note: Wrapper scripts are in the archive root, not in `stages/` subdirectories.
 
+### Custom Upload Modules and Paths
+
+You can upload additional packages beyond the implicit `ytjobs` package:
+
+```yaml
+# configs/config.yaml
+pipeline:
+  build_folder: "//tmp/my_pipeline/build"
+  upload_modules: [my_package_1, my_package_2]   # Import by module name
+  upload_paths:                                  # Or by local path
+    - { source: "./lib/ad_hoc", target: "ad_hoc" }
+    - { source: "./shared_utils" }               # target defaults to "shared_utils"
+```
+
+**`upload_modules`** (optional): List of Python module/package names. Each module is resolved via `import`, and its directory is copied into the archive. Modules must be importable (installed in your environment).
+
+**`upload_paths`** (optional): List of dicts with:
+
+- **`source`** (required): Path relative to pipeline directory, or absolute
+- **`target`** (optional): Directory name in the archive. Defaults to the last component of `source` (e.g., `./lib/ad_hoc` → `ad_hoc`)
+
+**Implicit:** The `ytjobs` package is always uploaded; you do not need to list it.
+
+**Path resolution:** All paths in `upload_paths` are resolved relative to the pipeline directory. Use resolved absolute paths in error messages for easier debugging.
+
+**`.ytignore`:** Applied to all upload sources (ytjobs, upload_modules, upload_paths). Place `.ytignore` in the source directory to exclude files.
+
+**Reserved targets:** `stages` and `ytjobs` cannot be used as target names.
+
+**Target conflicts:** If two sources map to the same target (e.g., `upload_modules: [my_utils]` and `upload_paths: [{ source: "./lib/my_utils", target: "my_utils" }]`), the framework raises an error.
+
 ## Code Archive Contents
 
 The `code.tar.gz` archive contains:
 
 ### Framework Packages
 
-- **`yt_framework/`**: Framework package (read-only)
-- **`ytjobs/`**: YT jobs utilities package (read-only)
+- **`ytjobs/`**: YT jobs utilities package (always uploaded, read-only)
+
+### Custom Packages (Optional)
+
+- **`<module_name>/`**: Packages from `upload_modules`
+- **`<target>/`**: Directories from `upload_paths`
 
 ### Stage Code
 
@@ -130,10 +165,10 @@ The `code.tar.gz` archive contains:
 
 ```plaintext
 code.tar.gz
-├── yt_framework/
-│   └── ...
 ├── ytjobs/
 │   └── ...
+├── my_package_1/          # From upload_modules (if configured)
+├── ad_hoc/                # From upload_paths (if configured)
 └── stages/
     └── my_stage/
         ├── config.yaml
@@ -180,7 +215,6 @@ Similar structure but executes `vanilla.py` instead of `mapper.py`.
 
 **Always uploaded:**
 
-- `yt_framework/` package
 - `ytjobs/` package
 - Stage source code (`src/`)
 - Stage config files
@@ -188,6 +222,8 @@ Similar structure but executes `vanilla.py` instead of `mapper.py`.
 **Conditionally uploaded:**
 
 - `requirements.txt` (if present in stage directory)
+- Packages from `upload_modules` (if configured)
+- Directories from `upload_paths` (if configured)
 
 ### Requirements.txt
 
