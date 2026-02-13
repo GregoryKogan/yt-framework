@@ -194,10 +194,6 @@ def _create_unified_wrapper_script(
 #!/bin/bash
 set -e
 
-# Extract code archive
-echo "Extracting code archive..." >&2
-tar -xzf code.tar.gz
-
 # Get current directory (sandbox root)
 SANDBOX_ROOT="$(pwd)"
 
@@ -215,7 +211,6 @@ if [ -f "{requirements_path}" ]; then
 fi
 
 # Execute the {operation_type} operation
-echo "Running {operation_type} operation..." >&2
 python3 {script_path}
 """
 
