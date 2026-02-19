@@ -60,6 +60,7 @@ class StreamMapper:
                 )
             except Exception as e:
                 log_error({"error": f"Processing failed: {str(e)}", "row": line})
+                raise
 
 
 class BatchMapper:
@@ -133,6 +134,7 @@ class BatchMapper:
                         "total_rows": len(rows),
                     }
                 )
+                raise
 
     def _process_in_batches(
         self,
@@ -215,3 +217,4 @@ class BatchMapper:
                     "batch_number": batch_number,
                 }
             )
+            raise
