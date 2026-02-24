@@ -81,6 +81,7 @@ def _prepare_vanilla_operation(
     script_path, dependencies, command = builder.build_dependencies(
         operation_type="vanilla",
         stage_dir=stage_dir,
+        archive_name="source.tar.gz",
         build_folder=pipeline_config.pipeline.build_folder,
         operation_config=operation_config,
         stage_config=stage_config,

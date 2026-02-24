@@ -40,7 +40,6 @@ stages:
 pipeline:
   mode: "dev"  # or "prod"
   build_folder: "//tmp/my_pipeline/build"  # Required for operations with code
-  build_code_dir: null  # Optional: custom code directory
 ```
 
 ### Stages Section
@@ -72,15 +71,6 @@ pipeline:
 ```
 
 Required if any enabled stages have `src/` directory (for map or vanilla operations).
-
-**`build_code_dir`** (optional): Custom directory containing code to upload.
-
-```yaml
-pipeline:
-  build_code_dir: "/path/to/custom/code"
-```
-
-If not specified, uses the pipeline directory. Useful for monorepos or shared code.
 
 **`upload_modules`** (optional): List of Python module names to upload in addition to ytjobs.
 
