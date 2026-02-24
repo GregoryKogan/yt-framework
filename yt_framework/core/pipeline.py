@@ -254,15 +254,6 @@ class BasePipeline:
                     'Add: build_folder = "//path/to/build/folder"'
                 )
 
-        # Get build code directory from config (optional)
-        build_code_dir_str = self.config.pipeline.get("build_code_dir")
-        build_code_dir = None
-        if build_code_dir_str:
-            build_code_dir = Path(build_code_dir_str)
-            if not build_code_dir.is_absolute():
-                # If relative path, make it relative to pipeline directory
-                build_code_dir = self.pipeline_dir / build_code_dir
-
         # Get upload_modules and upload_paths from config
         upload_modules = _normalize_upload_modules(
             self.config.pipeline.get("upload_modules")
@@ -276,7 +267,6 @@ class BasePipeline:
             build_folder=build_folder,
             pipeline_dir=self.pipeline_dir,
             logger=self.logger,
-            build_code_dir=build_code_dir,
             upload_modules=upload_modules,
             upload_paths=upload_paths,
         )

@@ -775,8 +775,8 @@ class YTDevClient(BaseYTClient):
                             f"  Dev: checkpoint path does not exist: {checkpoint_path}"
                         )
 
-            # Handle build files (code.tar.gz, etc.)
-            if not copied and (".build" in yt_path or yt_path.endswith(".tar.gz")):
+            # Handle build files (source.tar.gz, etc.)
+            if not copied and yt_path.endswith(".tar.gz"):
                 # Try to find the file in .build directory
                 local_build = self.pipeline_dir / ".build"
                 if local_build.exists():

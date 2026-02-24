@@ -20,6 +20,9 @@ from yt_framework.utils.ignore import YTIgnoreMatcher
 # Marker for the implicit ytjobs framework package in target conflict checks
 _IMPLICIT_YTJOBS_SOURCE = "implicit (framework)"
 
+# Default build code directory name
+_BUILD_CODE_DIR = ".build"
+
 
 def _get_ytjobs_dir() -> Path:
     """Get ytjobs package directory dynamically."""
@@ -402,7 +405,7 @@ def _create_unified_wrapper_script(
     Create unified wrapper script for map or vanilla operations.
 
     The wrapper script:
-    1. Extracts code.tar.gz archive
+    1. Extracts tar.gz archive
     2. Sets up PYTHONPATH to include current directory
     3. Sets JOB_CONFIG_PATH to stage config
     4. Installs requirements.txt if present
@@ -529,13 +532,8 @@ def build_code_locally(
     """
     log_header(logger, "Code Build", f"Build directory: {build_dir}")
 
-    # Clean build directory from previous run so contents match current config
-    if build_dir.exists():
-        shutil.rmtree(build_dir)
-        logger.debug("Cleaned existing build directory from previous run")
-
     # Create build directory
-    build_dir.mkdir(parents=True, exist_ok=True)
+    build_dir.mkdir(parents=True)
 
     # Validate and resolve upload config
     _validate_upload_config(
@@ -663,7 +661,8 @@ def upload_code_archive(
     log_header(logger, "Uploading Code Archive to YT")
     logger.info(f"Build folder: {build_folder}")
 
-    archive_yt_path = f"{build_folder}/code.tar.gz"
+    archive_name = archive_path.name
+    archive_yt_path = f"{build_folder}/{archive_name}"
 
     yt_client.upload_file(
         local_path=archive_path,
@@ -675,7 +674,6 @@ def upload_code_archive(
 
 
 def _resolve_build_code_dir(
-    build_code_dir: Optional[Path],
     pipeline_dir: Path,
     logger: logging.Logger,
 ) -> Path:
@@ -683,37 +681,32 @@ def _resolve_build_code_dir(
     Resolve build code directory path.
 
     Args:
-        build_code_dir: Optional path to local build directory
         pipeline_dir: Path to pipeline directory
         logger: Logger instance
 
     Returns:
         Resolved build code directory path
     """
-    if build_code_dir is None:
-        # Default to pipeline_dir/.build
-        build_code_dir = pipeline_dir / ".build"
-        logger.debug(f"Using default build directory: {build_code_dir}")
-    else:
-        build_code_dir = Path(build_code_dir).resolve()
-        logger.debug(f"Using specified build directory: {build_code_dir}")
+    build_code_dir = pipeline_dir / _BUILD_CODE_DIR
+    logger.debug(f"Using build directory: {build_code_dir}")
 
     # Ensure build directory exists
-    build_code_dir.mkdir(parents=True, exist_ok=True)
+    if build_code_dir.exists():
+        shutil.rmtree(build_code_dir)
+    build_code_dir.mkdir(parents=True)
     return build_code_dir
 
 
-def upload_code_as_archive(
+def upload_all_code(
     yt_client: BaseYTClient,
     build_folder: str,
     pipeline_dir: Path,
     logger: logging.Logger,
-    build_code_dir: Optional[Path] = None,
     upload_modules: Optional[List[str]] = None,
     upload_paths: Optional[List[Dict[str, str]]] = None,
 ) -> None:
     """
-    Upload code to YT as a tar archive.
+    Upload all code to YT: ytjobs package, optional custom modules/paths, and stages.
 
     Builds code locally, creates tar archive, and uploads it to YT.
 
@@ -722,8 +715,6 @@ def upload_code_as_archive(
         build_folder: YT build folder path
         pipeline_dir: Path to pipeline directory
         logger: Logger instance
-        build_code_dir: Optional path to local build directory. If None, creates
-                       a directory inside pipeline_dir
         upload_modules: Optional list of module names to upload
         upload_paths: Optional list of {source, target?} for local paths
 
@@ -736,13 +727,12 @@ def upload_code_as_archive(
 
     # Resolve build directory path
     build_code_dir = _resolve_build_code_dir(
-        build_code_dir=build_code_dir,
         pipeline_dir=pipeline_dir,
-        logger=logger,
+        logger=logger
     )
 
     # Build code locally (including wrapper scripts for tar archive mode)
-    build_dir = build_code_dir / "build"
+    build_dir = build_code_dir / "source"
     build_code_locally(
         build_dir=build_dir,
         pipeline_dir=pipeline_dir,
@@ -753,7 +743,7 @@ def upload_code_as_archive(
     )
 
     # Create archive
-    archive_path = build_code_dir / "code.tar.gz"
+    archive_path = build_code_dir / "source.tar.gz"
     create_code_archive(
         build_dir=build_dir,
         archive_path=archive_path,
@@ -768,43 +758,4 @@ def upload_code_as_archive(
         logger=logger,
     )
 
-    log_success(logger, "Code upload completed (tar archive mode)")
-
-
-def upload_all_code(
-    yt_client: BaseYTClient,
-    build_folder: str,
-    pipeline_dir: Path,
-    logger: logging.Logger,
-    build_code_dir: Optional[Path] = None,
-    upload_modules: Optional[List[str]] = None,
-    upload_paths: Optional[List[Dict[str, str]]] = None,
-) -> None:
-    """
-    Upload all code to YT: ytjobs package, optional custom modules/paths, and stages.
-
-    This is the main entry point for code upload operations.
-    Code is always uploaded as a tar archive.
-
-    Args:
-        yt_client: YT client instance
-        build_folder: YT build folder path
-        pipeline_dir: Path to pipeline directory
-        logger: Logger instance
-        build_code_dir: Optional path to local build directory. If None, creates
-                       a directory inside pipeline_dir
-        upload_modules: Optional list of module names to upload
-        upload_paths: Optional list of {source, target?} for local paths
-
-    Returns:
-        None
-    """
-    upload_code_as_archive(
-        yt_client=yt_client,
-        build_folder=build_folder,
-        pipeline_dir=pipeline_dir,
-        logger=logger,
-        build_code_dir=build_code_dir,
-        upload_modules=upload_modules,
-        upload_paths=upload_paths,
-    )
+    log_success(logger, "Code upload completed")

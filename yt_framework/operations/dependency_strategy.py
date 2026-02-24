@@ -27,6 +27,7 @@ class DependencyBuilder(Protocol):
         self,
         operation_type: Literal["map", "vanilla"],
         stage_dir: Path,
+        archive_name: str,
         build_folder: str,
         operation_config: DictConfig,
         stage_config: DictConfig,
@@ -38,6 +39,7 @@ class DependencyBuilder(Protocol):
         Args:
             operation_type: Type of operation ('map' or 'vanilla')
             stage_dir: Path to stage directory
+            archive_name: Name of the archive (e.g., "source.tar.gz")
             build_folder: YT build folder path
             operation_config: Operation-specific config (from client.operations.map/vanilla)
             stage_config: Full stage config (for accessing job section)
@@ -49,7 +51,6 @@ class DependencyBuilder(Protocol):
             - dependencies: List of (yt_path, local_path) tuples
             - command: Optional command to execute (for tar mode)
         """
-        ...
 
 
 class TarArchiveDependencyBuilder:
@@ -66,6 +67,7 @@ class TarArchiveDependencyBuilder:
         self,
         operation_type: Literal["map", "vanilla"],
         stage_dir: Path,
+        archive_name: str,
         build_folder: str,
         operation_config: DictConfig,
         stage_config: DictConfig,
@@ -74,7 +76,7 @@ class TarArchiveDependencyBuilder:
         """Build dependencies using tar archive strategy.
         
         Creates a tar archive deployment where all code is packaged into a single
-        code.tar.gz file. Generates a bootstrap command that extracts the archive
+        tar.gz file. Generates a bootstrap command that extracts the archive
         and executes the appropriate wrapper script.
         
         Args:
@@ -89,7 +91,7 @@ class TarArchiveDependencyBuilder:
             Tuple containing:
             - script_path: Placeholder path to script in YT (not used when command provided).
             - dependencies: List of (yt_path, local_path) tuples including:
-              * code.tar.gz archive
+              * tar.gz archive
               * Optional checkpoint file if configured
             - command: Bootstrap command string that extracts archive and runs wrapper.
         """
@@ -108,6 +110,7 @@ class TarArchiveDependencyBuilder:
         bootstrap_command = self._create_bootstrap_command(
             stage_name=stage_name,
             operation_type=operation_type,
+            archive_name=archive_name,
             logger=logger,
         )
 
@@ -121,8 +124,8 @@ class TarArchiveDependencyBuilder:
         dependencies: List[Tuple[str, str]] = []
 
         # Add tar archive as dependency
-        archive_yt_path = f"{build_folder}/code.tar.gz"
-        dependencies.append((archive_yt_path, "code.tar.gz"))
+        archive_yt_path = f"{build_folder}/{archive_name}"
+        dependencies.append((archive_yt_path, archive_name))
         logger.info(f"Added tar archive dependency: {archive_yt_path}")
 
         # Add checkpoint if configured (for map operations with models)
@@ -156,18 +159,20 @@ class TarArchiveDependencyBuilder:
         self,
         stage_name: str,
         operation_type: Literal["map", "vanilla"],
+        archive_name: str,
         logger: logging.Logger,
     ) -> str:
         """
         Create bootstrap command for tar archive mode.
 
         The bootstrap command:
-        1. Extracts code.tar.gz archive
+        1. Extracts tar.gz archive
         2. Runs the operation-specific wrapper script
 
         Args:
             stage_name: Name of the stage (e.g., "run_map")
             operation_type: Type of operation ('map' or 'vanilla')
+            archive_name: Name of the archive (e.g., "source.tar.gz")
             logger: Logger instance
 
         Returns:
@@ -179,7 +184,7 @@ class TarArchiveDependencyBuilder:
         wrapper_name = f"operation_wrapper_{stage_name}_{operation_type}.sh"
 
         bootstrap_command = f"""set -e
-tar -xzf code.tar.gz
+tar -xzf {archive_name}
 ./{wrapper_name}
 """
 
