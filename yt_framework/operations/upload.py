@@ -529,6 +529,11 @@ def build_code_locally(
     """
     log_header(logger, "Code Build", f"Build directory: {build_dir}")
 
+    # Clean build directory from previous run so contents match current config
+    if build_dir.exists():
+        shutil.rmtree(build_dir)
+        logger.debug("Cleaned existing build directory from previous run")
+
     # Create build directory
     build_dir.mkdir(parents=True, exist_ok=True)
 
