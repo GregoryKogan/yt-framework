@@ -36,7 +36,7 @@ stages/
 
 ### Upload Process
 
-1. **Code Packaging**: Creates `code.tar.gz` archive containing:
+1. **Code Packaging**: Creates `source.tar.gz` archive containing:
    - `yt_framework/` package
    - `ytjobs/` package
    - `stages/` directory with all stage code
@@ -46,7 +46,7 @@ stages/
 2. **Upload to YT**: Uploads archive to `build_folder`:
 
    ```plaintext
-   //tmp/my_pipeline/build/code.tar.gz
+   //tmp/my_pipeline/build/source.tar.gz
    ```
 
 3. **Wrapper Scripts**: Generates wrapper scripts for each operation in build folder root:
@@ -83,13 +83,13 @@ After upload, build folder contains:
 
 ```plaintext
 //tmp/my_pipeline/build/
-└── code.tar.gz                                    # Code archive (contains everything)
+└── source.tar.gz                                    # Code archive (contains everything)
 ```
 
-The `code.tar.gz` archive contains (when extracted):
+The `source.tar.gz` archive contains (when extracted):
 
 ```plaintext
-code.tar.gz (extracted contents)
+source.tar.gz (extracted contents)
 ├── ytjobs/                                        # YT jobs package
 ├── stages/
 │   └── my_stage/
@@ -135,7 +135,7 @@ pipeline:
 
 ## Code Archive Contents
 
-The `code.tar.gz` archive contains:
+The `source.tar.gz` archive contains:
 
 ### Framework Packages
 
@@ -164,7 +164,7 @@ The `code.tar.gz` archive contains:
 ### Archive Structure
 
 ```plaintext
-code.tar.gz
+source.tar.gz
 ├── ytjobs/
 │   └── ...
 ├── my_package_1/          # From upload_modules (if configured)
@@ -188,7 +188,7 @@ Wrapper scripts handle code extraction and execution.
 set -e
 
 # Extract code archive
-tar -xzf code.tar.gz
+tar -xzf source.tar.gz
 
 # Set PYTHONPATH
 export PYTHONPATH="${PYTHONPATH}:$(pwd)"
@@ -248,33 +248,18 @@ transformers>=4.20.0
 - Only include necessary dependencies
 - Keep file size reasonable
 
-## Build Code Directory
+## Local Build Directory
 
-By default, code is uploaded from the pipeline directory. You can specify a custom code directory:
-
-```yaml
-# configs/config.yaml
-pipeline:
-  mode: "prod"
-  build_folder: "//tmp/my_pipeline/build"
-  build_code_dir: "/path/to/custom/code"  # Optional
-```
-
-**Use cases:**
-
-- Monorepo with shared code
-- Code in different location
-- Custom code structure
-
-**Note:** If `build_code_dir` is relative, it's resolved relative to pipeline directory.
+Code is assembled under the pipeline directory in a local `.build` directory before being packed into `source.tar.gz` and uploaded. The `.build` directory is cleaned at the start of each upload run so its contents always match the current config (`upload_modules`, `upload_paths`, and stages).
 
 ## Dev Mode Behavior
 
-In dev mode, code upload is skipped:
+In dev mode, code is still built locally (`.build/` and `source.tar.gz` are created) but not uploaded to YT:
 
 - Code runs directly from local filesystem
-- No archive creation
-- No upload to YT
+- Archive is created locally in `.build/source.tar.gz`
+- No upload to YT (upload is a no-op in dev)
+
 - Faster iteration
 
 **Dev mode execution:**
@@ -282,7 +267,7 @@ In dev mode, code upload is skipped:
 ```plaintext
 .dev/sandbox_input->output/
 ├── input.jsonl
-├── code.tar.gz (extracted)
+├── source.tar.gz (extracted)
 └── operation_wrapper_*.sh
 ```
 
@@ -331,7 +316,7 @@ from ytjobs.logging.logger import get_logger
 
 ```plaintext
 sandbox/
-├── code.tar.gz (extracted)
+├── source.tar.gz (extracted)
 ├── stages/
 │   └── my_stage/
 │       ├── config.yaml
@@ -389,13 +374,13 @@ Code upload happens automatically. Check logs for:
 **In YT web UI:**
 
 1. Navigate to build folder: `//tmp/my_pipeline/build`
-2. Download `code.tar.gz`
+2. Download `source.tar.gz`
 3. Extract and inspect contents
 
 **In dev mode:**
 
-1. Check `.build/build/` directory
-2. Inspect `code.tar.gz` archive
+1. Check `.build/source/` directory
+2. Inspect `source.tar.gz` archive
 3. Review wrapper scripts
 
 ## Best Practices
@@ -408,17 +393,6 @@ Code upload happens automatically. Check logs for:
 6. **Version control**: Track code changes
 
 ## Advanced Topics
-
-### Custom Code Structure
-
-For custom code structures, use `build_code_dir`:
-
-```yaml
-pipeline:
-  build_code_dir: "/path/to/shared/code"
-```
-
-This allows sharing code across pipelines or using monorepo structures.
 
 ### Code Upload Optimization
 

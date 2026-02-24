@@ -93,7 +93,7 @@ Map operations run locally using subprocess:
 # Dev mode execution
 .dev/sandbox_input->output/
 ├── input.jsonl
-├── code.tar.gz (extracted)
+├── source.tar.gz (extracted)
 └── operation_wrapper_*.sh
 ```
 
@@ -102,7 +102,7 @@ Map operations run locally using subprocess:
 Vanilla operations run locally using subprocess:
 
 1. Creates sandbox directory: `.dev/<stage_name>_sandbox/`
-2. Extracts code archive
+2. Extracts source archive
 3. Executes vanilla.py script
 4. Logs output to `.dev/<stage_name>.log`
 
