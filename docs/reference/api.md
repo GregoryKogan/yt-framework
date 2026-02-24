@@ -15,7 +15,7 @@ YT Framework is organized into several key modules:
 - **Core**: Pipeline, stage, registry, and discovery functionality
 - **Operations**: Map, vanilla, YQL, S3, and table operations
 - **YT**: YT client implementations (dev and prod)
-- **Utils**: Logging, environment, and utility functions
+- **Utils**: Logging, environment, ignore patterns, and utility functions
 
 ```{note}
 **Auto-Generated Documentation**
@@ -120,15 +120,6 @@ YQL operations are implemented as methods on `BaseYTClient` and its subclasses (
 
 ## Utilities
 
-### Archive
-
-```{eval-rst}
-.. automodule:: yt_framework.utils.archive
-   :members:
-   :undoc-members:
-   :show-inheritance:
-```
-
 ### Environment
 
 ```{eval-rst}
@@ -142,6 +133,15 @@ YQL operations are implemented as methods on `BaseYTClient` and its subclasses (
 
 ```{eval-rst}
 .. automodule:: yt_framework.utils.logging
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+### Ignore Patterns
+
+```{eval-rst}
+.. automodule:: yt_framework.utils.ignore
    :members:
    :undoc-members:
    :show-inheritance:
