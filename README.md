@@ -1,11 +1,12 @@
 # YT Framework
 
-![GitHub License](https://img.shields.io/github/license/GregoryKogan/yt-framework)
 [![PyPI - Version](https://img.shields.io/pypi/v/yt_framework)](https://pypi.org/project/yt-framework/)
+[![Documentation Status](https://app.readthedocs.org/projects/yt-framework/badge/?version=latest)](https://yt-framework.readthedocs.io)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/GregoryKogan/yt-framework)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/yt_framework)
-![Documentation Status](https://app.readthedocs.org/projects/yt-framework/badge/?version=latest)
+![GitHub License](https://img.shields.io/github/license/GregoryKogan/yt-framework)
 
-**[PyPI](https://pypi.org/project/yt-framework/) | [Documentation](https://yt-framework.readthedocs.io/en/latest/) | [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples)**
+**[PyPI](https://pypi.org/project/yt-framework/) | [Docs](https://yt-framework.readthedocs.io/en/latest/) | [DeepWiki](https://deepwiki.com/GregoryKogan/yt-framework) | [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples)**
 
 ---
 
