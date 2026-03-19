@@ -7,7 +7,9 @@ Reusable S3 client for any S3 operations.
 
 import boto3
 import logging
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
+from urllib.parse import urlparse
+
 from botocore.client import Config as BotoConfig
 
 
@@ -58,23 +60,47 @@ class S3Client:
         max_retries: int = 30,
         timeout: int = 360,
         logger: Optional[logging.Logger] = None,
+        *,
+        region_name: Optional[str] = None,
+        boto_config: Optional[BotoConfig] = None,
     ):
         self.logger = logger or logging.getLogger(__name__)
 
-        self.client = boto3.client(
-            service_name="s3",
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            endpoint_url=endpoint,
-            config=BotoConfig(
+        if boto_config is None:
+            config = BotoConfig(
                 s3={"addressing_style": "virtual"},
                 retries={"max_attempts": max_retries, "mode": "standard"},
                 read_timeout=timeout,
                 max_pool_connections=1,
-            ),
+            )
+        else:
+            config = boto_config
+
+        client_kwargs: Dict[str, Any] = dict(
+            service_name="s3",
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            endpoint_url=endpoint,
+            config=config,
         )
+        if region_name is not None:
+            client_kwargs["region_name"] = region_name
+        self.client = boto3.client(**client_kwargs)
 
         self.logger.debug(f"S3 client initialized: {endpoint}")
+
+    @staticmethod
+    def parse_s3_uri(uri: str) -> tuple[str, str]:
+        """
+        Split ``s3://bucket/key/path`` into ``(bucket, key)``.
+
+        Raises:
+            ValueError: If the URI is not a valid S3 URI.
+        """
+        u = urlparse(uri)
+        if u.scheme != "s3" or not u.netloc or not u.path:
+            raise ValueError(f"Bad s3 uri: {uri}")
+        return u.netloc, u.path.lstrip("/")
 
     @staticmethod
     def create(
@@ -172,6 +198,11 @@ class S3Client:
         except Exception as e:
             self.logger.error(f"Failed to download: {e}")
             raise
+
+    def download_by_uri(self, s3_uri: str) -> bytes:
+        """Download object bytes from ``s3://bucket/key``."""
+        bucket, key = S3Client.parse_s3_uri(s3_uri)
+        return self.download(bucket, key)
 
     def upload(
         self, data: bytes, bucket: str, key: str, content_type: Optional[str] = None
