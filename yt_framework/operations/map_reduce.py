@@ -16,6 +16,7 @@ from yt_framework.utils.logging import log_header, log_success
 from yt_framework.core.stage import StageContext
 from yt_framework.yt.client_base import OperationResources
 from .dependency_strategy import TarArchiveDependencyBuilder
+from .job_command import require_consistent_map_reduce_legs
 from .common import (
     build_environment,
     prepare_docker_auth,
@@ -56,9 +57,12 @@ def run_map_reduce(
     """
     Run a YT map-reduce operation and wait for completion.
 
-    The stage must pass mapper and reducer as TypedJob instances (e.g. from
-    pure_mds or stage src). Dependencies are built from the stage archive and
-    operation_config.file_paths; env from configs/secrets.env.
+    Pass mapper and reducer either both as ``TypedJob`` instances or both as
+    command strings (JSON stdin/stdout). Mixing kinds raises ``ValueError``.
+
+    Set ``operation_config.tar_command_bootstrap: true`` to wrap string legs with
+    the same ``tar -xzf source.tar.gz`` + wrapper pattern as map operations
+    (requires matching wrappers in the uploaded tarball; see docs).
 
     Args:
         context: Stage context (deps, logger, stage_dir, config).
@@ -90,8 +94,10 @@ def run_map_reduce(
             env[str(k)] = str(v)
     resources = _resources_from_config(operation_config, logger)
 
+    require_consistent_map_reduce_legs(mapper, reducer)
+
     builder = TarArchiveDependencyBuilder()
-    _, dependencies, _ = builder.build_dependencies(
+    dep = builder.build_dependencies(
         operation_type="map_reduce",
         stage_dir=context.stage_dir,
         archive_name="source.tar.gz",
@@ -99,7 +105,19 @@ def run_map_reduce(
         operation_config=operation_config,
         stage_config=context.config,
         logger=logger,
+        mapper=mapper,
+        reducer=reducer,
     )
+    dependencies = dep.dependencies
+    if dep.mapper_command is not None and dep.reducer_command is not None:
+        mapper = dep.mapper_command
+        reducer = dep.reducer_command
+        logger.info("Using tar bootstrap commands for map-reduce mapper and reducer legs")
+    elif dep.mapper_command is not None or dep.reducer_command is not None:
+        raise RuntimeError(
+            "Internal error: partial map-reduce tar bootstrap (only one leg set); "
+            "expected both or neither."
+        )
 
     docker_image = (operation_config.get("resources") or {}).get("docker_image") or operation_config.get("docker_image")
     docker_auth = prepare_docker_auth(
@@ -163,8 +181,9 @@ def run_reduce(
     """
     Run a YT reduce-only operation and wait for completion.
 
-    The stage must pass reducer as a TypedJob instance. Dependencies and env
-    are built by the framework.
+    Pass ``reducer`` as a ``TypedJob`` or a command string. With
+    ``operation_config.tar_command_bootstrap: true``, string reducers get the same
+    tar extract + wrapper bootstrap as map (see docs).
 
     Args:
         context: Stage context.
@@ -195,7 +214,7 @@ def run_reduce(
     resources = _resources_from_config(operation_config, logger)
 
     builder = TarArchiveDependencyBuilder()
-    _, dependencies, _ = builder.build_dependencies(
+    dep = builder.build_dependencies(
         operation_type="reduce",
         stage_dir=context.stage_dir,
         archive_name="source.tar.gz",
@@ -203,7 +222,12 @@ def run_reduce(
         operation_config=operation_config,
         stage_config=context.config,
         logger=logger,
+        reducer=reducer,
     )
+    dependencies = dep.dependencies
+    if dep.reducer_command is not None:
+        reducer = dep.reducer_command
+        logger.info("Using tar bootstrap command for reduce leg")
 
     docker_image = (operation_config.get("resources") or {}).get("docker_image") or operation_config.get("docker_image")
     docker_auth = prepare_docker_auth(

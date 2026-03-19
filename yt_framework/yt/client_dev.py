@@ -17,6 +17,7 @@ from yt.wrapper import Operation  # pyright: ignore[reportMissingImports]
 from typing import TYPE_CHECKING
 
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
+from yt_framework.operations.job_command import is_typed_job
 
 if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
@@ -725,6 +726,18 @@ class YTDevClient(BaseYTClient):
         **kwargs: Any,
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
+        def _leg_desc(obj: Any) -> str:
+            if is_typed_job(obj):
+                return "TypedJob"
+            if isinstance(obj, str):
+                return "command (prod uses JsonFormat on this leg)"
+            return f"invalid leg type {type(obj).__name__} (expected TypedJob or str)"
+
+        self.logger.info(
+            "Dev: map-reduce mapper leg: %s; reducer leg: %s",
+            _leg_desc(mapper),
+            _leg_desc(reducer),
+        )
         self.logger.info("Dev: map-reduce no-op (copying input -> output)")
         assert self.pipeline_dir is not None
         self._dev_dir().mkdir(parents=True, exist_ok=True)
@@ -752,6 +765,13 @@ class YTDevClient(BaseYTClient):
         **kwargs: Any,
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
+        if is_typed_job(reducer):
+            rdesc = "TypedJob"
+        elif isinstance(reducer, str):
+            rdesc = "command (prod uses JsonFormat on this leg)"
+        else:
+            rdesc = f"invalid leg type {type(reducer).__name__} (expected TypedJob or str)"
+        self.logger.info("Dev: reduce leg: %s", rdesc)
         self.logger.info("Dev: reduce no-op (copying input -> output)")
         assert self.pipeline_dir is not None
         self._dev_dir().mkdir(parents=True, exist_ok=True)

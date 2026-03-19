@@ -79,7 +79,7 @@ def _prepare_map_operation(
     # Use strategy pattern to build dependencies
     # Pass both operation_config (for checkpoint) and stage_config (for job.model_name)
     builder = TarArchiveDependencyBuilder()
-    mapper_path, dependencies, command = builder.build_dependencies(
+    dep = builder.build_dependencies(
         operation_type="map",
         stage_dir=stage_dir,
         archive_name="source.tar.gz",
@@ -88,6 +88,9 @@ def _prepare_map_operation(
         stage_config=stage_config,
         logger=logger,
     )
+    mapper_path = dep.script_path
+    dependencies = dep.dependencies
+    command = dep.command
 
     # Get Docker auth credentials from loaded secrets
     # Support both resources.docker_image and direct docker_image for flexibility

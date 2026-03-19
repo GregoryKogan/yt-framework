@@ -105,6 +105,7 @@ stages:
 
 ## See Also
 
+- [Command mode map-reduce / reduce](command-mode-map-reduce.md) — `tar_command_bootstrap`, JSON stdin/stdout legs
 - [Map Operations](map.md) - Detailed map operation guide
 - [Vanilla Operations](vanilla.md) - Detailed vanilla operation guide
 - [YQL Operations](yql.md) - Detailed YQL operation guide

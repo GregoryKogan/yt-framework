@@ -8,11 +8,39 @@ This module provides a clean separation between deployment strategy and operatio
 preparation logic, following SOLID principles.
 """
 
+from __future__ import annotations
+
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, Tuple, List, Optional, Literal
+from typing import Any, Protocol, Tuple, List, Optional, Literal
 
 from omegaconf import DictConfig
+
+from yt_framework.operations.job_command import (
+    require_consistent_map_reduce_legs,
+    map_reduce_leg_kind,
+)
+from yt_framework.operations.tar_command_wiring import (
+    bootstrap_shell_run_wrapper,
+    map_reduce_wrapper_names,
+    reduce_wrapper_name,
+    wrap_bootstrap_as_bash_c,
+)
+
+
+@dataclass
+class DependencyBuildResult:
+    """Result of tar-dependency preparation for an operation."""
+
+    script_path: str
+    dependencies: List[Tuple[str, str]]
+    command: Optional[str]
+    """Bootstrap command for single-leg map/vanilla (``bash -c '...'``)."""
+    mapper_command: Optional[str] = None
+    """When set, map-reduce mapper leg should use this string (tar + wrapper)."""
+    reducer_command: Optional[str] = None
+    """Map-reduce reducer or reduce-only leg string (tar + wrapper) when set."""
 
 
 class DependencyBuilder(Protocol):
@@ -32,24 +60,15 @@ class DependencyBuilder(Protocol):
         operation_config: DictConfig,
         stage_config: DictConfig,
         logger: logging.Logger,
-    ) -> Tuple[str, List[Tuple[str, str]], Optional[str]]:
+        *,
+        mapper: Any = None,
+        reducer: Any = None,
+    ) -> DependencyBuildResult:
         """
         Build dependencies for an operation.
 
-        Args:
-            operation_type: Type of operation ('map', 'vanilla', 'map_reduce', or 'reduce')
-            stage_dir: Path to stage directory
-            archive_name: Name of the archive (e.g., "source.tar.gz")
-            build_folder: YT build folder path
-            operation_config: Operation-specific config (from client.operations.map/vanilla)
-            stage_config: Full stage config (for accessing job section)
-            logger: Logger instance
-
-        Returns:
-            Tuple of (script_path, dependencies, command)
-            - script_path: Path to script in YT (or placeholder)
-            - dependencies: List of (yt_path, local_path) tuples
-            - command: Optional command to execute (for tar mode)
+        Optional ``mapper`` / ``reducer`` are used for map_reduce / reduce tar command
+        bootstrap when ``tar_command_bootstrap`` is enabled in ``operation_config``.
         """
 
 
@@ -72,30 +91,11 @@ class TarArchiveDependencyBuilder:
         operation_config: DictConfig,
         stage_config: DictConfig,
         logger: logging.Logger,
-    ) -> Tuple[str, List[Tuple[str, str]], Optional[str]]:
-        """Build dependencies using tar archive strategy.
-        
-        Creates a tar archive deployment where all code is packaged into a single
-        tar.gz file. Generates a bootstrap command that extracts the archive
-        and executes the appropriate wrapper script.
-        
-        Args:
-            operation_type: Type of operation ('map', 'vanilla', 'map_reduce', or 'reduce').
-            stage_dir: Path to stage directory containing src/ folder.
-            build_folder: YT build folder path where archive will be stored.
-            operation_config: Operation-specific config (from client.operations.map/vanilla).
-            stage_config: Full stage config (for accessing job.model_name for checkpoints).
-            logger: Logger instance for logging dependency preparation.
-            
-        Returns:
-            Tuple containing:
-            - script_path: Placeholder path to script in YT (not used when command provided).
-            - dependencies: List of (yt_path, local_path) tuples including:
-              * tar.gz archive
-              * Optional checkpoint file if configured
-            - command: Bootstrap command string that extracts archive and runs wrapper.
-        """
-
+        *,
+        mapper: Any = None,
+        reducer: Any = None,
+    ) -> DependencyBuildResult:
+        """Build dependencies using tar archive strategy."""
         from yt_framework.utils import log_header
 
         effective_type = "map" if operation_type in ("map_reduce", "reduce") else operation_type
@@ -107,8 +107,34 @@ class TarArchiveDependencyBuilder:
 
         stage_name = stage_dir.name
 
-        # For map_reduce/reduce we only need dependencies (no command); archive same as map
-        if operation_type in ("map_reduce", "reduce"):
+        tar_bootstrap_flag = bool(operation_config.get("tar_command_bootstrap", False))
+
+        mapper_command: Optional[str] = None
+        reducer_command: Optional[str] = None
+
+        if operation_type == "map_reduce":
+            if mapper is not None and reducer is not None:
+                require_consistent_map_reduce_legs(mapper, reducer)
+            if tar_bootstrap_flag and mapper is not None and reducer is not None:
+                if map_reduce_leg_kind(mapper) == "command":
+                    w_m, w_r = map_reduce_wrapper_names(stage_name)
+                    inner_m = bootstrap_shell_run_wrapper(archive_name, w_m, logger)
+                    inner_r = bootstrap_shell_run_wrapper(archive_name, w_r, logger)
+                    mapper_command = wrap_bootstrap_as_bash_c(inner_m)
+                    reducer_command = wrap_bootstrap_as_bash_c(inner_r)
+                    logger.info(
+                        "tar_command_bootstrap enabled: map-reduce legs use tar extract + "
+                        f"{w_m} / {w_r}"
+                    )
+            bootstrap_command = ""
+        elif operation_type == "reduce":
+            if tar_bootstrap_flag and reducer is not None and isinstance(reducer, str):
+                w = reduce_wrapper_name(stage_name)
+                inner = bootstrap_shell_run_wrapper(archive_name, w, logger)
+                reducer_command = wrap_bootstrap_as_bash_c(inner)
+                logger.info(
+                    f"tar_command_bootstrap enabled: reduce leg uses tar extract + {w}"
+                )
             bootstrap_command = ""
         else:
             bootstrap_command = self._create_bootstrap_command(
@@ -159,13 +185,19 @@ class TarArchiveDependencyBuilder:
 
         logger.info(f"Total dependencies: {len(dependencies)} files")
 
-        if operation_type in ("map_reduce", "reduce"):
-            command = None
-        else:
+        if operation_type in ("map", "vanilla"):
             escaped_command = bootstrap_command.replace("'", "'\"'\"'")
-            command = f"bash -c '{escaped_command}'"
+            command: Optional[str] = f"bash -c '{escaped_command}'"
+        else:
+            command = None
 
-        return script_path, dependencies, command
+        return DependencyBuildResult(
+            script_path=script_path,
+            dependencies=dependencies,
+            command=command,
+            mapper_command=mapper_command,
+            reducer_command=reducer_command,
+        )
 
     def _create_bootstrap_command(
         self,
@@ -183,7 +215,7 @@ class TarArchiveDependencyBuilder:
 
         Args:
             stage_name: Name of the stage (e.g., "run_map")
-            operation_type: Type of operation ('map', 'vanilla', 'map_reduce', or 'reduce')
+            operation_type: Type of operation ('map' or 'vanilla')
             archive_name: Name of the archive (e.g., "source.tar.gz")
             logger: Logger instance
 
