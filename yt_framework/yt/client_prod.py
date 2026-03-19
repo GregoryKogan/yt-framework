@@ -16,12 +16,50 @@ from yt.wrapper import (  # pyright: ignore[reportMissingImports]
     Operation,
     MapSpecBuilder,
     VanillaSpecBuilder,
+    TypedJob,
     format as yt_format,
+)
+from yt.wrapper.spec_builders import (  # pyright: ignore[reportMissingImports]
+    MapReduceSpecBuilder,
+    ReduceSpecBuilder,
 )
 from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
 
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
 from yt_framework.utils.ignore import YTIgnoreMatcher
+
+
+def _merge_map_reduce_reduce_job_io(
+    reducer: Any,
+    typed_row_iterator_io: bool,
+    user_reduce_job_io: Any,
+) -> Optional[Dict[str, Any]]:
+    """
+    Build reduce_job_io for map-reduce when using TypedJob + RowIterator reducer.
+
+    YT's map_reduce reducer leg omits enable_row_index for TypedJob by default;
+    enabling it aligns reducer I/O with standalone reduce (native iterator batching).
+    """
+    from copy import deepcopy
+
+    base: Dict[str, Any] = {}
+    if typed_row_iterator_io and isinstance(reducer, TypedJob):
+        base = {
+            "control_attributes": {
+                "enable_row_index": True,
+                "enable_key_switch": True,
+            }
+        }
+    if not user_reduce_job_io:
+        return base if base else None
+    user = deepcopy(dict(user_reduce_job_io))
+    if not base:
+        return user
+    u_ca = user.pop("control_attributes", None) or {}
+    b_ca = dict(base.get("control_attributes") or {})
+    b_ca.update(u_ca)
+    merged = {**base, **user, "control_attributes": b_ca}
+    return merged
 
 
 class YTProdClient(BaseYTClient):
@@ -954,4 +992,205 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         except Exception as e:
             self.logger.error(f"Failed to submit vanilla operation: {e}")
+            raise
+
+    def run_map_reduce(
+        self,
+        mapper: Any,
+        reducer: Any,
+        input_table: str,
+        output_table: str,
+        reduce_by: List[str],
+        files: List[Tuple[str, str]],
+        resources: OperationResources,
+        env: Dict[str, str],
+        sort_by: Optional[List[str]] = None,
+        output_schema: Optional[TableSchema] = None,
+        max_failed_jobs: int = 1,
+        docker_auth: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> Operation:
+        """Run a map-reduce operation on YT cluster."""
+        self.logger.info("Submitting map-reduce operation")
+        self.logger.info(f"  Input: {input_table} -> Output: {output_table}")
+        self.logger.info(f"  Reduce by: {reduce_by}")
+
+        try:
+            file_paths = [
+                FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
+            ]
+            source_table = TablePath(input_table)
+            dest_table = TablePath(output_table, append=False, schema=output_schema)
+
+            spec_builder = (
+                MapReduceSpecBuilder()
+                .input_table_paths(source_table)
+                .output_table_paths(dest_table)
+                .pool(resources.pool)
+                .max_failed_job_count(max_failed_jobs)
+            )
+            if resources.pool_tree:
+                spec_builder = spec_builder.pool_trees([resources.pool_tree])
+            if resources.user_slots:
+                spec_builder = spec_builder.resource_limits({"user_slots": resources.user_slots})
+
+            od = kwargs.get("operation_description")
+            if isinstance(od, dict):
+                spec_builder = spec_builder.description(od)
+
+            # Map-reduce TypedJob reducers with RowIterator[...] need explicit reduce_job_io
+            # control attributes on some clusters (standalone reduce sets enable_row_index;
+            # map_reduce reducer path does not by default).
+            reduce_io = _merge_map_reduce_reduce_job_io(
+                reducer=reducer,
+                typed_row_iterator_io=bool(kwargs.get("typed_reduce_row_iterator_io")),
+                user_reduce_job_io=kwargs.get("reduce_job_io"),
+            )
+            if reduce_io:
+                spec_builder = spec_builder.reduce_job_io(reduce_io)
+                self.logger.info(
+                    "  reduce_job_io control_attributes: %s",
+                    reduce_io.get("control_attributes", reduce_io),
+                )
+
+            map_io = kwargs.get("map_job_io")
+            if map_io:
+                spec_builder = spec_builder.map_job_io(dict(map_io))
+                self.logger.info("  map_job_io: %s", map_io)
+
+            mapper_builder = (
+                spec_builder.begin_mapper()
+                .command(mapper)
+                .file_paths(file_paths)
+                .environment(env)
+                .memory_limit(resources.memory_gb * 1024**3)
+                .cpu_limit(resources.cpu_limit)
+                .gpu_limit(resources.gpu_limit)
+            )
+            if not isinstance(mapper, TypedJob):
+                mapper_builder = mapper_builder.format(yt_format.JsonFormat(encode_utf8=False))
+            if resources.docker_image:
+                mapper_builder = mapper_builder.docker_image(resources.docker_image)
+                spec_builder = spec_builder.secure_vault({"docker_auth": docker_auth or {}})
+            mapper_builder.end_mapper()
+
+            reducer_builder = (
+                spec_builder.begin_reducer()
+                .command(reducer)
+                .file_paths(file_paths)
+                .environment(env)
+                .memory_limit(resources.memory_gb * 1024**3)
+                .cpu_limit(resources.cpu_limit)
+            )
+            if not isinstance(reducer, TypedJob):
+                reducer_builder = reducer_builder.format(yt_format.JsonFormat(encode_utf8=False))
+            if resources.docker_image:
+                reducer_builder = reducer_builder.docker_image(resources.docker_image)
+            reducer_builder.end_reducer()
+
+            spec_builder = spec_builder.reduce_by(reduce_by)
+            if sort_by:
+                spec_builder = spec_builder.sort_by(sort_by)
+            if kwargs.get("map_job_count") is not None:
+                spec_builder = spec_builder.map_job_count(kwargs["map_job_count"])
+
+            operation = self.client.run_operation(spec_builder, sync=False)
+            if operation is None:
+                raise RuntimeError("Failed to submit map-reduce operation")
+            self.logger.info(f"Map-reduce operation submitted: {operation.id}")
+            return operation
+        except Exception as e:
+            self.logger.error(f"Failed to submit map-reduce operation: {e}")
+            raise
+
+    def run_reduce(
+        self,
+        reducer: Any,
+        input_table: str,
+        output_table: str,
+        reduce_by: List[str],
+        files: List[Tuple[str, str]],
+        resources: OperationResources,
+        env: Dict[str, str],
+        output_schema: Optional[TableSchema] = None,
+        max_failed_jobs: int = 1,
+        docker_auth: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> Operation:
+        """Run a reduce-only operation on YT cluster."""
+        self.logger.info("Submitting reduce operation")
+        self.logger.info(f"  Input: {input_table} -> Output: {output_table}")
+        self.logger.info(f"  Reduce by: {reduce_by}")
+
+        try:
+            file_paths = [
+                FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
+            ]
+            source_table = TablePath(input_table)
+            dest_table = TablePath(output_table, append=False, schema=output_schema)
+
+            spec_builder = (
+                ReduceSpecBuilder()
+                .input_table_paths(source_table)
+                .output_table_paths(dest_table)
+                .pool(resources.pool)
+                .max_failed_job_count(max_failed_jobs)
+            )
+            if resources.pool_tree:
+                spec_builder = spec_builder.pool_trees([resources.pool_tree])
+            if resources.user_slots:
+                spec_builder = spec_builder.resource_limits({"user_slots": resources.user_slots})
+
+            rod = kwargs.get("operation_description")
+            if isinstance(rod, dict):
+                spec_builder = spec_builder.description(rod)
+
+            jio = kwargs.get("job_io")
+            if jio:
+                spec_builder = spec_builder.job_io(dict(jio))
+                self.logger.info("  job_io: %s", jio)
+
+            reducer_builder = (
+                spec_builder.begin_reducer()
+                .command(reducer)
+                .file_paths(file_paths)
+                .environment(env)
+                .memory_limit(resources.memory_gb * 1024**3)
+                .cpu_limit(resources.cpu_limit)
+            )
+            if not isinstance(reducer, TypedJob):
+                reducer_builder = reducer_builder.format(yt_format.JsonFormat(encode_utf8=False))
+            if resources.docker_image:
+                reducer_builder = reducer_builder.docker_image(resources.docker_image)
+                spec_builder = spec_builder.secure_vault({"docker_auth": docker_auth or {}})
+            reducer_builder.end_reducer()
+
+            spec_builder = spec_builder.reduce_by(reduce_by)
+
+            operation = self.client.run_operation(spec_builder, sync=False)
+            if operation is None:
+                raise RuntimeError("Failed to submit reduce operation")
+            self.logger.info(f"Reduce operation submitted: {operation.id}")
+            return operation
+        except Exception as e:
+            self.logger.error(f"Failed to submit reduce operation: {e}")
+            raise
+
+    def run_sort(
+        self,
+        table_path: str,
+        sort_by: List[str],
+        **kwargs: Any,
+    ) -> None:
+        """Sort a table in place by the given columns."""
+        self.logger.info(f"Sorting table {table_path} by {sort_by}")
+        try:
+            from yt.wrapper import schema as yt_schema  # pyright: ignore[reportMissingImports]
+            sort_columns = [
+                yt_schema.SortColumn(col, sort_order="ascending") for col in sort_by
+            ]
+            self.client.run_sort(table_path, sort_by=sort_columns, **kwargs)
+            self.logger.info("Sort completed")
+        except Exception as e:
+            self.logger.error(f"Failed to sort table: {e}")
             raise

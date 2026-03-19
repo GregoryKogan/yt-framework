@@ -25,7 +25,7 @@ class DependencyBuilder(Protocol):
 
     def build_dependencies(
         self,
-        operation_type: Literal["map", "vanilla"],
+        operation_type: Literal["map", "vanilla", "map_reduce", "reduce"],
         stage_dir: Path,
         archive_name: str,
         build_folder: str,
@@ -37,7 +37,7 @@ class DependencyBuilder(Protocol):
         Build dependencies for an operation.
 
         Args:
-            operation_type: Type of operation ('map' or 'vanilla')
+            operation_type: Type of operation ('map', 'vanilla', 'map_reduce', or 'reduce')
             stage_dir: Path to stage directory
             archive_name: Name of the archive (e.g., "source.tar.gz")
             build_folder: YT build folder path
@@ -65,7 +65,7 @@ class TarArchiveDependencyBuilder:
 
     def build_dependencies(
         self,
-        operation_type: Literal["map", "vanilla"],
+        operation_type: Literal["map", "vanilla", "map_reduce", "reduce"],
         stage_dir: Path,
         archive_name: str,
         build_folder: str,
@@ -80,7 +80,7 @@ class TarArchiveDependencyBuilder:
         and executes the appropriate wrapper script.
         
         Args:
-            operation_type: Type of operation ('map' or 'vanilla').
+            operation_type: Type of operation ('map', 'vanilla', 'map_reduce', or 'reduce').
             stage_dir: Path to stage directory containing src/ folder.
             build_folder: YT build folder path where archive will be stored.
             operation_config: Operation-specific config (from client.operations.map/vanilla).
@@ -98,29 +98,33 @@ class TarArchiveDependencyBuilder:
 
         from yt_framework.utils import log_header
 
+        effective_type = "map" if operation_type in ("map_reduce", "reduce") else operation_type
         log_header(
             logger,
-            f"{operation_type.title()} Operation",
+            f"{operation_type.replace('_', ' ').title()} Operation",
             "Preparing (Tar Archive Mode)",
         )
 
         stage_name = stage_dir.name
 
-        # Create bootstrap command that extracts archive and runs wrapper
-        bootstrap_command = self._create_bootstrap_command(
-            stage_name=stage_name,
-            operation_type=operation_type,
-            archive_name=archive_name,
-            logger=logger,
-        )
+        # For map_reduce/reduce we only need dependencies (no command); archive same as map
+        if operation_type in ("map_reduce", "reduce"):
+            bootstrap_command = ""
+        else:
+            bootstrap_command = self._create_bootstrap_command(
+                stage_name=stage_name,
+                operation_type=operation_type,
+                archive_name=archive_name,
+                logger=logger,
+            )
 
         # Script path is a placeholder (not used when command is provided)
-        if operation_type == "map":
+        if effective_type == "map":
             script_path = f"{build_folder}/stages/{stage_name}/src/mapper.py"
-        else:  # vanilla
+        else:
             script_path = f"{build_folder}/stages/{stage_name}/src/vanilla.py"
 
-        # Dependencies: only the tar archive and optional checkpoint
+        # Dependencies: tar archive and optional checkpoint / extra file_paths
         dependencies: List[Tuple[str, str]] = []
 
         # Add tar archive as dependency
@@ -128,20 +132,26 @@ class TarArchiveDependencyBuilder:
         dependencies.append((archive_yt_path, archive_name))
         logger.info(f"Added tar archive dependency: {archive_yt_path}")
 
-        # Add checkpoint if configured (for map operations with models)
-        if operation_type == "map":
-            # Get model_name from stage_config.job.model_name (job is at stage level)
+        # Add extra file_paths from operation_config (e.g. secrets, extra files)
+        for item in operation_config.get("file_paths") or []:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                yt_path, local_path = item[0], item[1]
+                dependencies.append((yt_path, local_path))
+                logger.info(f"Added file dependency: {yt_path}")
+            elif isinstance(item, str):
+                dependencies.append((item, item.split("/")[-1]))
+                logger.info(f"Added file dependency: {item}")
+
+        # Add checkpoint if configured (for map and map_reduce operations with models)
+        if effective_type in ("map", "map_reduce"):
             model_name = None
             if "job" in stage_config and stage_config.job.get("model_name"):
                 model_name = stage_config.job.model_name
-
-            # Get checkpoint_base from operation_config.checkpoint.checkpoint_base
             checkpoint_base = None
             if "checkpoint" in operation_config and operation_config.checkpoint.get(
                 "checkpoint_base"
             ):
                 checkpoint_base = operation_config.checkpoint.checkpoint_base
-
             if model_name and checkpoint_base:
                 checkpoint_file_path = f"{checkpoint_base}/{model_name}"
                 dependencies.append((checkpoint_file_path, model_name))
@@ -149,9 +159,11 @@ class TarArchiveDependencyBuilder:
 
         logger.info(f"Total dependencies: {len(dependencies)} files")
 
-        # Escape single quotes in command for bash -c
-        escaped_command = bootstrap_command.replace("'", "'\"'\"'")
-        command = f"bash -c '{escaped_command}'"
+        if operation_type in ("map_reduce", "reduce"):
+            command = None
+        else:
+            escaped_command = bootstrap_command.replace("'", "'\"'\"'")
+            command = f"bash -c '{escaped_command}'"
 
         return script_path, dependencies, command
 
@@ -171,7 +183,7 @@ class TarArchiveDependencyBuilder:
 
         Args:
             stage_name: Name of the stage (e.g., "run_map")
-            operation_type: Type of operation ('map' or 'vanilla')
+            operation_type: Type of operation ('map', 'vanilla', 'map_reduce', or 'reduce')
             archive_name: Name of the archive (e.g., "source.tar.gz")
             logger: Logger instance
 

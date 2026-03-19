@@ -22,6 +22,9 @@ from .table import get_row_count, read_table, download_table
 # Map operations
 from .map import run_map
 
+# Map-reduce and reduce operations
+from .map_reduce import run_map_reduce, run_reduce
+
 # Common utilities
 from .common import build_environment, prepare_docker_auth
 
@@ -48,6 +51,9 @@ __all__ = [
     "download_table",
     # Map
     "run_map",
+    # Map-reduce / reduce
+    "run_map_reduce",
+    "run_reduce",
     "build_environment",
     "prepare_docker_auth",
     # Vanilla

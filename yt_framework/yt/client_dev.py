@@ -708,6 +708,71 @@ class YTDevClient(BaseYTClient):
         err_hint = f"Output written to {logs_path}" if proc.returncode != 0 else ""
         return _DevOperation(proc.returncode, err_hint)  # type: ignore[return-value]
 
+    def run_map_reduce(
+        self,
+        mapper: Any,
+        reducer: Any,
+        input_table: str,
+        output_table: str,
+        reduce_by: List[str],
+        files: List[Tuple[str, str]],
+        resources: OperationResources,
+        env: Dict[str, str],
+        sort_by: Optional[List[str]] = None,
+        output_schema: Optional["TableSchema"] = None,
+        max_failed_jobs: int = 1,
+        docker_auth: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> Operation:
+        """Dev: no-op; copy input table to output table."""
+        self.logger.info("Dev: map-reduce no-op (copying input -> output)")
+        assert self.pipeline_dir is not None
+        self._dev_dir().mkdir(parents=True, exist_ok=True)
+        input_path = self._table_local_path(input_table)
+        output_path = self._table_local_path(output_table)
+        if input_path.exists():
+            shutil.copy2(input_path, output_path)
+        else:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("")
+        return _DevOperation(0)  # type: ignore[return-value]
+
+    def run_reduce(
+        self,
+        reducer: Any,
+        input_table: str,
+        output_table: str,
+        reduce_by: List[str],
+        files: List[Tuple[str, str]],
+        resources: OperationResources,
+        env: Dict[str, str],
+        output_schema: Optional["TableSchema"] = None,
+        max_failed_jobs: int = 1,
+        docker_auth: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> Operation:
+        """Dev: no-op; copy input table to output table."""
+        self.logger.info("Dev: reduce no-op (copying input -> output)")
+        assert self.pipeline_dir is not None
+        self._dev_dir().mkdir(parents=True, exist_ok=True)
+        input_path = self._table_local_path(input_table)
+        output_path = self._table_local_path(output_table)
+        if input_path.exists():
+            shutil.copy2(input_path, output_path)
+        else:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("")
+        return _DevOperation(0)  # type: ignore[return-value]
+
+    def run_sort(
+        self,
+        table_path: str,
+        sort_by: List[str],
+        **kwargs: Any,
+    ) -> None:
+        """Dev: no-op (table unchanged)."""
+        self.logger.info(f"Dev: run_sort no-op for {table_path} by {sort_by}")
+
     def _build_env(self, env: Dict[str, str]) -> Dict[str, str]:
         """Build environment variables for subprocess."""
 

@@ -470,6 +470,93 @@ class BaseYTClient(ABC):
         pass
 
     @abstractmethod
+    def run_map_reduce(
+        self,
+        mapper: Any,
+        reducer: Any,
+        input_table: str,
+        output_table: str,
+        reduce_by: List[str],
+        files: List[Tuple[str, str]],
+        resources: OperationResources,
+        env: Dict[str, str],
+        sort_by: Optional[List[str]] = None,
+        output_schema: Optional["TableSchema"] = None,
+        max_failed_jobs: int = 1,
+        docker_auth: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> Operation:
+        """
+        Run a map-reduce operation on YT.
+
+        Args:
+            mapper: Mapper job (TypedJob instance or command string).
+            reducer: Reducer job (TypedJob instance or command string).
+            input_table: Input table path.
+            output_table: Output table path.
+            reduce_by: List of columns to reduce by.
+            files: List of (yt_path, local_path) tuples for dependencies.
+            resources: Operation resources.
+            env: Environment variables.
+            sort_by: Optional sort columns before reduce.
+            output_schema: Optional output table schema.
+            max_failed_jobs: Maximum failed jobs allowed.
+            docker_auth: Optional Docker auth.
+            **kwargs: Extra options applied to the spec builder where supported.
+        """
+        pass
+
+    @abstractmethod
+    def run_reduce(
+        self,
+        reducer: Any,
+        input_table: str,
+        output_table: str,
+        reduce_by: List[str],
+        files: List[Tuple[str, str]],
+        resources: OperationResources,
+        env: Dict[str, str],
+        output_schema: Optional["TableSchema"] = None,
+        max_failed_jobs: int = 1,
+        docker_auth: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> Operation:
+        """
+        Run a reduce-only operation on YT.
+
+        Args:
+            reducer: Reducer job (TypedJob instance or command string).
+            input_table: Input table path.
+            output_table: Output table path.
+            reduce_by: List of columns to reduce by.
+            files: List of (yt_path, local_path) tuples for dependencies.
+            resources: Operation resources.
+            env: Environment variables.
+            output_schema: Optional output table schema.
+            max_failed_jobs: Maximum failed jobs allowed.
+            docker_auth: Optional Docker auth.
+            **kwargs: Extra options applied to the spec builder where supported.
+        """
+        pass
+
+    @abstractmethod
+    def run_sort(
+        self,
+        table_path: str,
+        sort_by: List[str],
+        **kwargs: Any,
+    ) -> None:
+        """
+        Sort a table in place by the given columns.
+
+        Args:
+            table_path: Table to sort.
+            sort_by: List of column names (or SortColumn objects) to sort by.
+            **kwargs: Extra options for the sort operation.
+        """
+        pass
+
+    @abstractmethod
     def run_vanilla(
         self,
         command: str,
