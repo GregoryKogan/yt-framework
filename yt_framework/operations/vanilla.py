@@ -13,7 +13,6 @@ from omegaconf import DictConfig, OmegaConf
 
 from yt_framework.utils.logging import log_header, log_success
 from .common import (
-    build_environment,
     extract_operation_resources,
     build_operation_environment,
     extract_docker_auth_from_operation_config,
@@ -49,38 +48,25 @@ def _prepare_vanilla_operation(
     operation_config: DictConfig,
     stage_config: DictConfig,
     stage_dir: Path,
-    configs_dir: Path,
     logger: logging.Logger,
 ) -> VanillaOperationData:
     """
-    Prepare everything needed for a vanilla operation (private function).
+    Build tar-archive dependencies for a vanilla operation.
 
-    Automatically handles:
-    - Secrets-only environment building
-    - Dependency file list preparation
-    - Docker authentication preparation
+    Environment and docker_auth are intentionally left empty here; the caller
+    builds them via ``build_operation_environment`` and sets them on the returned
+    object after construction.
 
     Args:
-        pipeline_config: Pipeline-level config (for secrets)
+        pipeline_config: Pipeline-level config (build_folder, etc.)
         operation_config: Operation-specific config (from client.operations.vanilla)
         stage_config: Full stage config (for accessing job section)
         stage_dir: Path to stage directory
-        configs_dir: Directory containing secrets.env
         logger: Logger instance
 
     Returns:
-        VanillaOperationData instance containing:
-        - script_path: Path to vanilla.py in YT (or placeholder if tar mode)
-        - dependencies: List of (yt_path, local_path) tuples
-        - environment: Environment variables (secrets only)
-        - docker_auth: Docker auth dict or None
-        - command: Optional command to execute (for tar mode)
+        VanillaOperationData with dependencies and command populated.
     """
-
-    environment = build_environment(configs_dir=configs_dir, logger=logger)
-
-    # Use strategy pattern to build dependencies
-    # Pass both operation_config (for checkpoint) and stage_config (for job.model_name)
     builder = TarArchiveDependencyBuilder()
     dep = builder.build_dependencies(
         operation_type="vanilla",
@@ -91,18 +77,13 @@ def _prepare_vanilla_operation(
         stage_config=stage_config,
         logger=logger,
     )
-    script_path = dep.script_path
-    dependencies = dep.dependencies
-    command = dep.command
-
-    docker_auth = extract_docker_auth_from_operation_config(operation_config, environment)
 
     return VanillaOperationData(
-        script_path=script_path,
-        dependencies=dependencies,
-        environment=environment,
-        docker_auth=docker_auth,
-        command=command,
+        script_path=dep.script_path,
+        dependencies=dep.dependencies,
+        environment={},
+        docker_auth=None,
+        command=dep.command,
     )
 
 
@@ -144,7 +125,6 @@ def run_vanilla(
         operation_config=operation_config,
         stage_config=context.config,
         stage_dir=context.stage_dir,
-        configs_dir=context.deps.configs_dir,
         logger=logger,
     )
     vanilla_operation_data.environment = env
@@ -174,6 +154,7 @@ def run_vanilla(
     if od:
         if isinstance(od, str):
             logger.info(f"Operation label: {od}")
+            vanilla_kwargs["title"] = od
         else:
             vanilla_kwargs["operation_description"] = OmegaConf.to_container(
                 od, resolve=True
@@ -197,7 +178,6 @@ def run_vanilla(
 
     operation = context.deps.yt_client.run_vanilla(
         command=command,
-        job=command,
         files=vanilla_operation_data.dependencies,
         env=vanilla_operation_data.environment,
         task_name=task_name,

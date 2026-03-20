@@ -25,6 +25,9 @@ from .map import run_map
 # Map-reduce and reduce operations
 from .map_reduce import run_map_reduce, run_reduce
 
+# Sort operations
+from .sort import run_sort
+
 # Common utilities
 from .common import build_environment, prepare_docker_auth
 
@@ -55,6 +58,8 @@ __all__ = [
     # Map-reduce / reduce
     "run_map_reduce",
     "run_reduce",
+    # Sort
+    "run_sort",
     "build_environment",
     "prepare_docker_auth",
     # Vanilla

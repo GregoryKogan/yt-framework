@@ -17,7 +17,7 @@ from yt.wrapper import Operation  # pyright: ignore[reportMissingImports]
 from typing import TYPE_CHECKING
 
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
-from yt_framework.operations.job_command import is_typed_job
+from yt_framework.operations.job_command import is_typed_job, resolve_aliased_job
 
 if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
@@ -739,8 +739,15 @@ class YTDevClient(BaseYTClient):
         **kwargs: Any,
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
-        mapper_leg = map_job if map_job is not None else mapper
-        reducer_leg = reduce_job if reduce_job is not None else reducer
+        mapper_leg = resolve_aliased_job(
+            legacy_name="mapper", legacy_value=mapper,
+            preferred_name="map_job", preferred_value=map_job,
+        )
+        reducer_leg = resolve_aliased_job(
+            legacy_name="reducer", legacy_value=reducer,
+            preferred_name="reduce_job", preferred_value=reduce_job,
+        )
+
         def _leg_desc(obj: Any) -> str:
             if is_typed_job(obj):
                 return "TypedJob"
@@ -781,7 +788,10 @@ class YTDevClient(BaseYTClient):
         **kwargs: Any,
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
-        reducer_leg = job if job is not None else reducer
+        reducer_leg = resolve_aliased_job(
+            legacy_name="reducer", legacy_value=reducer,
+            preferred_name="job", preferred_value=job,
+        )
         if is_typed_job(reducer_leg):
             rdesc = "TypedJob"
         elif isinstance(reducer_leg, str):
@@ -805,6 +815,8 @@ class YTDevClient(BaseYTClient):
         self,
         table_path: str,
         sort_by: List[str],
+        pool: Optional[str] = None,
+        pool_tree: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """Dev: no-op (table unchanged)."""

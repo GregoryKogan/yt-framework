@@ -554,6 +554,8 @@ class BaseYTClient(ABC):
         self,
         table_path: str,
         sort_by: List[str],
+        pool: Optional[str] = None,
+        pool_tree: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -562,7 +564,9 @@ class BaseYTClient(ABC):
         Args:
             table_path: Table to sort.
             sort_by: List of column names (or SortColumn objects) to sort by.
-            **kwargs: Extra options for the sort operation.
+            pool: Scheduler pool to run in.
+            pool_tree: Pool tree to run in.
+            **kwargs: Extra options forwarded to the underlying sort call.
         """
         pass
 
@@ -574,7 +578,6 @@ class BaseYTClient(ABC):
         env: Dict[str, str],
         task_name: str,
         job: Any = None,
-        *args,
         **kwargs,
     ) -> Operation:
         """

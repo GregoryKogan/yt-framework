@@ -6,8 +6,8 @@ mapper/reducer instances. Dependencies (archive + optional file_paths) are
 built by the framework; credentials come from configs/secrets.env.
 """
 
-import logging
-from typing import Any, List, Optional, TYPE_CHECKING
+import warnings
+from typing import Any, Optional, TYPE_CHECKING
 
 from omegaconf import DictConfig, OmegaConf
 
@@ -29,8 +29,8 @@ if TYPE_CHECKING:
 def run_map_reduce(
     context: "StageContext",
     operation_config: DictConfig,
-    mapper: Any,
-    reducer: Any,
+    mapper: Any = None,
+    reducer: Any = None,
     output_schema: Optional[Any] = None,
     map_job: Any = None,
     reduce_job: Any = None,
@@ -49,15 +49,27 @@ def run_map_reduce(
         context: Stage context (deps, logger, stage_dir, config).
         operation_config: client.operations.map_reduce config (input_table,
             output_table, reduce_by, sort_by, resources, file_paths, etc.).
-        mapper: Mapper leg (legacy name).
-        reducer: Reducer leg (legacy name).
+        mapper: *Deprecated* — use ``map_job`` instead.
+        reducer: *Deprecated* — use ``reduce_job`` instead.
         output_schema: Optional YT TableSchema for output table.
-        map_job: Preferred mapper leg alias.
-        reduce_job: Preferred reducer leg alias.
+        map_job: Mapper leg (``TypedJob`` instance or command string).
+        reduce_job: Reducer leg (``TypedJob`` instance or command string).
 
     Returns:
         True if the operation completed successfully.
     """
+    if mapper is not None and map_job is None:
+        warnings.warn(
+            "'mapper=' is deprecated; use 'map_job=' instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    if reducer is not None and reduce_job is None:
+        warnings.warn(
+            "'reducer=' is deprecated; use 'reduce_job=' instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     logger = context.logger
     log_header(
         logger,
@@ -69,7 +81,10 @@ def run_map_reduce(
     output_table = operation_config.get("output_table")
     reduce_by = list(operation_config.get("reduce_by") or [])
     if not input_table or not output_table or not reduce_by:
-        raise ValueError("operation_config must set input_table, output_table, and reduce_by")
+        raise ValueError(
+            "operation_config must set input_table, output_table, and reduce_by; "
+            "expected at client.operations.map_reduce.{input_table,output_table,reduce_by}"
+        )
 
     env = build_operation_environment(
         context=context,
@@ -125,6 +140,7 @@ def run_map_reduce(
     if od:
         if isinstance(od, str):
             logger.info(f"Operation label: {od}")
+            spec_kwargs["title"] = od
         else:
             spec_kwargs["operation_description"] = OmegaConf.to_container(od, resolve=True)
 
@@ -155,8 +171,6 @@ def run_map_reduce(
     operation = context.deps.yt_client.run_map_reduce(
         mapper=mapper,
         reducer=reducer,
-        map_job=mapper,
-        reduce_job=reducer,
         input_table=input_table,
         output_table=output_table,
         reduce_by=reduce_by,
@@ -181,7 +195,7 @@ def run_map_reduce(
 def run_reduce(
     context: "StageContext",
     operation_config: DictConfig,
-    reducer: Any,
+    reducer: Any = None,
     output_schema: Optional[Any] = None,
     job: Any = None,
 ) -> bool:
@@ -213,7 +227,10 @@ def run_reduce(
     output_table = operation_config.get("output_table")
     reduce_by = list(operation_config.get("reduce_by") or [])
     if not input_table or not output_table or not reduce_by:
-        raise ValueError("operation_config must set input_table, output_table, and reduce_by")
+        raise ValueError(
+            "operation_config must set input_table, output_table, and reduce_by; "
+            "expected at client.operations.reduce.{input_table,output_table,reduce_by}"
+        )
 
     env = build_operation_environment(
         context=context,
@@ -253,6 +270,7 @@ def run_reduce(
     if rod:
         if isinstance(rod, str):
             logger.info(f"Operation label: {rod}")
+            reduce_kw["title"] = rod
         else:
             reduce_kw["operation_description"] = OmegaConf.to_container(rod, resolve=True)
 
@@ -278,7 +296,6 @@ def run_reduce(
 
     operation = context.deps.yt_client.run_reduce(
         reducer=reducer,
-        job=reducer,
         input_table=input_table,
         output_table=output_table,
         reduce_by=reduce_by,

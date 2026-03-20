@@ -33,6 +33,28 @@ def map_reduce_leg_kind(obj: Any) -> LegKind:
     )
 
 
+def resolve_aliased_job(
+    *,
+    legacy_name: str,
+    legacy_value: Any,
+    preferred_name: str,
+    preferred_value: Any,
+) -> Any:
+    """Resolve legacy/preferred aliased job arguments with compatibility checks.
+
+    Raises ``ValueError`` when both are set to different values, so callers
+    can support both names while preventing silently-conflicting configs.
+    """
+    if legacy_value is not None and preferred_value is not None and legacy_value != preferred_value:
+        raise ValueError(
+            f"Both '{legacy_name}' and '{preferred_name}' are set with different values; "
+            "please provide only one"
+        )
+    if preferred_value is not None:
+        return preferred_value
+    return legacy_value
+
+
 def require_consistent_map_reduce_legs(mapper: Any, reducer: Any) -> None:
     """
     Mapper and reducer must both use the same wire protocol: both TypedJob or both str.

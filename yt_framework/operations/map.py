@@ -16,7 +16,6 @@ from yt_framework.utils.logging import log_header, log_success
 from yt_framework.yt.client_base import OperationResources
 from .dependency_strategy import TarArchiveDependencyBuilder
 from .common import (
-    build_environment,
     extract_operation_resources,
     build_operation_environment,
     extract_docker_auth_from_operation_config,
@@ -51,38 +50,25 @@ def _prepare_map_operation(
     operation_config: DictConfig,
     stage_config: DictConfig,
     stage_dir: Path,
-    configs_dir: Path,
     logger: logging.Logger,
 ) -> MapOperationData:
     """
-    Prepare everything needed for a map operation (private function).
+    Build tar-archive dependencies for a map operation.
 
-    Automatically handles:
-    - Secrets-only environment building
-    - Dependency file list preparation
-    - Docker authentication preparation
+    Environment and docker_auth are intentionally left empty here; the caller
+    builds them via ``build_operation_environment`` and sets them on the returned
+    object after construction.
 
     Args:
-        pipeline_config: Pipeline-level config (for secrets)
+        pipeline_config: Pipeline-level config (build_folder, etc.)
         operation_config: Operation-specific config (from client.operations.map)
         stage_config: Full stage config (for accessing job section)
         stage_dir: Path to stage directory
-        configs_dir: Directory containing secrets.env
         logger: Logger instance
 
     Returns:
-        MapOperationData instance containing:
-        - mapper_path: Path to mapper.py in YT (or bash wrapper if tar mode)
-        - dependencies: List of (yt_path, local_path) tuples
-        - environment: Environment variables (secrets only)
-        - docker_auth: Docker auth dict or None
-        - command: Optional command to execute (for tar mode)
+        MapOperationData with dependencies and command populated.
     """
-
-    environment = build_environment(configs_dir=configs_dir, logger=logger)
-
-    # Use strategy pattern to build dependencies
-    # Pass both operation_config (for checkpoint) and stage_config (for job.model_name)
     builder = TarArchiveDependencyBuilder()
     dep = builder.build_dependencies(
         operation_type="map",
@@ -93,18 +79,13 @@ def _prepare_map_operation(
         stage_config=stage_config,
         logger=logger,
     )
-    mapper_path = dep.script_path
-    dependencies = dep.dependencies
-    command = dep.command
-
-    docker_auth = extract_docker_auth_from_operation_config(operation_config, environment)
 
     return MapOperationData(
-        mapper_path=mapper_path,
-        dependencies=dependencies,
-        environment=environment,
-        docker_auth=docker_auth,
-        command=command,
+        mapper_path=dep.script_path,
+        dependencies=dep.dependencies,
+        environment={},
+        docker_auth=None,
+        command=dep.command,
     )
 
 
@@ -141,9 +122,15 @@ def run_map(
     )
 
     if not operation_config.get("input_table"):
-        raise ValueError("No input_table configured in operation config")
+        raise ValueError(
+            "No input_table in operation_config; "
+            "expected at client.operations.map.input_table"
+        )
     if not operation_config.get("output_table"):
-        raise ValueError("No output_table configured in operation config")
+        raise ValueError(
+            "No output_table in operation_config; "
+            "expected at client.operations.map.output_table"
+        )
 
     env = build_operation_environment(
         context=context,
@@ -158,7 +145,6 @@ def run_map(
         operation_config=operation_config,
         stage_config=context.config,
         stage_dir=context.stage_dir,
-        configs_dir=context.deps.configs_dir,
         logger=logger,
     )
     map_operation_data.environment = env
@@ -178,6 +164,16 @@ def run_map(
     resources: OperationResources = extract_operation_resources(operation_config, logger)
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
+    map_kwargs: dict = {}
+    od = operation_config.get("operation_description")
+    if od:
+        if isinstance(od, str):
+            logger.info(f"Operation label: {od}")
+            map_kwargs["title"] = od
+        else:
+            from omegaconf import OmegaConf as _OmegaConf
+            map_kwargs["operation_description"] = _OmegaConf.to_container(od, resolve=True)
+
     reserved_keys = {
         "input_table",
         "output_table",
@@ -190,7 +186,7 @@ def run_map(
         "tar_command_bootstrap",
         "operation_description",
     }
-    passthrough_kwargs = collect_passthrough_kwargs(operation_config, reserved_keys)
+    map_kwargs.update(collect_passthrough_kwargs(operation_config, reserved_keys))
 
     operation = context.deps.yt_client.run_map(
         command=mapper_leg,
@@ -202,7 +198,7 @@ def run_map(
         output_schema=output_schema,
         max_failed_jobs=max_failed_jobs,
         docker_auth=map_operation_data.docker_auth,
-        **passthrough_kwargs,
+        **map_kwargs,
     )
 
     # Wait for completion

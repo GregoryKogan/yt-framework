@@ -10,8 +10,8 @@ Directory structure: stages/<stage_name>/stage.py
 """
 
 from abc import ABC, abstractmethod
-from typing import cast, TYPE_CHECKING, Dict, Any
-from dataclasses import dataclass
+from typing import cast, Optional, TYPE_CHECKING, Dict, Any
+from dataclasses import dataclass, replace as _dataclass_replace
 from pathlib import Path
 import logging
 import inspect
@@ -43,6 +43,41 @@ class StageContext:
     stage_dir: Path
     logger: logging.Logger
     deps: StageDependencies
+
+    def fork(
+        self,
+        name: Optional[str] = None,
+        stage_dir: Optional[Path] = None,
+    ) -> "StageContext":
+        """Return a shallow copy with selective overrides.
+
+        Use this in multi-operation stages when a later operation needs a
+        slightly different context (e.g., a different ``stage_dir`` so that
+        :class:`~yt_framework.operations.dependency_strategy.TarArchiveDependencyBuilder`
+        resolves wrapper scripts from the correct location).
+
+        Only ``name`` and ``stage_dir`` can be overridden; all other fields
+        (``config``, ``logger``, ``deps``) are inherited from the parent
+        context, which is intentional — they represent shared pipeline state.
+
+        Args:
+            name: Override for the stage name.  Defaults to the current name.
+            stage_dir: Override for the stage directory.  Defaults to the
+                current ``stage_dir``.
+
+        Returns:
+            A new :class:`StageContext` with the specified fields replaced.
+
+        Example::
+
+            ctx_reduce = self.context.fork(name="mds", stage_dir=Path(__file__).parent)
+            run_reduce(context=ctx_reduce, operation_config=reduce_cfg, reducer=MyReducer())
+        """
+        return _dataclass_replace(
+            self,
+            name=name if name is not None else self.name,
+            stage_dir=stage_dir if stage_dir is not None else self.stage_dir,
+        )
 
 
 class BaseStage(ABC):

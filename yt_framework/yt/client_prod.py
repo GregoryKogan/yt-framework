@@ -27,6 +27,7 @@ from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImport
 
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
 from yt_framework.utils.ignore import YTIgnoreMatcher
+from yt_framework.operations.job_command import resolve_aliased_job as _resolve_aliased_job
 
 # YtClient.run_operation() only accepts these keyword args; everything else must be
 # applied via SpecBuilder chain methods (weight, title, description, …).
@@ -75,24 +76,6 @@ def _apply_command_leg_format(
     if isinstance(leg, TypedJob):
         return leg_builder
     return leg_builder.format(yt_format.JsonFormat(encode_utf8=False))
-
-
-def _resolve_aliased_job(
-    *,
-    legacy_name: str,
-    legacy_value: Any,
-    preferred_name: str,
-    preferred_value: Any,
-) -> Any:
-    """Resolve legacy/preferred aliased job arguments with compatibility checks."""
-    if legacy_value is not None and preferred_value is not None and legacy_value != preferred_value:
-        raise ValueError(
-            f"Both '{legacy_name}' and '{preferred_name}' are set with different values; "
-            "please provide only one"
-        )
-    if preferred_value is not None:
-        return preferred_value
-    return legacy_value
 
 
 class YTProdClient(BaseYTClient):
@@ -968,6 +951,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         docker_auth: Optional[Dict[str, str]] = None,
         max_failed_jobs: int = 1,
         job: Optional[str] = None,
+        **kwargs: Any,
     ) -> Operation:
         """Run a vanilla operation on YT cluster.
         
@@ -983,6 +967,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             docker_auth: Optional Docker authentication for private registries.
             max_failed_jobs: Maximum failed jobs allowed before operation fails.
             job: Preferred command alias.
+            **kwargs: Extra options applied to the spec builder (e.g. weight, title) or
+                forwarded to run_operation (sync, enable_optimizations).
             
         Returns:
             Operation: YT operation object that can be monitored and waited on.
@@ -1003,9 +989,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 preferred_name="job",
                 preferred_value=job,
             )
+            kwargs = dict(kwargs)
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
+
+            od = kwargs.pop("operation_description", None)
 
             spec_builder = (
                 VanillaSpecBuilder()
@@ -1013,6 +1002,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 .resource_limits({"user_slots": resources.user_slots})
                 .max_failed_job_count(max_failed_jobs)
             )
+
+            if isinstance(od, dict):
+                spec_builder = spec_builder.description(od)
 
             # Set pool tree if specified
             if resources.pool_tree:
@@ -1036,7 +1028,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             task_builder.end_task()
 
-            operation = self.client.run_operation(spec_builder, sync=False)
+            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+                spec_builder, kwargs
+            )
+            run_op.setdefault("sync", False)
+            operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
                 raise RuntimeError(
                     "Failed to submit operation: run_operation returned None"
@@ -1093,8 +1089,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             spec_builder = (
                 MapReduceSpecBuilder()
-                .input_table_paths(source_table)
-                .output_table_paths(dest_table)
+                .input_table_paths([source_table])
+                .output_table_paths([dest_table])
                 .pool(resources.pool)
                 .max_failed_job_count(max_failed_jobs)
             )
@@ -1129,6 +1125,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 .environment(env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
+                .gpu_limit(resources.gpu_limit)
             )
             reducer_builder = _apply_command_leg_format(reducer_builder, reducer_leg)
             if resources.docker_image:
@@ -1191,8 +1188,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             spec_builder = (
                 ReduceSpecBuilder()
-                .input_table_paths(source_table)
-                .output_table_paths(dest_table)
+                .input_table_paths([source_table])
+                .output_table_paths([dest_table])
                 .pool(resources.pool)
                 .max_failed_job_count(max_failed_jobs)
             )
@@ -1212,6 +1209,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 .environment(env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
+                .gpu_limit(resources.gpu_limit)
             )
             reducer_builder = _apply_command_leg_format(reducer_builder, reducer_leg)
             if resources.docker_image:
@@ -1238,6 +1236,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self,
         table_path: str,
         sort_by: List[str],
+        pool: Optional[str] = None,
+        pool_tree: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """Sort a table in place by the given columns."""
@@ -1247,6 +1247,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             sort_columns = [
                 yt_schema.SortColumn(col, sort_order="ascending") for col in sort_by
             ]
+            spec: dict = dict(kwargs.pop("spec", None) or {})
+            if pool:
+                spec["pool"] = pool
+            if pool_tree:
+                spec["pool_tree"] = pool_tree
+            if spec:
+                kwargs["spec"] = spec
             self.client.run_sort(table_path, sort_by=sort_columns, **kwargs)
             self.logger.info("Sort completed")
         except Exception as e:
