@@ -33,6 +33,7 @@ from .vanilla import run_vanilla
 
 # Checkpoint operations
 from .checkpoint import init_checkpoint_directory
+from .tokenizer_artifact import init_tokenizer_artifact_directory
 
 __all__ = [
     # S3
@@ -60,4 +61,5 @@ __all__ = [
     "run_vanilla",
     # Checkpoint
     "init_checkpoint_directory",
+    "init_tokenizer_artifact_directory",
 ]

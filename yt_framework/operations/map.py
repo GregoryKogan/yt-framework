@@ -21,6 +21,11 @@ from .common import (
     prepare_docker_auth,
     _get_config_value_with_default,
 )
+from .tokenizer_artifact import (
+    init_tokenizer_artifact_directory,
+    resolve_tokenizer_artifact_name,
+    resolve_tokenizer_archive_name,
+)
 
 
 @dataclass
@@ -150,6 +155,13 @@ def run_map(
         raise ValueError("No output_table configured in operation config")
 
     # Prepare operation data automatically
+    tokenizer_cfg = operation_config.get("tokenizer_artifact")
+    if tokenizer_cfg:
+        init_tokenizer_artifact_directory(
+            context=context,
+            tokenizer_artifact_config=tokenizer_cfg,
+        )
+
     map_operation_data = _prepare_map_operation(
         pipeline_config=context.deps.pipeline_config,
         operation_config=operation_config,
@@ -166,6 +178,23 @@ def run_map(
         raise ValueError("Command not provided by dependency builder")
 
     command = map_operation_data.command
+
+    if tokenizer_cfg and tokenizer_cfg.get("artifact_base"):
+        artifact_name = resolve_tokenizer_artifact_name(
+            stage_config=context.config,
+            tokenizer_artifact_config=tokenizer_cfg,
+        )
+        if artifact_name:
+            archive_name = resolve_tokenizer_archive_name(artifact_name)
+            map_operation_data.environment.setdefault(
+                "TOKENIZER_ARTIFACT_FILE", archive_name
+            )
+            map_operation_data.environment.setdefault(
+                "TOKENIZER_ARTIFACT_DIR", f"tokenizer_artifacts/{artifact_name}"
+            )
+            map_operation_data.environment.setdefault(
+                "TOKENIZER_ARTIFACT_NAME", artifact_name
+            )
 
     # Extract job parameters from operation_config.resources (or top-level as fallback)
     # Use defaults when values are not specified in config, logging when defaults are used
@@ -216,6 +245,7 @@ def run_map(
         "max_failed_job_count",
         "file_paths",
         "checkpoint",
+        "tokenizer_artifact",
         "tar_command_bootstrap",
         "operation_description",
     }

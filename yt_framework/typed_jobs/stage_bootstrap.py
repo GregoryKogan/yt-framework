@@ -102,6 +102,24 @@ def _bootstrap_once(stage_name: str) -> None:
     if os.path.isfile(job_config_path):
         os.environ["JOB_CONFIG_PATH"] = job_config_path
 
+    tokenizer_artifact_file = os.environ.get("TOKENIZER_ARTIFACT_FILE", "").strip()
+    tokenizer_artifact_dir = os.environ.get("TOKENIZER_ARTIFACT_DIR", "").strip()
+    if tokenizer_artifact_file:
+        artifact_tar = os.path.join(root, tokenizer_artifact_file)
+        if not tokenizer_artifact_dir:
+            artifact_name = os.environ.get("TOKENIZER_ARTIFACT_NAME", "default").strip() or "default"
+            tokenizer_artifact_dir = os.path.join("tokenizer_artifacts", artifact_name)
+            os.environ["TOKENIZER_ARTIFACT_DIR"] = tokenizer_artifact_dir
+        artifact_dir_abs = os.path.join(root, tokenizer_artifact_dir)
+        if os.path.isfile(artifact_tar):
+            os.makedirs(artifact_dir_abs, exist_ok=True)
+            marker = os.path.join(artifact_dir_abs, ".extracted")
+            if not os.path.isfile(marker):
+                with tarfile.open(artifact_tar, "r:gz") as tf:
+                    tf.extractall(artifact_dir_abs)
+                with open(marker, "w", encoding="utf-8") as m:
+                    m.write("ok\n")
+
 
 class StageBootstrapTypedJob(yt.TypedJob):
     """

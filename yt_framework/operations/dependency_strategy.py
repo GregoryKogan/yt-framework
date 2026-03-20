@@ -27,6 +27,10 @@ from yt_framework.operations.tar_command_wiring import (
     reduce_wrapper_name,
     wrap_bootstrap_as_bash_c,
 )
+from yt_framework.operations.tokenizer_artifact import (
+    resolve_tokenizer_archive_name,
+    resolve_tokenizer_artifact_name,
+)
 
 
 @dataclass
@@ -182,6 +186,24 @@ class TarArchiveDependencyBuilder:
                 checkpoint_file_path = f"{checkpoint_base}/{model_name}"
                 dependencies.append((checkpoint_file_path, model_name))
                 logger.info(f"Added checkpoint dependency: {checkpoint_file_path}")
+
+        # Add tokenizer artifact if configured (mounted as a .tar.gz file)
+        tokenizer_cfg = operation_config.get("tokenizer_artifact")
+        if tokenizer_cfg and tokenizer_cfg.get("artifact_base"):
+            artifact_name = resolve_tokenizer_artifact_name(
+                stage_config=stage_config,
+                tokenizer_artifact_config=tokenizer_cfg,
+            )
+            if artifact_name:
+                archive_name = resolve_tokenizer_archive_name(artifact_name)
+                artifact_path = f"{tokenizer_cfg.artifact_base}/{archive_name}"
+                dependencies.append((artifact_path, archive_name))
+                logger.info(f"Added tokenizer artifact dependency: {artifact_path}")
+            else:
+                logger.warning(
+                    "tokenizer_artifact configured but artifact_name cannot be resolved; "
+                    "skipping dependency mount"
+                )
 
         logger.info(f"Total dependencies: {len(dependencies)} files")
 

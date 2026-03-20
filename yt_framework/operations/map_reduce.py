@@ -22,6 +22,11 @@ from .common import (
     prepare_docker_auth,
     _get_config_value_with_default,
 )
+from .tokenizer_artifact import (
+    init_tokenizer_artifact_directory,
+    resolve_tokenizer_artifact_name,
+    resolve_tokenizer_archive_name,
+)
 
 
 def _resources_from_config(operation_config: DictConfig, logger: logging.Logger) -> OperationResources:
@@ -114,6 +119,25 @@ def run_map_reduce(
         if v is not None:
             env[str(k)] = str(v)
 
+    tokenizer_cfg = operation_config.get("tokenizer_artifact")
+    if tokenizer_cfg:
+        init_tokenizer_artifact_directory(
+            context=context,
+            tokenizer_artifact_config=tokenizer_cfg,
+        )
+        if tokenizer_cfg.get("artifact_base"):
+            artifact_name = resolve_tokenizer_artifact_name(
+                stage_config=context.config,
+                tokenizer_artifact_config=tokenizer_cfg,
+            )
+            if artifact_name:
+                archive_name = resolve_tokenizer_archive_name(artifact_name)
+                env.setdefault("TOKENIZER_ARTIFACT_FILE", archive_name)
+                env.setdefault(
+                    "TOKENIZER_ARTIFACT_DIR", f"tokenizer_artifacts/{artifact_name}"
+                )
+                env.setdefault("TOKENIZER_ARTIFACT_NAME", artifact_name)
+
     # Let worker-side TypedJobs know which stage directory to wire up.
     # Used by `yt_framework.typed_jobs.StageBootstrapTypedJob`.
     env.setdefault("YT_STAGE_NAME", context.name)
@@ -177,6 +201,7 @@ def run_map_reduce(
             "max_failed_job_count",
             "file_paths",
             "checkpoint",
+            "tokenizer_artifact",
             "tar_command_bootstrap",
             "map_job_count",
             "operation_description",
@@ -252,6 +277,25 @@ def run_reduce(
         if v is not None:
             env[str(k)] = str(v)
 
+    tokenizer_cfg = operation_config.get("tokenizer_artifact")
+    if tokenizer_cfg:
+        init_tokenizer_artifact_directory(
+            context=context,
+            tokenizer_artifact_config=tokenizer_cfg,
+        )
+        if tokenizer_cfg.get("artifact_base"):
+            artifact_name = resolve_tokenizer_artifact_name(
+                stage_config=context.config,
+                tokenizer_artifact_config=tokenizer_cfg,
+            )
+            if artifact_name:
+                archive_name = resolve_tokenizer_archive_name(artifact_name)
+                env.setdefault("TOKENIZER_ARTIFACT_FILE", archive_name)
+                env.setdefault(
+                    "TOKENIZER_ARTIFACT_DIR", f"tokenizer_artifacts/{artifact_name}"
+                )
+                env.setdefault("TOKENIZER_ARTIFACT_NAME", artifact_name)
+
     # Let worker-side TypedJobs know which stage directory to wire up.
     # Used by `yt_framework.typed_jobs.StageBootstrapTypedJob`.
     env.setdefault("YT_STAGE_NAME", context.name)
@@ -301,6 +345,7 @@ def run_reduce(
             "max_failed_job_count",
             "file_paths",
             "checkpoint",
+            "tokenizer_artifact",
             "tar_command_bootstrap",
             "operation_description",
             # Legacy custom IO option is intentionally no longer consumed here.
