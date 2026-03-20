@@ -12,11 +12,12 @@ from __future__ import annotations
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from omegaconf import DictConfig
 
-from yt_framework.core.stage import StageContext
+if TYPE_CHECKING:
+    from yt_framework.core.stage import StageContext
 
 
 def resolve_tokenizer_artifact_name(
@@ -101,7 +102,7 @@ def _prepare_local_archive(local_artifact_path: Path, artifact_name: str) -> Pat
 
 
 def init_tokenizer_artifact_directory(
-    context: StageContext,
+    context: "StageContext",
     tokenizer_artifact_config: DictConfig,
 ) -> None:
     """

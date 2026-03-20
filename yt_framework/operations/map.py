@@ -7,25 +7,25 @@ This module provides functions for running map operations on YTsaurus clusters.
 import logging
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Optional, Any
+from typing import List, Tuple, Dict, Optional, TYPE_CHECKING
 
 from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
 from yt_framework.utils.logging import log_header, log_success
-from yt_framework.core.stage import StageContext
 from yt_framework.yt.client_base import OperationResources
 from .dependency_strategy import TarArchiveDependencyBuilder
 from .common import (
     build_environment,
-    prepare_docker_auth,
-    _get_config_value_with_default,
+    extract_operation_resources,
+    build_operation_environment,
+    extract_docker_auth_from_operation_config,
+    extract_max_failed_jobs,
+    collect_passthrough_kwargs,
 )
-from .tokenizer_artifact import (
-    init_tokenizer_artifact_directory,
-    resolve_tokenizer_artifact_name,
-    resolve_tokenizer_archive_name,
-)
+
+if TYPE_CHECKING:
+    from yt_framework.core.stage import StageContext
 
 
 @dataclass
@@ -97,21 +97,7 @@ def _prepare_map_operation(
     dependencies = dep.dependencies
     command = dep.command
 
-    # Get Docker auth credentials from loaded secrets
-    # Support both resources.docker_image and direct docker_image for flexibility
-    docker_image = None
-    if "resources" in operation_config and operation_config.resources.get(
-        "docker_image"
-    ):
-        docker_image = operation_config.resources.docker_image
-    elif operation_config.get("docker_image"):
-        docker_image = operation_config.docker_image
-
-    docker_auth = prepare_docker_auth(
-        docker_image=docker_image,
-        docker_username=environment.get("DOCKER_AUTH_USERNAME"),
-        docker_password=environment.get("DOCKER_AUTH_PASSWORD"),
-    )
+    docker_auth = extract_docker_auth_from_operation_config(operation_config, environment)
 
     return MapOperationData(
         mapper_path=mapper_path,
@@ -123,7 +109,7 @@ def _prepare_map_operation(
 
 
 def run_map(
-    context: StageContext,
+    context: "StageContext",
     operation_config: DictConfig,
     output_schema: Optional[TableSchema] = None,
 ) -> bool:
@@ -154,13 +140,13 @@ def run_map(
     if not operation_config.get("output_table"):
         raise ValueError("No output_table configured in operation config")
 
-    # Prepare operation data automatically
-    tokenizer_cfg = operation_config.get("tokenizer_artifact")
-    if tokenizer_cfg:
-        init_tokenizer_artifact_directory(
-            context=context,
-            tokenizer_artifact_config=tokenizer_cfg,
-        )
+    env = build_operation_environment(
+        context=context,
+        operation_config=operation_config,
+        logger=logger,
+        include_stage_name=True,
+        include_tokenizer_artifact=True,
+    )
 
     map_operation_data = _prepare_map_operation(
         pipeline_config=context.deps.pipeline_config,
@@ -170,6 +156,8 @@ def run_map(
         configs_dir=context.deps.configs_dir,
         logger=logger,
     )
+    map_operation_data.environment = env
+    map_operation_data.docker_auth = extract_docker_auth_from_operation_config(operation_config, env)
 
     logger.debug(f"Dependencies: {len(map_operation_data.dependencies)} files")
 
@@ -179,64 +167,10 @@ def run_map(
 
     command = map_operation_data.command
 
-    if tokenizer_cfg and tokenizer_cfg.get("artifact_base"):
-        artifact_name = resolve_tokenizer_artifact_name(
-            stage_config=context.config,
-            tokenizer_artifact_config=tokenizer_cfg,
-        )
-        if artifact_name:
-            archive_name = resolve_tokenizer_archive_name(artifact_name)
-            map_operation_data.environment.setdefault(
-                "TOKENIZER_ARTIFACT_FILE", archive_name
-            )
-            map_operation_data.environment.setdefault(
-                "TOKENIZER_ARTIFACT_DIR", f"tokenizer_artifacts/{artifact_name}"
-            )
-            map_operation_data.environment.setdefault(
-                "TOKENIZER_ARTIFACT_NAME", artifact_name
-            )
-
-    # Extract job parameters from operation_config.resources (or top-level as fallback)
-    # Use defaults when values are not specified in config, logging when defaults are used
-    resources_config = operation_config.get("resources", {})
-    if not resources_config:
-        # Fallback to top-level config if resources section doesn't exist
-        resources_config = operation_config
-
     logger.debug("Extracting operation resources from config")
+    resources: OperationResources = extract_operation_resources(operation_config, logger)
+    max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
-    pool = _get_config_value_with_default(resources_config, "pool", "default", logger)
-    pool_tree = _get_config_value_with_default(
-        resources_config, "pool_tree", None, logger
-    )
-    docker_image = _get_config_value_with_default(
-        resources_config, "docker_image", None, logger
-    )
-    memory_gb = _get_config_value_with_default(
-        resources_config, "memory_limit_gb", 4, logger
-    )
-    cpu_limit = _get_config_value_with_default(resources_config, "cpu_limit", 2, logger)
-    gpu_limit = _get_config_value_with_default(resources_config, "gpu_limit", 0, logger)
-    job_count = _get_config_value_with_default(resources_config, "job_count", 1, logger)
-    user_slots = _get_config_value_with_default(
-        resources_config, "user_slots", None, logger
-    )
-    max_failed_jobs = _get_config_value_with_default(
-        operation_config, "max_failed_job_count", 1, logger
-    )
-
-    resources = OperationResources(
-        pool=pool,
-        pool_tree=pool_tree,
-        docker_image=docker_image,
-        memory_gb=memory_gb,
-        cpu_limit=cpu_limit,
-        gpu_limit=gpu_limit,
-        job_count=job_count,
-        user_slots=user_slots,
-    )
-
-    passthrough_kwargs: dict[str, Any] = {}
     reserved_keys = {
         "input_table",
         "output_table",
@@ -249,16 +183,7 @@ def run_map(
         "tar_command_bootstrap",
         "operation_description",
     }
-    for k in operation_config.keys():
-        if k in reserved_keys:
-            continue
-        v = operation_config.get(k)
-        if v is None:
-            continue
-        if isinstance(v, DictConfig):
-            passthrough_kwargs[str(k)] = OmegaConf.to_container(v, resolve=True)
-        else:
-            passthrough_kwargs[str(k)] = v
+    passthrough_kwargs = collect_passthrough_kwargs(operation_config, reserved_keys)
 
     operation = context.deps.yt_client.run_map(
         command=command,

@@ -7,74 +7,27 @@ built by the framework; credentials come from configs/secrets.env.
 """
 
 import logging
-from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, TYPE_CHECKING
 
 from omegaconf import DictConfig, OmegaConf
 
 from yt_framework.utils.logging import log_header, log_success
-from yt_framework.core.stage import StageContext
-from yt_framework.yt.client_base import OperationResources
 from .dependency_strategy import TarArchiveDependencyBuilder
 from .job_command import require_consistent_map_reduce_legs
 from .common import (
-    build_environment,
-    prepare_docker_auth,
-    _get_config_value_with_default,
-)
-from .tokenizer_artifact import (
-    init_tokenizer_artifact_directory,
-    resolve_tokenizer_artifact_name,
-    resolve_tokenizer_archive_name,
+    extract_operation_resources,
+    build_operation_environment,
+    extract_docker_auth_from_operation_config,
+    extract_max_failed_jobs,
+    collect_passthrough_kwargs,
 )
 
-
-def _resources_from_config(operation_config: DictConfig, logger: logging.Logger) -> OperationResources:
-    """Extract OperationResources from operation_config.resources."""
-    resources_config = operation_config.get("resources") or operation_config
-    pool = _get_config_value_with_default(resources_config, "pool", "default", logger)
-    pool_tree = _get_config_value_with_default(resources_config, "pool_tree", None, logger)
-    docker_image = _get_config_value_with_default(resources_config, "docker_image", None, logger)
-    memory_gb = _get_config_value_with_default(resources_config, "memory_limit_gb", 4, logger)
-    cpu_limit = _get_config_value_with_default(resources_config, "cpu_limit", 2, logger)
-    gpu_limit = _get_config_value_with_default(resources_config, "gpu_limit", 0, logger)
-    job_count = _get_config_value_with_default(resources_config, "job_count", 1, logger)
-    user_slots = _get_config_value_with_default(resources_config, "user_slots", None, logger)
-    return OperationResources(
-        pool=pool,
-        pool_tree=pool_tree,
-        docker_image=docker_image,
-        memory_gb=memory_gb,
-        cpu_limit=cpu_limit,
-        gpu_limit=gpu_limit,
-        job_count=job_count,
-        user_slots=user_slots,
-    )
-
-
-def _collect_passthrough_kwargs(operation_config: DictConfig, reserved_keys: set[str]) -> dict[str, Any]:
-    """
-    Collect arbitrary operation kwargs to pass through to YT client.
-
-    Any top-level key not reserved by framework orchestration is forwarded as-is
-    (OmegaConf nodes are resolved to plain Python containers).
-    """
-    out: dict[str, Any] = {}
-    for k in operation_config.keys():
-        if k in reserved_keys:
-            continue
-        v = operation_config.get(k)
-        if v is None:
-            continue
-        if isinstance(v, DictConfig):
-            out[str(k)] = OmegaConf.to_container(v, resolve=True)
-        else:
-            out[str(k)] = v
-    return out
+if TYPE_CHECKING:
+    from yt_framework.core.stage import StageContext
 
 
 def run_map_reduce(
-    context: StageContext,
+    context: "StageContext",
     operation_config: DictConfig,
     mapper: Any,
     reducer: Any,
@@ -114,34 +67,14 @@ def run_map_reduce(
     if not input_table or not output_table or not reduce_by:
         raise ValueError("operation_config must set input_table, output_table, and reduce_by")
 
-    env = build_environment(configs_dir=context.deps.configs_dir, logger=logger)
-    for k, v in (operation_config.get("env") or {}).items():
-        if v is not None:
-            env[str(k)] = str(v)
-
-    tokenizer_cfg = operation_config.get("tokenizer_artifact")
-    if tokenizer_cfg:
-        init_tokenizer_artifact_directory(
-            context=context,
-            tokenizer_artifact_config=tokenizer_cfg,
-        )
-        if tokenizer_cfg.get("artifact_base"):
-            artifact_name = resolve_tokenizer_artifact_name(
-                stage_config=context.config,
-                tokenizer_artifact_config=tokenizer_cfg,
-            )
-            if artifact_name:
-                archive_name = resolve_tokenizer_archive_name(artifact_name)
-                env.setdefault("TOKENIZER_ARTIFACT_FILE", archive_name)
-                env.setdefault(
-                    "TOKENIZER_ARTIFACT_DIR", f"tokenizer_artifacts/{artifact_name}"
-                )
-                env.setdefault("TOKENIZER_ARTIFACT_NAME", artifact_name)
-
-    # Let worker-side TypedJobs know which stage directory to wire up.
-    # Used by `yt_framework.typed_jobs.StageBootstrapTypedJob`.
-    env.setdefault("YT_STAGE_NAME", context.name)
-    resources = _resources_from_config(operation_config, logger)
+    env = build_operation_environment(
+        context=context,
+        operation_config=operation_config,
+        logger=logger,
+        include_stage_name=True,
+        include_tokenizer_artifact=True,
+    )
+    resources = extract_operation_resources(operation_config, logger)
 
     require_consistent_map_reduce_legs(mapper, reducer)
 
@@ -168,15 +101,10 @@ def run_map_reduce(
             "expected both or neither."
         )
 
-    docker_image = (operation_config.get("resources") or {}).get("docker_image") or operation_config.get("docker_image")
-    docker_auth = prepare_docker_auth(
-        docker_image=docker_image,
-        docker_username=env.get("DOCKER_AUTH_USERNAME"),
-        docker_password=env.get("DOCKER_AUTH_PASSWORD"),
-    )
+    docker_auth = extract_docker_auth_from_operation_config(operation_config, env)
 
     sort_by = list(operation_config.get("sort_by") or [])
-    max_failed_jobs = _get_config_value_with_default(operation_config, "max_failed_job_count", 1, logger)
+    max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
     spec_kwargs: dict = {}
     if operation_config.get("map_job_count") is not None:
@@ -189,7 +117,7 @@ def run_map_reduce(
         else:
             spec_kwargs["operation_description"] = OmegaConf.to_container(od, resolve=True)
 
-    passthrough = _collect_passthrough_kwargs(
+    passthrough = collect_passthrough_kwargs(
         operation_config,
         reserved_keys={
             "input_table",
@@ -238,7 +166,7 @@ def run_map_reduce(
 
 
 def run_reduce(
-    context: StageContext,
+    context: "StageContext",
     operation_config: DictConfig,
     reducer: Any,
     output_schema: Optional[Any] = None,
@@ -272,34 +200,14 @@ def run_reduce(
     if not input_table or not output_table or not reduce_by:
         raise ValueError("operation_config must set input_table, output_table, and reduce_by")
 
-    env = build_environment(configs_dir=context.deps.configs_dir, logger=logger)
-    for k, v in (operation_config.get("env") or {}).items():
-        if v is not None:
-            env[str(k)] = str(v)
-
-    tokenizer_cfg = operation_config.get("tokenizer_artifact")
-    if tokenizer_cfg:
-        init_tokenizer_artifact_directory(
-            context=context,
-            tokenizer_artifact_config=tokenizer_cfg,
-        )
-        if tokenizer_cfg.get("artifact_base"):
-            artifact_name = resolve_tokenizer_artifact_name(
-                stage_config=context.config,
-                tokenizer_artifact_config=tokenizer_cfg,
-            )
-            if artifact_name:
-                archive_name = resolve_tokenizer_archive_name(artifact_name)
-                env.setdefault("TOKENIZER_ARTIFACT_FILE", archive_name)
-                env.setdefault(
-                    "TOKENIZER_ARTIFACT_DIR", f"tokenizer_artifacts/{artifact_name}"
-                )
-                env.setdefault("TOKENIZER_ARTIFACT_NAME", artifact_name)
-
-    # Let worker-side TypedJobs know which stage directory to wire up.
-    # Used by `yt_framework.typed_jobs.StageBootstrapTypedJob`.
-    env.setdefault("YT_STAGE_NAME", context.name)
-    resources = _resources_from_config(operation_config, logger)
+    env = build_operation_environment(
+        context=context,
+        operation_config=operation_config,
+        logger=logger,
+        include_stage_name=True,
+        include_tokenizer_artifact=True,
+    )
+    resources = extract_operation_resources(operation_config, logger)
 
     builder = TarArchiveDependencyBuilder()
     dep = builder.build_dependencies(
@@ -317,14 +225,9 @@ def run_reduce(
         reducer = dep.reducer_command
         logger.info("Using tar bootstrap command for reduce leg")
 
-    docker_image = (operation_config.get("resources") or {}).get("docker_image") or operation_config.get("docker_image")
-    docker_auth = prepare_docker_auth(
-        docker_image=docker_image,
-        docker_username=env.get("DOCKER_AUTH_USERNAME"),
-        docker_password=env.get("DOCKER_AUTH_PASSWORD"),
-    )
+    docker_auth = extract_docker_auth_from_operation_config(operation_config, env)
 
-    max_failed_jobs = _get_config_value_with_default(operation_config, "max_failed_job_count", 1, logger)
+    max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
     reduce_kw: dict = {}
     rod = operation_config.get("operation_description")
@@ -334,7 +237,7 @@ def run_reduce(
         else:
             reduce_kw["operation_description"] = OmegaConf.to_container(rod, resolve=True)
 
-    passthrough = _collect_passthrough_kwargs(
+    passthrough = collect_passthrough_kwargs(
         operation_config,
         reserved_keys={
             "input_table",

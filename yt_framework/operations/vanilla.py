@@ -7,19 +7,23 @@ This module provides functions for running vanilla operations on YTsaurus cluste
 import logging
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Any, TYPE_CHECKING
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from yt_framework.utils.logging import log_header, log_success
-from yt_framework.core.stage import StageContext
-from yt_framework.yt.client_base import OperationResources
 from .common import (
     build_environment,
-    prepare_docker_auth,
-    _get_config_value_with_default,
+    extract_operation_resources,
+    build_operation_environment,
+    extract_docker_auth_from_operation_config,
+    extract_max_failed_jobs,
+    collect_passthrough_kwargs,
 )
 from .dependency_strategy import TarArchiveDependencyBuilder
+
+if TYPE_CHECKING:
+    from yt_framework.core.stage import StageContext
 
 
 @dataclass
@@ -91,21 +95,7 @@ def _prepare_vanilla_operation(
     dependencies = dep.dependencies
     command = dep.command
 
-    # Get Docker auth credentials from loaded secrets
-    # Support both resources.docker_image and direct docker_image for flexibility
-    docker_image = None
-    if "resources" in operation_config and operation_config.resources.get(
-        "docker_image"
-    ):
-        docker_image = operation_config.resources.docker_image
-    elif operation_config.get("docker_image"):
-        docker_image = operation_config.docker_image
-
-    docker_auth = prepare_docker_auth(
-        docker_image=docker_image,
-        docker_username=environment.get("DOCKER_AUTH_USERNAME"),
-        docker_password=environment.get("DOCKER_AUTH_PASSWORD"),
-    )
+    docker_auth = extract_docker_auth_from_operation_config(operation_config, environment)
 
     return VanillaOperationData(
         script_path=script_path,
@@ -117,7 +107,7 @@ def _prepare_vanilla_operation(
 
 
 def run_vanilla(
-    context: StageContext,
+    context: "StageContext",
     operation_config: DictConfig,
 ) -> bool:
     """
@@ -138,6 +128,13 @@ def run_vanilla(
     logger = context.logger
     # Use stage name as task name
     task_name = context.name
+    env = build_operation_environment(
+        context=context,
+        operation_config=operation_config,
+        logger=logger,
+        include_stage_name=True,
+        include_tokenizer_artifact=False,
+    )
 
     # Prepare operation data automatically
     vanilla_operation_data = _prepare_vanilla_operation(
@@ -147,6 +144,10 @@ def run_vanilla(
         stage_dir=context.stage_dir,
         configs_dir=context.deps.configs_dir,
         logger=logger,
+    )
+    vanilla_operation_data.environment = env
+    vanilla_operation_data.docker_auth = extract_docker_auth_from_operation_config(
+        operation_config, env
     )
 
     log_header(
@@ -162,44 +163,34 @@ def run_vanilla(
 
     command = vanilla_operation_data.command
 
-    # Extract job parameters from operation_config.resources (or top-level as fallback)
-    # Use defaults when values are not specified in config, logging when defaults are used
-    resources_config = operation_config.get("resources", {})
-    if not resources_config:
-        # Fallback to top-level config if resources section doesn't exist
-        resources_config = operation_config
-
     logger.debug("Extracting operation resources from config")
+    resources = extract_operation_resources(operation_config, logger)
+    max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
-    pool = _get_config_value_with_default(resources_config, "pool", "default", logger)
-    pool_tree = _get_config_value_with_default(
-        resources_config, "pool_tree", None, logger
-    )
-    docker_image = _get_config_value_with_default(
-        resources_config, "docker_image", None, logger
-    )
-    memory_gb = _get_config_value_with_default(
-        resources_config, "memory_limit_gb", 4, logger
-    )
-    cpu_limit = _get_config_value_with_default(resources_config, "cpu_limit", 2, logger)
-    gpu_limit = _get_config_value_with_default(resources_config, "gpu_limit", 0, logger)
-    job_count = _get_config_value_with_default(resources_config, "job_count", 1, logger)
-    user_slots = _get_config_value_with_default(
-        resources_config, "user_slots", None, logger
-    )
-    max_failed_jobs = _get_config_value_with_default(
-        operation_config, "max_failed_job_count", 1, logger
-    )
+    vanilla_kwargs: dict[str, Any] = {}
+    od = operation_config.get("operation_description")
+    if od:
+        if isinstance(od, str):
+            logger.info(f"Operation label: {od}")
+        else:
+            vanilla_kwargs["operation_description"] = OmegaConf.to_container(
+                od, resolve=True
+            )
 
-    resources = OperationResources(
-        pool=pool,
-        pool_tree=pool_tree,
-        docker_image=docker_image,
-        memory_gb=memory_gb,
-        cpu_limit=cpu_limit,
-        gpu_limit=gpu_limit,
-        job_count=job_count,
-        user_slots=user_slots,
+    vanilla_kwargs.update(
+        collect_passthrough_kwargs(
+            operation_config,
+            reserved_keys={
+                "resources",
+                "env",
+                "max_failed_job_count",
+                "file_paths",
+                "checkpoint",
+                "tokenizer_artifact",
+                "tar_command_bootstrap",
+                "operation_description",
+            },
+        )
     )
 
     operation = context.deps.yt_client.run_vanilla(
@@ -210,6 +201,7 @@ def run_vanilla(
         resources=resources,
         docker_auth=vanilla_operation_data.docker_auth,
         max_failed_jobs=max_failed_jobs,
+        **vanilla_kwargs,
     )
 
     if operation is None:
