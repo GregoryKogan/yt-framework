@@ -28,38 +28,39 @@ from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImport
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
 from yt_framework.utils.ignore import YTIgnoreMatcher
 
+# YtClient.run_operation() only accepts these keyword args; everything else must be
+# applied via SpecBuilder chain methods (weight, title, description, …).
+_RUN_OPERATION_KWARGS = frozenset(
+    {"enable_optimizations", "run_operation_mutation_id", "sync"}
+)
 
-def _merge_map_reduce_reduce_job_io(
-    reducer: Any,
-    typed_row_iterator_io: bool,
-    user_reduce_job_io: Any,
-) -> Optional[Dict[str, Any]]:
+
+def _apply_spec_options_and_split_run_operation_kwargs(
+    spec_builder: Any,
+    kwargs: Dict[str, Any],
+) -> tuple[Any, Dict[str, Any]]:
     """
-    Build reduce_job_io for map-reduce when using TypedJob + RowIterator reducer.
-
-    YT's map_reduce reducer leg omits enable_row_index for TypedJob by default;
-    enabling it aligns reducer I/O with standalone reduce (native iterator batching).
+    Apply kwargs that correspond to SpecBuilder chain methods (e.g. ``weight``,
+    ``title``, ``alias``). Remaining keys must be only those accepted by
+    ``YtClient.run_operation`` (see ``_RUN_OPERATION_KWARGS``).
     """
-    from copy import deepcopy
-
-    base: Dict[str, Any] = {}
-    if typed_row_iterator_io and isinstance(reducer, TypedJob):
-        base = {
-            "control_attributes": {
-                "enable_row_index": True,
-                "enable_key_switch": True,
-            }
-        }
-    if not user_reduce_job_io:
-        return base if base else None
-    user = deepcopy(dict(user_reduce_job_io))
-    if not base:
-        return user
-    u_ca = user.pop("control_attributes", None) or {}
-    b_ca = dict(base.get("control_attributes") or {})
-    b_ca.update(u_ca)
-    merged = {**base, **user, "control_attributes": b_ca}
-    return merged
+    kwargs = dict(kwargs)
+    run_op: Dict[str, Any] = {}
+    for k in list(kwargs.keys()):
+        if k in _RUN_OPERATION_KWARGS:
+            run_op[k] = kwargs.pop(k)
+    for k, v in list(kwargs.items()):
+        meth = getattr(spec_builder, k, None)
+        if meth is not None and callable(meth):
+            spec_builder = meth(v)
+            del kwargs[k]
+        else:
+            raise ValueError(
+                f"Unknown YT operation option {k!r}: not a SpecBuilder method on "
+                f"{type(spec_builder).__name__} and not one of "
+                f"{sorted(_RUN_OPERATION_KWARGS)}."
+            )
+    return spec_builder, run_op
 
 
 class YTProdClient(BaseYTClient):
@@ -828,6 +829,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_schema: Optional[TableSchema] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
     ) -> Operation:
         """Run a map operation on YT cluster.
         
@@ -861,6 +863,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info(f"  Resources: {resources}")
 
         try:
+            kwargs = dict(kwargs)
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
@@ -898,7 +901,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             mapper_builder = mapper_builder.end_mapper()
 
-            operation = self.client.run_operation(spec_builder, sync=False)
+            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+                spec_builder, kwargs
+            )
+            run_op.setdefault("sync", False)
+            operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
                 raise RuntimeError(
                     "Failed to submit operation: run_operation returned None"
@@ -1034,29 +1041,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             if resources.user_slots:
                 spec_builder = spec_builder.resource_limits({"user_slots": resources.user_slots})
 
-            od = kwargs.get("operation_description")
+            od = kwargs.pop("operation_description", None)
             if isinstance(od, dict):
                 spec_builder = spec_builder.description(od)
-
-            # Map-reduce TypedJob reducers with RowIterator[...] need explicit reduce_job_io
-            # control attributes on some clusters (standalone reduce sets enable_row_index;
-            # map_reduce reducer path does not by default).
-            reduce_io = _merge_map_reduce_reduce_job_io(
-                reducer=reducer,
-                typed_row_iterator_io=bool(kwargs.get("typed_reduce_row_iterator_io")),
-                user_reduce_job_io=kwargs.get("reduce_job_io"),
-            )
-            if reduce_io:
-                spec_builder = spec_builder.reduce_job_io(reduce_io)
-                self.logger.info(
-                    "  reduce_job_io control_attributes: %s",
-                    reduce_io.get("control_attributes", reduce_io),
-                )
-
-            map_io = kwargs.get("map_job_io")
-            if map_io:
-                spec_builder = spec_builder.map_job_io(dict(map_io))
-                self.logger.info("  map_job_io: %s", map_io)
 
             mapper_builder = (
                 spec_builder.begin_mapper()
@@ -1091,10 +1078,15 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             spec_builder = spec_builder.reduce_by(reduce_by)
             if sort_by:
                 spec_builder = spec_builder.sort_by(sort_by)
-            if kwargs.get("map_job_count") is not None:
-                spec_builder = spec_builder.map_job_count(kwargs["map_job_count"])
+            map_job_count = kwargs.pop("map_job_count", None)
+            if map_job_count is not None:
+                spec_builder = spec_builder.map_job_count(map_job_count)
 
-            operation = self.client.run_operation(spec_builder, sync=False)
+            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+                spec_builder, kwargs
+            )
+            run_op.setdefault("sync", False)
+            operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
                 raise RuntimeError("Failed to submit map-reduce operation")
             self.logger.info(f"Map-reduce operation submitted: {operation.id}")
@@ -1123,6 +1115,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info(f"  Reduce by: {reduce_by}")
 
         try:
+            kwargs = dict(kwargs)
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
@@ -1141,14 +1134,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             if resources.user_slots:
                 spec_builder = spec_builder.resource_limits({"user_slots": resources.user_slots})
 
-            rod = kwargs.get("operation_description")
+            rod = kwargs.pop("operation_description", None)
             if isinstance(rod, dict):
                 spec_builder = spec_builder.description(rod)
-
-            jio = kwargs.get("job_io")
-            if jio:
-                spec_builder = spec_builder.job_io(dict(jio))
-                self.logger.info("  job_io: %s", jio)
 
             reducer_builder = (
                 spec_builder.begin_reducer()
@@ -1167,7 +1155,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             spec_builder = spec_builder.reduce_by(reduce_by)
 
-            operation = self.client.run_operation(spec_builder, sync=False)
+            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+                spec_builder, kwargs
+            )
+            run_op.setdefault("sync", False)
+            operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
                 raise RuntimeError("Failed to submit reduce operation")
             self.logger.info(f"Reduce operation submitted: {operation.id}")

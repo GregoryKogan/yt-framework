@@ -532,6 +532,7 @@ class YTDevClient(BaseYTClient):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
     ) -> Operation:
         """Run a map operation locally using subprocess.
         
@@ -549,6 +550,7 @@ class YTDevClient(BaseYTClient):
             output_schema: Optional output table schema (not used in dev mode).
             max_failed_jobs: Maximum failed jobs allowed (not used in dev mode).
             docker_auth: Optional Docker authentication (not used in dev mode).
+            **kwargs: Additional arguments (not used in dev mode).
             
         Returns:
             Operation: Mock operation object that simulates YT operation.

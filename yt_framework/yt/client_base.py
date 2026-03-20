@@ -452,6 +452,7 @@ class BaseYTClient(ABC):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
     ) -> Operation:
         """
         Run a map operation on YT.
@@ -466,6 +467,7 @@ class BaseYTClient(ABC):
             output_schema: Optional YT TableSchema for typed output table
             max_failed_jobs: Maximum number of failed jobs before operation fails
             docker_auth: Optional Docker authentication dictionary
+            **kwargs: Extra options forwarded to the underlying YT client.
         """
         pass
 

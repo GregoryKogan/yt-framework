@@ -47,6 +47,27 @@ def _resources_from_config(operation_config: DictConfig, logger: logging.Logger)
     )
 
 
+def _collect_passthrough_kwargs(operation_config: DictConfig, reserved_keys: set[str]) -> dict[str, Any]:
+    """
+    Collect arbitrary operation kwargs to pass through to YT client.
+
+    Any top-level key not reserved by framework orchestration is forwarded as-is
+    (OmegaConf nodes are resolved to plain Python containers).
+    """
+    out: dict[str, Any] = {}
+    for k in operation_config.keys():
+        if k in reserved_keys:
+            continue
+        v = operation_config.get(k)
+        if v is None:
+            continue
+        if isinstance(v, DictConfig):
+            out[str(k)] = OmegaConf.to_container(v, resolve=True)
+        else:
+            out[str(k)] = v
+    return out
+
+
 def run_map_reduce(
     context: StageContext,
     operation_config: DictConfig,
@@ -143,14 +164,29 @@ def run_map_reduce(
             logger.info(f"Operation label: {od}")
         else:
             spec_kwargs["operation_description"] = OmegaConf.to_container(od, resolve=True)
-    if operation_config.get("typed_reduce_row_iterator_io"):
-        spec_kwargs["typed_reduce_row_iterator_io"] = True
-    rji = operation_config.get("reduce_job_io")
-    if rji:
-        spec_kwargs["reduce_job_io"] = OmegaConf.to_container(rji, resolve=True)
-    mji = operation_config.get("map_job_io")
-    if mji:
-        spec_kwargs["map_job_io"] = OmegaConf.to_container(mji, resolve=True)
+
+    passthrough = _collect_passthrough_kwargs(
+        operation_config,
+        reserved_keys={
+            "input_table",
+            "output_table",
+            "reduce_by",
+            "sort_by",
+            "resources",
+            "env",
+            "max_failed_job_count",
+            "file_paths",
+            "checkpoint",
+            "tar_command_bootstrap",
+            "map_job_count",
+            "operation_description",
+            # Legacy custom IO options are intentionally no longer consumed here.
+            "typed_reduce_row_iterator_io",
+            "reduce_job_io",
+            "map_job_io",
+        },
+    )
+    spec_kwargs.update(passthrough)
 
     operation = context.deps.yt_client.run_map_reduce(
         mapper=mapper,
@@ -253,9 +289,25 @@ def run_reduce(
             logger.info(f"Operation label: {rod}")
         else:
             reduce_kw["operation_description"] = OmegaConf.to_container(rod, resolve=True)
-    jio = operation_config.get("job_io")
-    if jio:
-        reduce_kw["job_io"] = OmegaConf.to_container(jio, resolve=True)
+
+    passthrough = _collect_passthrough_kwargs(
+        operation_config,
+        reserved_keys={
+            "input_table",
+            "output_table",
+            "reduce_by",
+            "resources",
+            "env",
+            "max_failed_job_count",
+            "file_paths",
+            "checkpoint",
+            "tar_command_bootstrap",
+            "operation_description",
+            # Legacy custom IO option is intentionally no longer consumed here.
+            "job_io",
+        },
+    )
+    reduce_kw.update(passthrough)
 
     operation = context.deps.yt_client.run_reduce(
         reducer=reducer,

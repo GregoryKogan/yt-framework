@@ -7,10 +7,10 @@ This module provides functions for running map operations on YTsaurus clusters.
 import logging
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Any
 
 from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from yt_framework.utils.logging import log_header, log_success
 from yt_framework.core.stage import StageContext
@@ -207,6 +207,29 @@ def run_map(
         user_slots=user_slots,
     )
 
+    passthrough_kwargs: dict[str, Any] = {}
+    reserved_keys = {
+        "input_table",
+        "output_table",
+        "resources",
+        "env",
+        "max_failed_job_count",
+        "file_paths",
+        "checkpoint",
+        "tar_command_bootstrap",
+        "operation_description",
+    }
+    for k in operation_config.keys():
+        if k in reserved_keys:
+            continue
+        v = operation_config.get(k)
+        if v is None:
+            continue
+        if isinstance(v, DictConfig):
+            passthrough_kwargs[str(k)] = OmegaConf.to_container(v, resolve=True)
+        else:
+            passthrough_kwargs[str(k)] = v
+
     operation = context.deps.yt_client.run_map(
         command=command,
         input_table=operation_config.input_table,
@@ -217,6 +240,7 @@ def run_map(
         output_schema=output_schema,
         max_failed_jobs=max_failed_jobs,
         docker_auth=map_operation_data.docker_auth,
+        **passthrough_kwargs,
     )
 
     # Wait for completion
