@@ -7,7 +7,7 @@ This module provides functions for running map operations on YTsaurus clusters.
 import logging
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Optional, TYPE_CHECKING
+from typing import List, Tuple, Dict, Optional, TYPE_CHECKING, Any
 
 from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
 from omegaconf import DictConfig
@@ -112,6 +112,8 @@ def run_map(
     context: "StageContext",
     operation_config: DictConfig,
     output_schema: Optional[TableSchema] = None,
+    mapper: Optional[Any] = None,
+    job: Optional[Any] = None,
 ) -> bool:
     """
     Run YT map operation and wait for completion.
@@ -124,6 +126,9 @@ def run_map(
         context: Stage context (provides deps, logger, stage_dir)
         operation_config: Operation-specific config (from client.operations.map)
         output_schema: Optional YT TableSchema for typed output table
+        mapper: Optional mapper leg (legacy name). When omitted, framework uses command wrapper.
+            Can be a TypedJob instance or command string.
+        job: Preferred mapper leg alias. Can be a TypedJob instance or command string.
 
     Returns:
         True if successful, False otherwise
@@ -161,11 +166,13 @@ def run_map(
 
     logger.debug(f"Dependencies: {len(map_operation_data.dependencies)} files")
 
-    # Command is always provided by the dependency builder (tar archive mode)
-    if not map_operation_data.command:
+    if mapper is not None and job is not None and mapper != job:
+        raise ValueError("Both 'mapper' and 'job' are set with different values; use only one")
+    mapper_leg = job if job is not None else mapper
+    if mapper_leg is None:
+        mapper_leg = map_operation_data.command
+    if mapper_leg is None:
         raise ValueError("Command not provided by dependency builder")
-
-    command = map_operation_data.command
 
     logger.debug("Extracting operation resources from config")
     resources: OperationResources = extract_operation_resources(operation_config, logger)
@@ -186,7 +193,7 @@ def run_map(
     passthrough_kwargs = collect_passthrough_kwargs(operation_config, reserved_keys)
 
     operation = context.deps.yt_client.run_map(
-        command=command,
+        command=mapper_leg,
         input_table=operation_config.input_table,
         output_table=operation_config.output_table,
         files=map_operation_data.dependencies,

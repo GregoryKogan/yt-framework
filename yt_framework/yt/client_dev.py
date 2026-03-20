@@ -523,7 +523,7 @@ class YTDevClient(BaseYTClient):
 
     def run_map(
         self,
-        command: str,
+        command: Any,
         input_table: str,
         output_table: str,
         files: List[Tuple[str, str]],
@@ -532,6 +532,7 @@ class YTDevClient(BaseYTClient):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        job: Any = None,
         **kwargs: Any,
     ) -> Operation:
         """Run a map operation locally using subprocess.
@@ -541,7 +542,7 @@ class YTDevClient(BaseYTClient):
         with all dependencies available.
         
         Args:
-            command: Command to execute (typically bash command with script path).
+            command: Mapper job (command string in dev mode).
             input_table: Input YT table path (read from local JSONL).
             output_table: Output YT table path (written to local JSONL).
             files: List of (yt_path, local_path) tuples for dependencies.
@@ -570,7 +571,13 @@ class YTDevClient(BaseYTClient):
         self.logger.info("Submitting map operation")
         self.logger.info(f"  Input: {input_table}")
         self.logger.info(f"  Output: {output_table}")
-        self.logger.info(f"  Command: {command}")
+        mapper_job = job if job is not None else command
+        self.logger.info(f"  Command: {mapper_job}")
+        if not isinstance(mapper_job, str):
+            raise NotImplementedError(
+                "Dev mode run_map supports only string commands; "
+                "TypedJob mappers are supported in prod mode."
+            )
 
         # Prepare sandbox and input/output files
         sandbox_dir, sandbox_input, sandbox_output = self._prepare_map_sandbox(
@@ -590,7 +597,7 @@ class YTDevClient(BaseYTClient):
             open(logs_path, "w") as ferr,
         ):
             proc = subprocess.run(
-                ["bash", "-c", command],
+                ["bash", "-c", mapper_job],
                 stdin=fin,
                 stdout=fout,
                 stderr=ferr,
@@ -612,6 +619,7 @@ class YTDevClient(BaseYTClient):
         files: List[Tuple[str, str]],
         env: Dict[str, str],
         task_name: str = "main",
+        job: Optional[str] = None,
         **kwargs,
     ) -> Operation:
         """Run a vanilla operation locally using subprocess.
@@ -630,7 +638,8 @@ class YTDevClient(BaseYTClient):
             Operation: Mock operation object that simulates YT operation.
         """
         self.logger.info("Submitting vanilla operation")
-        self.logger.info(f"  Command: {command}")
+        vanilla_job = job if job is not None else command
+        self.logger.info(f"  Command: {vanilla_job}")
         self.logger.info(f"  Task: {task_name}")
 
         assert self.pipeline_dir is not None
@@ -652,15 +661,15 @@ class YTDevClient(BaseYTClient):
         # Convert YT paths in command to local sandbox paths
         # YT path format: //tmp/.../build/stages/.../vanilla.py
         # Local path format: stages/.../vanilla.py (relative to sandbox)
-        local_command = command
-        if "/build/" in command:
+        local_command = vanilla_job
+        if "/build/" in vanilla_job:
             # Extract the path after /build/ and use it as local path
             import re
 
             # Split command into parts and find the /build/ part
             # Command format: "python3 //tmp/examples/05_vanilla_operation/build/stages/run_vanilla/src/vanilla.py"
             # We want to extract: "stages/run_vanilla/src/vanilla.py"
-            parts = command.split("/build/", 1)
+            parts = vanilla_job.split("/build/", 1)
             if len(parts) == 2:
                 # parts[1] contains "stages/run_vanilla/src/vanilla.py" (may have leading/trailing spaces)
                 local_path = parts[1].strip()
@@ -669,20 +678,20 @@ class YTDevClient(BaseYTClient):
                 yt_path_pattern = r"//[^/\s]+(?:/[^/\s]+)*/build/" + re.escape(
                     local_path.split()[0]
                 )
-                local_command = re.sub(yt_path_pattern, local_path.split()[0], command)
-                if local_command != command:
+                local_command = re.sub(yt_path_pattern, local_path.split()[0], vanilla_job)
+                if local_command != vanilla_job:
                     self.logger.debug(
-                        f"  Dev: converted command: {command} -> {local_command}"
+                        f"  Dev: converted command: {vanilla_job} -> {local_command}"
                     )
                 else:
                     # Fallback: simple string replacement
                     yt_full_path = "/build/".join(parts)
-                    if yt_full_path in command:
-                        local_command = command.replace(
+                    if yt_full_path in vanilla_job:
+                        local_command = vanilla_job.replace(
                             yt_full_path, local_path.split()[0]
                         )
                         self.logger.debug(
-                            f"  Dev: converted command (fallback): {command} -> {local_command}"
+                            f"  Dev: converted command (fallback): {vanilla_job} -> {local_command}"
                         )
 
         logs_path = self._dev_dir() / f"{task_name}.log"
@@ -725,9 +734,13 @@ class YTDevClient(BaseYTClient):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        map_job: Any = None,
+        reduce_job: Any = None,
         **kwargs: Any,
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
+        mapper_leg = map_job if map_job is not None else mapper
+        reducer_leg = reduce_job if reduce_job is not None else reducer
         def _leg_desc(obj: Any) -> str:
             if is_typed_job(obj):
                 return "TypedJob"
@@ -737,8 +750,8 @@ class YTDevClient(BaseYTClient):
 
         self.logger.info(
             "Dev: map-reduce mapper leg: %s; reducer leg: %s",
-            _leg_desc(mapper),
-            _leg_desc(reducer),
+            _leg_desc(mapper_leg),
+            _leg_desc(reducer_leg),
         )
         self.logger.info("Dev: map-reduce no-op (copying input -> output)")
         assert self.pipeline_dir is not None
@@ -764,15 +777,17 @@ class YTDevClient(BaseYTClient):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        job: Any = None,
         **kwargs: Any,
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
-        if is_typed_job(reducer):
+        reducer_leg = job if job is not None else reducer
+        if is_typed_job(reducer_leg):
             rdesc = "TypedJob"
-        elif isinstance(reducer, str):
+        elif isinstance(reducer_leg, str):
             rdesc = "command (prod uses JsonFormat on this leg)"
         else:
-            rdesc = f"invalid leg type {type(reducer).__name__} (expected TypedJob or str)"
+            rdesc = f"invalid leg type {type(reducer_leg).__name__} (expected TypedJob or str)"
         self.logger.info("Dev: reduce leg: %s", rdesc)
         self.logger.info("Dev: reduce no-op (copying input -> output)")
         assert self.pipeline_dir is not None

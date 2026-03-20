@@ -32,6 +32,8 @@ def run_map_reduce(
     mapper: Any,
     reducer: Any,
     output_schema: Optional[Any] = None,
+    map_job: Any = None,
+    reduce_job: Any = None,
 ) -> bool:
     """
     Run a YT map-reduce operation and wait for completion.
@@ -47,9 +49,11 @@ def run_map_reduce(
         context: Stage context (deps, logger, stage_dir, config).
         operation_config: client.operations.map_reduce config (input_table,
             output_table, reduce_by, sort_by, resources, file_paths, etc.).
-        mapper: Mapper TypedJob instance.
-        reducer: Reducer TypedJob instance.
+        mapper: Mapper leg (legacy name).
+        reducer: Reducer leg (legacy name).
         output_schema: Optional YT TableSchema for output table.
+        map_job: Preferred mapper leg alias.
+        reduce_job: Preferred reducer leg alias.
 
     Returns:
         True if the operation completed successfully.
@@ -75,6 +79,13 @@ def run_map_reduce(
         include_tokenizer_artifact=True,
     )
     resources = extract_operation_resources(operation_config, logger)
+
+    if mapper is not None and map_job is not None and mapper != map_job:
+        raise ValueError("Both 'mapper' and 'map_job' are set with different values; use only one")
+    if reducer is not None and reduce_job is not None and reducer != reduce_job:
+        raise ValueError("Both 'reducer' and 'reduce_job' are set with different values; use only one")
+    mapper = map_job if map_job is not None else mapper
+    reducer = reduce_job if reduce_job is not None else reducer
 
     require_consistent_map_reduce_legs(mapper, reducer)
 
@@ -144,6 +155,8 @@ def run_map_reduce(
     operation = context.deps.yt_client.run_map_reduce(
         mapper=mapper,
         reducer=reducer,
+        map_job=mapper,
+        reduce_job=reducer,
         input_table=input_table,
         output_table=output_table,
         reduce_by=reduce_by,
@@ -170,6 +183,7 @@ def run_reduce(
     operation_config: DictConfig,
     reducer: Any,
     output_schema: Optional[Any] = None,
+    job: Any = None,
 ) -> bool:
     """
     Run a YT reduce-only operation and wait for completion.
@@ -181,8 +195,9 @@ def run_reduce(
     Args:
         context: Stage context.
         operation_config: client.operations.reduce config.
-        reducer: Reducer TypedJob instance.
+        reducer: Reducer leg (legacy name).
         output_schema: Optional output table schema.
+        job: Preferred reducer leg alias.
 
     Returns:
         True if the operation completed successfully.
@@ -208,6 +223,10 @@ def run_reduce(
         include_tokenizer_artifact=True,
     )
     resources = extract_operation_resources(operation_config, logger)
+
+    if reducer is not None and job is not None and reducer != job:
+        raise ValueError("Both 'reducer' and 'job' are set with different values; use only one")
+    reducer = job if job is not None else reducer
 
     builder = TarArchiveDependencyBuilder()
     dep = builder.build_dependencies(
@@ -259,6 +278,7 @@ def run_reduce(
 
     operation = context.deps.yt_client.run_reduce(
         reducer=reducer,
+        job=reducer,
         input_table=input_table,
         output_table=output_table,
         reduce_by=reduce_by,

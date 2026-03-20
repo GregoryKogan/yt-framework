@@ -63,6 +63,38 @@ def _apply_spec_options_and_split_run_operation_kwargs(
     return spec_builder, run_op
 
 
+def _apply_command_leg_format(
+    leg_builder: Any,
+    leg: Any,
+) -> Any:
+    """
+    Configure wire format for command legs only.
+
+    TypedJob legs keep their native typed protocol; command string legs use JSON.
+    """
+    if isinstance(leg, TypedJob):
+        return leg_builder
+    return leg_builder.format(yt_format.JsonFormat(encode_utf8=False))
+
+
+def _resolve_aliased_job(
+    *,
+    legacy_name: str,
+    legacy_value: Any,
+    preferred_name: str,
+    preferred_value: Any,
+) -> Any:
+    """Resolve legacy/preferred aliased job arguments with compatibility checks."""
+    if legacy_value is not None and preferred_value is not None and legacy_value != preferred_value:
+        raise ValueError(
+            f"Both '{legacy_name}' and '{preferred_name}' are set with different values; "
+            "please provide only one"
+        )
+    if preferred_value is not None:
+        return preferred_value
+    return legacy_value
+
+
 class YTProdClient(BaseYTClient):
     """
     Production YT client implementation.
@@ -820,7 +852,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
     def run_map(
         self,
-        command: str,
+        command: Any,
         input_table: str,
         output_table: str,
         files: List[Tuple[str, str]],
@@ -829,6 +861,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_schema: Optional[TableSchema] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        job: Any = None,
         **kwargs: Any,
     ) -> Operation:
         """Run a map operation on YT cluster.
@@ -838,7 +871,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         with the specified resources and dependencies.
         
         Args:
-            command: Command to execute (typically bash command with script path).
+            command: Legacy mapper job argument (TypedJob instance or command string).
             input_table: Input YT table path.
             output_table: Output YT table path.
             files: List of (yt_path, local_path) tuples for dependencies.
@@ -847,6 +880,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             output_schema: Optional output table schema for typed output.
             max_failed_jobs: Maximum failed jobs allowed before operation fails.
             docker_auth: Optional Docker authentication for private registries.
+            job: Preferred mapper job alias.
             
         Returns:
             Operation: YT operation object that can be monitored and waited on.
@@ -863,6 +897,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info(f"  Resources: {resources}")
 
         try:
+            mapper_job = _resolve_aliased_job(
+                legacy_name="command",
+                legacy_value=command,
+                preferred_name="job",
+                preferred_value=job,
+            )
             kwargs = dict(kwargs)
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
@@ -886,14 +926,14 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             mapper_builder = (
                 spec_builder.begin_mapper()
-                .command(command)
-                .format(yt_format.JsonFormat(encode_utf8=False))
+                .command(mapper_job)
                 .file_paths(file_paths)
                 .environment(env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
                 .gpu_limit(resources.gpu_limit)
             )
+            mapper_builder = _apply_command_leg_format(mapper_builder, mapper_job)
 
             if resources.docker_image:
                 mapper_builder = mapper_builder.docker_image(resources.docker_image)
@@ -927,6 +967,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         resources: OperationResources,
         docker_auth: Optional[Dict[str, str]] = None,
         max_failed_jobs: int = 1,
+        job: Optional[str] = None,
     ) -> Operation:
         """Run a vanilla operation on YT cluster.
         
@@ -934,13 +975,14 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         The operation runs on the YT cluster with the specified resources and dependencies.
         
         Args:
-            command: Command to execute (typically bash command with script path).
+            command: Legacy command argument (typically bash command with script path).
             files: List of (yt_path, local_path) tuples for dependencies.
             env: Environment variables dictionary.
             task_name: Task name for the operation.
             resources: Operation resource configuration (memory, CPU, GPU, etc.).
             docker_auth: Optional Docker authentication for private registries.
             max_failed_jobs: Maximum failed jobs allowed before operation fails.
+            job: Preferred command alias.
             
         Returns:
             Operation: YT operation object that can be monitored and waited on.
@@ -955,6 +997,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info(f"  Resources: {resources}")
 
         try:
+            vanilla_job = _resolve_aliased_job(
+                legacy_name="command",
+                legacy_value=command,
+                preferred_name="job",
+                preferred_value=job,
+            )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
@@ -973,7 +1021,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             task_builder = (
                 spec_builder.begin_task(task_name)
-                .command(command)
+                .command(vanilla_job)
                 .file_paths(file_paths)
                 .environment(env)
                 .memory_limit(resources.memory_gb * 1024**3)
@@ -1015,6 +1063,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_schema: Optional[TableSchema] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        map_job: Any = None,
+        reduce_job: Any = None,
         **kwargs: Any,
     ) -> Operation:
         """Run a map-reduce operation on YT cluster."""
@@ -1023,6 +1073,18 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info(f"  Reduce by: {reduce_by}")
 
         try:
+            mapper_leg = _resolve_aliased_job(
+                legacy_name="mapper",
+                legacy_value=mapper,
+                preferred_name="map_job",
+                preferred_value=map_job,
+            )
+            reducer_leg = _resolve_aliased_job(
+                legacy_name="reducer",
+                legacy_value=reducer,
+                preferred_name="reduce_job",
+                preferred_value=reduce_job,
+            )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
@@ -1047,15 +1109,14 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             mapper_builder = (
                 spec_builder.begin_mapper()
-                .command(mapper)
+                .command(mapper_leg)
                 .file_paths(file_paths)
                 .environment(env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
                 .gpu_limit(resources.gpu_limit)
             )
-            if not isinstance(mapper, TypedJob):
-                mapper_builder = mapper_builder.format(yt_format.JsonFormat(encode_utf8=False))
+            mapper_builder = _apply_command_leg_format(mapper_builder, mapper_leg)
             if resources.docker_image:
                 mapper_builder = mapper_builder.docker_image(resources.docker_image)
                 spec_builder = spec_builder.secure_vault({"docker_auth": docker_auth or {}})
@@ -1063,14 +1124,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             reducer_builder = (
                 spec_builder.begin_reducer()
-                .command(reducer)
+                .command(reducer_leg)
                 .file_paths(file_paths)
                 .environment(env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
             )
-            if not isinstance(reducer, TypedJob):
-                reducer_builder = reducer_builder.format(yt_format.JsonFormat(encode_utf8=False))
+            reducer_builder = _apply_command_leg_format(reducer_builder, reducer_leg)
             if resources.docker_image:
                 reducer_builder = reducer_builder.docker_image(resources.docker_image)
             reducer_builder.end_reducer()
@@ -1107,6 +1167,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_schema: Optional[TableSchema] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        job: Any = None,
         **kwargs: Any,
     ) -> Operation:
         """Run a reduce-only operation on YT cluster."""
@@ -1115,6 +1176,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info(f"  Reduce by: {reduce_by}")
 
         try:
+            reducer_leg = _resolve_aliased_job(
+                legacy_name="reducer",
+                legacy_value=reducer,
+                preferred_name="job",
+                preferred_value=job,
+            )
             kwargs = dict(kwargs)
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
@@ -1140,14 +1207,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             reducer_builder = (
                 spec_builder.begin_reducer()
-                .command(reducer)
+                .command(reducer_leg)
                 .file_paths(file_paths)
                 .environment(env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
             )
-            if not isinstance(reducer, TypedJob):
-                reducer_builder = reducer_builder.format(yt_format.JsonFormat(encode_utf8=False))
+            reducer_builder = _apply_command_leg_format(reducer_builder, reducer_leg)
             if resources.docker_image:
                 reducer_builder = reducer_builder.docker_image(resources.docker_image)
                 spec_builder = spec_builder.secure_vault({"docker_auth": docker_auth or {}})

@@ -443,7 +443,7 @@ class BaseYTClient(ABC):
     @abstractmethod
     def run_map(
         self,
-        command: str,
+        command: Any,
         input_table: str,
         output_table: str,
         files: List[Tuple[str, str]],
@@ -452,13 +452,14 @@ class BaseYTClient(ABC):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        job: Any = None,
         **kwargs: Any,
     ) -> Operation:
         """
         Run a map operation on YT.
 
         Args:
-            command: Command to execute (e.g., "python3 mapper.py")
+            command: Legacy mapper job argument (TypedJob instance or command string).
             input_table: Input table path
             output_table: Output table path
             files: List of (yt_path, local_path) tuples for files to upload
@@ -467,6 +468,7 @@ class BaseYTClient(ABC):
             output_schema: Optional YT TableSchema for typed output table
             max_failed_jobs: Maximum number of failed jobs before operation fails
             docker_auth: Optional Docker authentication dictionary
+            job: Preferred mapper job argument (TypedJob instance or command string).
             **kwargs: Extra options forwarded to the underlying YT client.
         """
         pass
@@ -486,6 +488,8 @@ class BaseYTClient(ABC):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        map_job: Any = None,
+        reduce_job: Any = None,
         **kwargs: Any,
     ) -> Operation:
         """
@@ -504,6 +508,8 @@ class BaseYTClient(ABC):
             output_schema: Optional output table schema.
             max_failed_jobs: Maximum failed jobs allowed.
             docker_auth: Optional Docker auth.
+            map_job: Preferred mapper job alias (TypedJob instance or command string).
+            reduce_job: Preferred reducer job alias (TypedJob instance or command string).
             **kwargs: Extra options applied to the spec builder where supported.
         """
         pass
@@ -521,6 +527,7 @@ class BaseYTClient(ABC):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        job: Any = None,
         **kwargs: Any,
     ) -> Operation:
         """
@@ -537,6 +544,7 @@ class BaseYTClient(ABC):
             output_schema: Optional output table schema.
             max_failed_jobs: Maximum failed jobs allowed.
             docker_auth: Optional Docker auth.
+            job: Preferred reducer job alias (TypedJob instance or command string).
             **kwargs: Extra options applied to the spec builder where supported.
         """
         pass
@@ -561,10 +569,11 @@ class BaseYTClient(ABC):
     @abstractmethod
     def run_vanilla(
         self,
-        command: str,
+        command: Any,
         files: List[Tuple[str, str]],
         env: Dict[str, str],
         task_name: str,
+        job: Any = None,
         *args,
         **kwargs,
     ) -> Operation:
@@ -572,10 +581,11 @@ class BaseYTClient(ABC):
         Run a vanilla operation on YT.
 
         Args:
-            command: Command to execute (e.g., "python3 vanilla.py")
+            command: Legacy vanilla command argument (e.g., "python3 vanilla.py")
             files: List of (yt_path, local_path) tuples for files to upload
             env: Environment variables dictionary
             task_name: Task name for the operation
+            job: Preferred vanilla command alias.
             *args: Additional positional arguments (implementation-specific)
             **kwargs: Additional keyword arguments. Common kwargs include:
                 - resources: OperationResources instance (pool, memory, CPU, GPU, etc.)

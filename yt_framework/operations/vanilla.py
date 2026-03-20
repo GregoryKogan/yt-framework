@@ -109,6 +109,7 @@ def _prepare_vanilla_operation(
 def run_vanilla(
     context: "StageContext",
     operation_config: DictConfig,
+    job: Optional[str] = None,
 ) -> bool:
     """
     Run YT vanilla operation and wait for completion.
@@ -121,6 +122,7 @@ def run_vanilla(
     Args:
         context: Stage context (provides deps, logger, stage_dir, name)
         operation_config: Operation-specific config (from client.operations.vanilla)
+        job: Preferred command alias. When omitted, framework wrapper command is used.
 
     Returns:
         True if successful, False otherwise
@@ -161,7 +163,7 @@ def run_vanilla(
     if not vanilla_operation_data.command:
         raise ValueError("Command not provided by dependency builder")
 
-    command = vanilla_operation_data.command
+    command = job if job is not None else vanilla_operation_data.command
 
     logger.debug("Extracting operation resources from config")
     resources = extract_operation_resources(operation_config, logger)
@@ -195,6 +197,7 @@ def run_vanilla(
 
     operation = context.deps.yt_client.run_vanilla(
         command=command,
+        job=command,
         files=vanilla_operation_data.dependencies,
         env=vanilla_operation_data.environment,
         task_name=task_name,
