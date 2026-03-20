@@ -92,6 +92,10 @@ def run_map_reduce(
     for k, v in (operation_config.get("env") or {}).items():
         if v is not None:
             env[str(k)] = str(v)
+
+    # Let worker-side TypedJobs know which stage directory to wire up.
+    # Used by `yt_framework.typed_jobs.StageBootstrapTypedJob`.
+    env.setdefault("YT_STAGE_NAME", context.name)
     resources = _resources_from_config(operation_config, logger)
 
     require_consistent_map_reduce_legs(mapper, reducer)
@@ -211,6 +215,10 @@ def run_reduce(
     for k, v in (operation_config.get("env") or {}).items():
         if v is not None:
             env[str(k)] = str(v)
+
+    # Let worker-side TypedJobs know which stage directory to wire up.
+    # Used by `yt_framework.typed_jobs.StageBootstrapTypedJob`.
+    env.setdefault("YT_STAGE_NAME", context.name)
     resources = _resources_from_config(operation_config, logger)
 
     builder = TarArchiveDependencyBuilder()
