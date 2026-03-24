@@ -22,6 +22,12 @@ from .table import get_row_count, read_table, download_table
 # Map operations
 from .map import run_map
 
+# Map-reduce and reduce operations
+from .map_reduce import run_map_reduce, run_reduce
+
+# Sort operations
+from .sort import run_sort
+
 # Common utilities
 from .common import build_environment, prepare_docker_auth
 
@@ -30,6 +36,7 @@ from .vanilla import run_vanilla
 
 # Checkpoint operations
 from .checkpoint import init_checkpoint_directory
+from .tokenizer_artifact import init_tokenizer_artifact_directory
 
 __all__ = [
     # S3
@@ -48,10 +55,16 @@ __all__ = [
     "download_table",
     # Map
     "run_map",
+    # Map-reduce / reduce
+    "run_map_reduce",
+    "run_reduce",
+    # Sort
+    "run_sort",
     "build_environment",
     "prepare_docker_auth",
     # Vanilla
     "run_vanilla",
     # Checkpoint
     "init_checkpoint_directory",
+    "init_tokenizer_artifact_directory",
 ]

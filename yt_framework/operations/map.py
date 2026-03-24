@@ -7,20 +7,24 @@ This module provides functions for running map operations on YTsaurus clusters.
 import logging
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, TYPE_CHECKING, Any
 
 from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
 from omegaconf import DictConfig
 
 from yt_framework.utils.logging import log_header, log_success
-from yt_framework.core.stage import StageContext
 from yt_framework.yt.client_base import OperationResources
 from .dependency_strategy import TarArchiveDependencyBuilder
 from .common import (
-    build_environment,
-    prepare_docker_auth,
-    _get_config_value_with_default,
+    extract_operation_resources,
+    build_operation_environment,
+    extract_docker_auth_from_operation_config,
+    extract_max_failed_jobs,
+    collect_passthrough_kwargs,
 )
+
+if TYPE_CHECKING:
+    from yt_framework.core.stage import StageContext
 
 
 @dataclass
@@ -46,40 +50,27 @@ def _prepare_map_operation(
     operation_config: DictConfig,
     stage_config: DictConfig,
     stage_dir: Path,
-    configs_dir: Path,
     logger: logging.Logger,
 ) -> MapOperationData:
     """
-    Prepare everything needed for a map operation (private function).
+    Build tar-archive dependencies for a map operation.
 
-    Automatically handles:
-    - Secrets-only environment building
-    - Dependency file list preparation
-    - Docker authentication preparation
+    Environment and docker_auth are intentionally left empty here; the caller
+    builds them via ``build_operation_environment`` and sets them on the returned
+    object after construction.
 
     Args:
-        pipeline_config: Pipeline-level config (for secrets)
+        pipeline_config: Pipeline-level config (build_folder, etc.)
         operation_config: Operation-specific config (from client.operations.map)
         stage_config: Full stage config (for accessing job section)
         stage_dir: Path to stage directory
-        configs_dir: Directory containing secrets.env
         logger: Logger instance
 
     Returns:
-        MapOperationData instance containing:
-        - mapper_path: Path to mapper.py in YT (or bash wrapper if tar mode)
-        - dependencies: List of (yt_path, local_path) tuples
-        - environment: Environment variables (secrets only)
-        - docker_auth: Docker auth dict or None
-        - command: Optional command to execute (for tar mode)
+        MapOperationData with dependencies and command populated.
     """
-
-    environment = build_environment(configs_dir=configs_dir, logger=logger)
-
-    # Use strategy pattern to build dependencies
-    # Pass both operation_config (for checkpoint) and stage_config (for job.model_name)
     builder = TarArchiveDependencyBuilder()
-    mapper_path, dependencies, command = builder.build_dependencies(
+    dep = builder.build_dependencies(
         operation_type="map",
         stage_dir=stage_dir,
         archive_name="source.tar.gz",
@@ -89,35 +80,21 @@ def _prepare_map_operation(
         logger=logger,
     )
 
-    # Get Docker auth credentials from loaded secrets
-    # Support both resources.docker_image and direct docker_image for flexibility
-    docker_image = None
-    if "resources" in operation_config and operation_config.resources.get(
-        "docker_image"
-    ):
-        docker_image = operation_config.resources.docker_image
-    elif operation_config.get("docker_image"):
-        docker_image = operation_config.docker_image
-
-    docker_auth = prepare_docker_auth(
-        docker_image=docker_image,
-        docker_username=environment.get("DOCKER_AUTH_USERNAME"),
-        docker_password=environment.get("DOCKER_AUTH_PASSWORD"),
-    )
-
     return MapOperationData(
-        mapper_path=mapper_path,
-        dependencies=dependencies,
-        environment=environment,
-        docker_auth=docker_auth,
-        command=command,
+        mapper_path=dep.script_path,
+        dependencies=dep.dependencies,
+        environment={},
+        docker_auth=None,
+        command=dep.command,
     )
 
 
 def run_map(
-    context: StageContext,
+    context: "StageContext",
     operation_config: DictConfig,
     output_schema: Optional[TableSchema] = None,
+    mapper: Optional[Any] = None,
+    job: Optional[Any] = None,
 ) -> bool:
     """
     Run YT map operation and wait for completion.
@@ -130,6 +107,9 @@ def run_map(
         context: Stage context (provides deps, logger, stage_dir)
         operation_config: Operation-specific config (from client.operations.map)
         output_schema: Optional YT TableSchema for typed output table
+        mapper: Optional mapper leg (legacy name). When omitted, framework uses command wrapper.
+            Can be a TypedJob instance or command string.
+        job: Preferred mapper leg alias. Can be a TypedJob instance or command string.
 
     Returns:
         True if successful, False otherwise
@@ -142,70 +122,74 @@ def run_map(
     )
 
     if not operation_config.get("input_table"):
-        raise ValueError("No input_table configured in operation config")
+        raise ValueError(
+            "No input_table in operation_config; "
+            "expected at client.operations.map.input_table"
+        )
     if not operation_config.get("output_table"):
-        raise ValueError("No output_table configured in operation config")
+        raise ValueError(
+            "No output_table in operation_config; "
+            "expected at client.operations.map.output_table"
+        )
 
-    # Prepare operation data automatically
+    env = build_operation_environment(
+        context=context,
+        operation_config=operation_config,
+        logger=logger,
+        include_stage_name=True,
+        include_tokenizer_artifact=True,
+    )
+
     map_operation_data = _prepare_map_operation(
         pipeline_config=context.deps.pipeline_config,
         operation_config=operation_config,
         stage_config=context.config,
         stage_dir=context.stage_dir,
-        configs_dir=context.deps.configs_dir,
         logger=logger,
     )
+    map_operation_data.environment = env
+    map_operation_data.docker_auth = extract_docker_auth_from_operation_config(operation_config, env)
 
     logger.debug(f"Dependencies: {len(map_operation_data.dependencies)} files")
 
-    # Command is always provided by the dependency builder (tar archive mode)
-    if not map_operation_data.command:
+    if mapper is not None and job is not None and mapper != job:
+        raise ValueError("Both 'mapper' and 'job' are set with different values; use only one")
+    mapper_leg = job if job is not None else mapper
+    if mapper_leg is None:
+        mapper_leg = map_operation_data.command
+    if mapper_leg is None:
         raise ValueError("Command not provided by dependency builder")
 
-    command = map_operation_data.command
-
-    # Extract job parameters from operation_config.resources (or top-level as fallback)
-    # Use defaults when values are not specified in config, logging when defaults are used
-    resources_config = operation_config.get("resources", {})
-    if not resources_config:
-        # Fallback to top-level config if resources section doesn't exist
-        resources_config = operation_config
-
     logger.debug("Extracting operation resources from config")
+    resources: OperationResources = extract_operation_resources(operation_config, logger)
+    max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
-    pool = _get_config_value_with_default(resources_config, "pool", "default", logger)
-    pool_tree = _get_config_value_with_default(
-        resources_config, "pool_tree", None, logger
-    )
-    docker_image = _get_config_value_with_default(
-        resources_config, "docker_image", None, logger
-    )
-    memory_gb = _get_config_value_with_default(
-        resources_config, "memory_limit_gb", 4, logger
-    )
-    cpu_limit = _get_config_value_with_default(resources_config, "cpu_limit", 2, logger)
-    gpu_limit = _get_config_value_with_default(resources_config, "gpu_limit", 0, logger)
-    job_count = _get_config_value_with_default(resources_config, "job_count", 1, logger)
-    user_slots = _get_config_value_with_default(
-        resources_config, "user_slots", None, logger
-    )
-    max_failed_jobs = _get_config_value_with_default(
-        operation_config, "max_failed_job_count", 1, logger
-    )
+    map_kwargs: dict = {}
+    od = operation_config.get("operation_description")
+    if od:
+        if isinstance(od, str):
+            logger.info(f"Operation label: {od}")
+            map_kwargs["title"] = od
+        else:
+            from omegaconf import OmegaConf as _OmegaConf
+            map_kwargs["operation_description"] = _OmegaConf.to_container(od, resolve=True)
 
-    resources = OperationResources(
-        pool=pool,
-        pool_tree=pool_tree,
-        docker_image=docker_image,
-        memory_gb=memory_gb,
-        cpu_limit=cpu_limit,
-        gpu_limit=gpu_limit,
-        job_count=job_count,
-        user_slots=user_slots,
-    )
+    reserved_keys = {
+        "input_table",
+        "output_table",
+        "resources",
+        "env",
+        "max_failed_job_count",
+        "file_paths",
+        "checkpoint",
+        "tokenizer_artifact",
+        "tar_command_bootstrap",
+        "operation_description",
+    }
+    map_kwargs.update(collect_passthrough_kwargs(operation_config, reserved_keys))
 
     operation = context.deps.yt_client.run_map(
-        command=command,
+        command=mapper_leg,
         input_table=operation_config.input_table,
         output_table=operation_config.output_table,
         files=map_operation_data.dependencies,
@@ -214,6 +198,7 @@ def run_map(
         output_schema=output_schema,
         max_failed_jobs=max_failed_jobs,
         docker_auth=map_operation_data.docker_auth,
+        **map_kwargs,
     )
 
     # Wait for completion

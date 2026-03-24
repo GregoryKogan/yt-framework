@@ -6,6 +6,8 @@ YT Framework supports several types of operations for processing data on YTsauru
 :maxdepth: 1
 
 map
+map-reduce-typed-jobs
+command-mode-map-reduce
 vanilla
 yql
 s3
@@ -22,6 +24,13 @@ Process each row of a table independently. Perfect for row-by-row transformation
 
 +++
 [Learn More →](map.md)
+
+**Map-Reduce / Reduce Operations**
+^^^
+Group rows by key and aggregate with a reducer. Supports both TypedJob (pickled Python) and command-string (JSON stdin/stdout) legs.
+
++++
+[TypedJob guide →](map-reduce-typed-jobs.md) · [Command mode →](command-mode-map-reduce.md)
 
 **Vanilla Operations**
 ^^^
@@ -50,6 +59,8 @@ Integrate with S3 for file listing, downloading, and processing. Perfect for wor
 | Operation | Best For | Input/Output | Parallelization |
 |-----------|----------|--------------|-----------------|
 | **Map** | Row-by-row processing, transformations | Table → Table | Automatic (per row) |
+| **Map-Reduce** | Grouping + aggregation with custom Python | Table → Table | Automatic (map + reduce phases) |
+| **Reduce** | Reduce-only on a pre-sorted table | Table → Table | Automatic (per key group) |
 | **Vanilla** | Setup, cleanup, standalone tasks | None | Single job |
 | **YQL** | SQL-like queries, joins, aggregations | Table(s) → Table | Automatic (query-level) |
 | **S3** | External data integration | S3 → Table | File-level |
@@ -105,6 +116,7 @@ stages:
 
 ## See Also
 
+- [Command mode map-reduce / reduce](command-mode-map-reduce.md) — `tar_command_bootstrap`, JSON stdin/stdout legs
 - [Map Operations](map.md) - Detailed map operation guide
 - [Vanilla Operations](vanilla.md) - Detailed vanilla operation guide
 - [YQL Operations](yql.md) - Detailed YQL operation guide

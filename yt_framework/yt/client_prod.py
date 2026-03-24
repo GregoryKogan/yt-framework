@@ -16,12 +16,66 @@ from yt.wrapper import (  # pyright: ignore[reportMissingImports]
     Operation,
     MapSpecBuilder,
     VanillaSpecBuilder,
+    TypedJob,
     format as yt_format,
+)
+from yt.wrapper.spec_builders import (  # pyright: ignore[reportMissingImports]
+    MapReduceSpecBuilder,
+    ReduceSpecBuilder,
 )
 from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
 
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
 from yt_framework.utils.ignore import YTIgnoreMatcher
+from yt_framework.operations.job_command import resolve_aliased_job as _resolve_aliased_job
+
+# YtClient.run_operation() only accepts these keyword args; everything else must be
+# applied via SpecBuilder chain methods (weight, title, description, …).
+_RUN_OPERATION_KWARGS = frozenset(
+    {"enable_optimizations", "run_operation_mutation_id", "sync"}
+)
+
+
+def _apply_spec_options_and_split_run_operation_kwargs(
+    spec_builder: Any,
+    kwargs: Dict[str, Any],
+) -> tuple[Any, Dict[str, Any]]:
+    """
+    Apply kwargs that correspond to SpecBuilder chain methods (e.g. ``weight``,
+    ``title``, ``alias``). Remaining keys must be only those accepted by
+    ``YtClient.run_operation`` (see ``_RUN_OPERATION_KWARGS``).
+    """
+    kwargs = dict(kwargs)
+    run_op: Dict[str, Any] = {}
+    for k in list(kwargs.keys()):
+        if k in _RUN_OPERATION_KWARGS:
+            run_op[k] = kwargs.pop(k)
+    for k, v in list(kwargs.items()):
+        meth = getattr(spec_builder, k, None)
+        if meth is not None and callable(meth):
+            spec_builder = meth(v)
+            del kwargs[k]
+        else:
+            raise ValueError(
+                f"Unknown YT operation option {k!r}: not a SpecBuilder method on "
+                f"{type(spec_builder).__name__} and not one of "
+                f"{sorted(_RUN_OPERATION_KWARGS)}."
+            )
+    return spec_builder, run_op
+
+
+def _apply_command_leg_format(
+    leg_builder: Any,
+    leg: Any,
+) -> Any:
+    """
+    Configure wire format for command legs only.
+
+    TypedJob legs keep their native typed protocol; command string legs use JSON.
+    """
+    if isinstance(leg, TypedJob):
+        return leg_builder
+    return leg_builder.format(yt_format.JsonFormat(encode_utf8=False))
 
 
 class YTProdClient(BaseYTClient):
@@ -781,7 +835,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
     def run_map(
         self,
-        command: str,
+        command: Any,
         input_table: str,
         output_table: str,
         files: List[Tuple[str, str]],
@@ -790,6 +844,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_schema: Optional[TableSchema] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        job: Any = None,
+        **kwargs: Any,
     ) -> Operation:
         """Run a map operation on YT cluster.
         
@@ -798,7 +854,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         with the specified resources and dependencies.
         
         Args:
-            command: Command to execute (typically bash command with script path).
+            command: Legacy mapper job argument (TypedJob instance or command string).
             input_table: Input YT table path.
             output_table: Output YT table path.
             files: List of (yt_path, local_path) tuples for dependencies.
@@ -807,6 +863,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             output_schema: Optional output table schema for typed output.
             max_failed_jobs: Maximum failed jobs allowed before operation fails.
             docker_auth: Optional Docker authentication for private registries.
+            job: Preferred mapper job alias.
             
         Returns:
             Operation: YT operation object that can be monitored and waited on.
@@ -823,6 +880,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info(f"  Resources: {resources}")
 
         try:
+            mapper_job = _resolve_aliased_job(
+                legacy_name="command",
+                legacy_value=command,
+                preferred_name="job",
+                preferred_value=job,
+            )
+            kwargs = dict(kwargs)
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
@@ -845,14 +909,14 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             mapper_builder = (
                 spec_builder.begin_mapper()
-                .command(command)
-                .format(yt_format.JsonFormat(encode_utf8=False))
+                .command(mapper_job)
                 .file_paths(file_paths)
                 .environment(env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
                 .gpu_limit(resources.gpu_limit)
             )
+            mapper_builder = _apply_command_leg_format(mapper_builder, mapper_job)
 
             if resources.docker_image:
                 mapper_builder = mapper_builder.docker_image(resources.docker_image)
@@ -860,7 +924,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             mapper_builder = mapper_builder.end_mapper()
 
-            operation = self.client.run_operation(spec_builder, sync=False)
+            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+                spec_builder, kwargs
+            )
+            run_op.setdefault("sync", False)
+            operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
                 raise RuntimeError(
                     "Failed to submit operation: run_operation returned None"
@@ -882,6 +950,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         resources: OperationResources,
         docker_auth: Optional[Dict[str, str]] = None,
         max_failed_jobs: int = 1,
+        job: Optional[str] = None,
+        **kwargs: Any,
     ) -> Operation:
         """Run a vanilla operation on YT cluster.
         
@@ -889,13 +959,16 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         The operation runs on the YT cluster with the specified resources and dependencies.
         
         Args:
-            command: Command to execute (typically bash command with script path).
+            command: Legacy command argument (typically bash command with script path).
             files: List of (yt_path, local_path) tuples for dependencies.
             env: Environment variables dictionary.
             task_name: Task name for the operation.
             resources: Operation resource configuration (memory, CPU, GPU, etc.).
             docker_auth: Optional Docker authentication for private registries.
             max_failed_jobs: Maximum failed jobs allowed before operation fails.
+            job: Preferred command alias.
+            **kwargs: Extra options applied to the spec builder (e.g. weight, title) or
+                forwarded to run_operation (sync, enable_optimizations).
             
         Returns:
             Operation: YT operation object that can be monitored and waited on.
@@ -910,9 +983,18 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info(f"  Resources: {resources}")
 
         try:
+            vanilla_job = _resolve_aliased_job(
+                legacy_name="command",
+                legacy_value=command,
+                preferred_name="job",
+                preferred_value=job,
+            )
+            kwargs = dict(kwargs)
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
+
+            od = kwargs.pop("operation_description", None)
 
             spec_builder = (
                 VanillaSpecBuilder()
@@ -921,6 +1003,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 .max_failed_job_count(max_failed_jobs)
             )
 
+            if isinstance(od, dict):
+                spec_builder = spec_builder.description(od)
+
             # Set pool tree if specified
             if resources.pool_tree:
                 spec_builder = spec_builder.pool_trees([resources.pool_tree])
@@ -928,7 +1013,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             task_builder = (
                 spec_builder.begin_task(task_name)
-                .command(command)
+                .command(vanilla_job)
                 .file_paths(file_paths)
                 .environment(env)
                 .memory_limit(resources.memory_gb * 1024**3)
@@ -943,7 +1028,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             task_builder.end_task()
 
-            operation = self.client.run_operation(spec_builder, sync=False)
+            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+                spec_builder, kwargs
+            )
+            run_op.setdefault("sync", False)
+            operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
                 raise RuntimeError(
                     "Failed to submit operation: run_operation returned None"
@@ -954,4 +1043,219 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         except Exception as e:
             self.logger.error(f"Failed to submit vanilla operation: {e}")
+            raise
+
+    def run_map_reduce(
+        self,
+        mapper: Any,
+        reducer: Any,
+        input_table: str,
+        output_table: str,
+        reduce_by: List[str],
+        files: List[Tuple[str, str]],
+        resources: OperationResources,
+        env: Dict[str, str],
+        sort_by: Optional[List[str]] = None,
+        output_schema: Optional[TableSchema] = None,
+        max_failed_jobs: int = 1,
+        docker_auth: Optional[Dict[str, str]] = None,
+        map_job: Any = None,
+        reduce_job: Any = None,
+        **kwargs: Any,
+    ) -> Operation:
+        """Run a map-reduce operation on YT cluster."""
+        self.logger.info("Submitting map-reduce operation")
+        self.logger.info(f"  Input: {input_table} -> Output: {output_table}")
+        self.logger.info(f"  Reduce by: {reduce_by}")
+
+        try:
+            mapper_leg = _resolve_aliased_job(
+                legacy_name="mapper",
+                legacy_value=mapper,
+                preferred_name="map_job",
+                preferred_value=map_job,
+            )
+            reducer_leg = _resolve_aliased_job(
+                legacy_name="reducer",
+                legacy_value=reducer,
+                preferred_name="reduce_job",
+                preferred_value=reduce_job,
+            )
+            file_paths = [
+                FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
+            ]
+            source_table = TablePath(input_table)
+            dest_table = TablePath(output_table, append=False, schema=output_schema)
+
+            spec_builder = (
+                MapReduceSpecBuilder()
+                .input_table_paths([source_table])
+                .output_table_paths([dest_table])
+                .pool(resources.pool)
+                .max_failed_job_count(max_failed_jobs)
+            )
+            if resources.pool_tree:
+                spec_builder = spec_builder.pool_trees([resources.pool_tree])
+            if resources.user_slots:
+                spec_builder = spec_builder.resource_limits({"user_slots": resources.user_slots})
+
+            od = kwargs.pop("operation_description", None)
+            if isinstance(od, dict):
+                spec_builder = spec_builder.description(od)
+
+            mapper_builder = (
+                spec_builder.begin_mapper()
+                .command(mapper_leg)
+                .file_paths(file_paths)
+                .environment(env)
+                .memory_limit(resources.memory_gb * 1024**3)
+                .cpu_limit(resources.cpu_limit)
+                .gpu_limit(resources.gpu_limit)
+            )
+            mapper_builder = _apply_command_leg_format(mapper_builder, mapper_leg)
+            if resources.docker_image:
+                mapper_builder = mapper_builder.docker_image(resources.docker_image)
+                spec_builder = spec_builder.secure_vault({"docker_auth": docker_auth or {}})
+            mapper_builder.end_mapper()
+
+            reducer_builder = (
+                spec_builder.begin_reducer()
+                .command(reducer_leg)
+                .file_paths(file_paths)
+                .environment(env)
+                .memory_limit(resources.memory_gb * 1024**3)
+                .cpu_limit(resources.cpu_limit)
+                .gpu_limit(resources.gpu_limit)
+            )
+            reducer_builder = _apply_command_leg_format(reducer_builder, reducer_leg)
+            if resources.docker_image:
+                reducer_builder = reducer_builder.docker_image(resources.docker_image)
+            reducer_builder.end_reducer()
+
+            spec_builder = spec_builder.reduce_by(reduce_by)
+            if sort_by:
+                spec_builder = spec_builder.sort_by(sort_by)
+            map_job_count = kwargs.pop("map_job_count", None)
+            if map_job_count is not None:
+                spec_builder = spec_builder.map_job_count(map_job_count)
+
+            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+                spec_builder, kwargs
+            )
+            run_op.setdefault("sync", False)
+            operation = self.client.run_operation(spec_builder, **run_op)
+            if operation is None:
+                raise RuntimeError("Failed to submit map-reduce operation")
+            self.logger.info(f"Map-reduce operation submitted: {operation.id}")
+            return operation
+        except Exception as e:
+            self.logger.error(f"Failed to submit map-reduce operation: {e}")
+            raise
+
+    def run_reduce(
+        self,
+        reducer: Any,
+        input_table: str,
+        output_table: str,
+        reduce_by: List[str],
+        files: List[Tuple[str, str]],
+        resources: OperationResources,
+        env: Dict[str, str],
+        output_schema: Optional[TableSchema] = None,
+        max_failed_jobs: int = 1,
+        docker_auth: Optional[Dict[str, str]] = None,
+        job: Any = None,
+        **kwargs: Any,
+    ) -> Operation:
+        """Run a reduce-only operation on YT cluster."""
+        self.logger.info("Submitting reduce operation")
+        self.logger.info(f"  Input: {input_table} -> Output: {output_table}")
+        self.logger.info(f"  Reduce by: {reduce_by}")
+
+        try:
+            reducer_leg = _resolve_aliased_job(
+                legacy_name="reducer",
+                legacy_value=reducer,
+                preferred_name="job",
+                preferred_value=job,
+            )
+            kwargs = dict(kwargs)
+            file_paths = [
+                FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
+            ]
+            source_table = TablePath(input_table)
+            dest_table = TablePath(output_table, append=False, schema=output_schema)
+
+            spec_builder = (
+                ReduceSpecBuilder()
+                .input_table_paths([source_table])
+                .output_table_paths([dest_table])
+                .pool(resources.pool)
+                .max_failed_job_count(max_failed_jobs)
+            )
+            if resources.pool_tree:
+                spec_builder = spec_builder.pool_trees([resources.pool_tree])
+            if resources.user_slots:
+                spec_builder = spec_builder.resource_limits({"user_slots": resources.user_slots})
+
+            rod = kwargs.pop("operation_description", None)
+            if isinstance(rod, dict):
+                spec_builder = spec_builder.description(rod)
+
+            reducer_builder = (
+                spec_builder.begin_reducer()
+                .command(reducer_leg)
+                .file_paths(file_paths)
+                .environment(env)
+                .memory_limit(resources.memory_gb * 1024**3)
+                .cpu_limit(resources.cpu_limit)
+                .gpu_limit(resources.gpu_limit)
+            )
+            reducer_builder = _apply_command_leg_format(reducer_builder, reducer_leg)
+            if resources.docker_image:
+                reducer_builder = reducer_builder.docker_image(resources.docker_image)
+                spec_builder = spec_builder.secure_vault({"docker_auth": docker_auth or {}})
+            reducer_builder.end_reducer()
+
+            spec_builder = spec_builder.reduce_by(reduce_by)
+
+            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+                spec_builder, kwargs
+            )
+            run_op.setdefault("sync", False)
+            operation = self.client.run_operation(spec_builder, **run_op)
+            if operation is None:
+                raise RuntimeError("Failed to submit reduce operation")
+            self.logger.info(f"Reduce operation submitted: {operation.id}")
+            return operation
+        except Exception as e:
+            self.logger.error(f"Failed to submit reduce operation: {e}")
+            raise
+
+    def run_sort(
+        self,
+        table_path: str,
+        sort_by: List[str],
+        pool: Optional[str] = None,
+        pool_tree: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Sort a table in place by the given columns."""
+        self.logger.info(f"Sorting table {table_path} by {sort_by}")
+        try:
+            from yt.wrapper import schema as yt_schema  # pyright: ignore[reportMissingImports]
+            sort_columns = [
+                yt_schema.SortColumn(col, sort_order="ascending") for col in sort_by
+            ]
+            spec: dict = dict(kwargs.pop("spec", None) or {})
+            if pool:
+                spec["pool"] = pool
+            if pool_tree:
+                spec["pool_tree"] = pool_tree
+            if spec:
+                kwargs["spec"] = spec
+            self.client.run_sort(table_path, sort_by=sort_columns, **kwargs)
+            self.logger.info("Sort completed")
+        except Exception as e:
+            self.logger.error(f"Failed to sort table: {e}")
             raise
