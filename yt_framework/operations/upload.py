@@ -395,6 +395,122 @@ def _copy_stage_to_build_dir(
     return file_count
 
 
+def _bash_wrapper_script_body(stage_name: str, python_script_relative: str, label: str) -> str:
+    """Shared body for operation wrappers (map, vanilla, map-reduce legs, reduce)."""
+    requirements_path = f"stages/{stage_name}/requirements.txt"
+    return f"""
+#!/bin/bash
+set -e
+
+# Get current directory (sandbox root)
+SANDBOX_ROOT="$(pwd)"
+
+# Set PYTHONPATH to current directory so ytjobs and stages packages can be imported
+export PYTHONPATH="${{PYTHONPATH}}:${{SANDBOX_ROOT}}"
+
+# Set config path for ytjobs config loader
+# Config file is extracted to stages/{stage_name}/config.yaml
+export JOB_CONFIG_PATH="${{SANDBOX_ROOT}}/stages/{stage_name}/config.yaml"
+
+# Install requirements.txt if it exists
+if [ -f "{requirements_path}" ]; then
+    echo "Installing dependencies from requirements.txt..." >&2
+    pip install --quiet --no-cache-dir -r {requirements_path} || echo "Warning: Failed to install some dependencies" >&2
+fi
+
+# Execute: {label}
+python3 {python_script_relative}
+"""
+
+
+def _write_wrapper_file(
+    build_dir: Path,
+    filename: str,
+    body: str,
+    logger: logging.Logger,
+) -> None:
+    wrapper_path = build_dir / filename
+    wrapper_path.write_text(body)
+    wrapper_path.chmod(0o755)
+    logger.debug(f"Created wrapper script: {wrapper_path}")
+
+
+def _load_stage_job_section(stage_dir: Path, logger: logging.Logger) -> Dict:
+    """Return ``job`` dict from stage ``config.yaml`` if present."""
+    cfg_path = stage_dir / "config.yaml"
+    if not cfg_path.is_file():
+        return {}
+    try:
+        cfg = OmegaConf.to_container(OmegaConf.load(cfg_path), resolve=True)
+        if not isinstance(cfg, dict):
+            return {}
+        job = cfg.get("job")
+        return job if isinstance(job, dict) else {}
+    except Exception as e:
+        logger.warning("Could not read %s for wrapper script paths: %s", cfg_path, e)
+        return {}
+
+
+def _resolve_map_reduce_command_scripts(
+    stage_dir: Path,
+    logger: logging.Logger,
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Resolve mapper/reducer Python entrypoints under stages/<name>/src/ for map-reduce
+    command mode wrappers. Uses ``job.map_reduce_command`` when set.
+    """
+    job = _load_stage_job_section(stage_dir, logger)
+    mrc = job.get("map_reduce_command") or {}
+    if not isinstance(mrc, dict):
+        mrc = {}
+    mapper = str(mrc.get("mapper_script") or "mapper.py")
+    reducer = mrc.get("reducer_script")
+    if reducer is not None:
+        reducer = str(reducer)
+    src = stage_dir / "src"
+    if reducer is None:
+        for candidate in (
+            "reducer.py",
+            "reducer_mds.py",
+            "reducer_main.py",
+            "reducer_index.py",
+        ):
+            if (src / candidate).is_file():
+                reducer = candidate
+                break
+    if not (src / mapper).is_file():
+        logger.debug("No %s at %s — skipping map_reduce_mapper wrapper", mapper, src)
+        return None, None
+    if not reducer or not (src / reducer).is_file():
+        logger.debug("No reducer script resolved for map-reduce in %s", src)
+        return mapper, None
+    return mapper, reducer
+
+
+def _resolve_reduce_command_script(stage_dir: Path, logger: logging.Logger) -> Optional[str]:
+    """Reducer entrypoint for reduce-only command mode (``job.reduce_command``)."""
+    job = _load_stage_job_section(stage_dir, logger)
+    rc = job.get("reduce_command") or {}
+    if not isinstance(rc, dict):
+        rc = {}
+    explicit = rc.get("reducer_script")
+    if explicit:
+        name = str(explicit)
+        if (stage_dir / "src" / name).is_file():
+            return name
+        logger.warning("reduce_command.reducer_script %s not found under %s", name, stage_dir / "src")
+    src = stage_dir / "src"
+    for candidate in (
+        "reducer.py",
+        "reducer_index.py",
+        "reducer_mds.py",
+        "reducer_main.py",
+    ):
+        if (src / candidate).is_file():
+            return candidate
+    return None
+
+
 def _create_unified_wrapper_script(
     stage_name: str,
     operation_type: Literal["map", "vanilla"],
@@ -420,44 +536,73 @@ def _create_unified_wrapper_script(
     Returns:
         None
     """
-    # Determine script to execute
     if operation_type == "map":
         script_path = f"stages/{stage_name}/src/mapper.py"
-    else:  # vanilla
+    else:
         script_path = f"stages/{stage_name}/src/vanilla.py"
 
-    # Check if requirements.txt exists in the stage directory
-    requirements_path = f"stages/{stage_name}/requirements.txt"
+    body = _bash_wrapper_script_body(stage_name, script_path, f"{operation_type} operation")
+    _write_wrapper_file(
+        build_dir,
+        f"operation_wrapper_{stage_name}_{operation_type}.sh",
+        body,
+        logger,
+    )
 
-    bash_script = f"""
-#!/bin/bash
-set -e
 
-# Get current directory (sandbox root)
-SANDBOX_ROOT="$(pwd)"
+def _create_map_reduce_command_wrappers(
+    stage_name: str,
+    stage_dir: Path,
+    build_dir: Path,
+    logger: logging.Logger,
+) -> None:
+    """Wrappers for ``tar_command_bootstrap`` map-reduce (JSON stdin/stdout legs)."""
+    mapper_f, reducer_f = _resolve_map_reduce_command_scripts(stage_dir, logger)
+    if not mapper_f:
+        return
+    m_rel = f"stages/{stage_name}/src/{mapper_f}"
+    body_m = _bash_wrapper_script_body(stage_name, m_rel, "map-reduce mapper (command mode)")
+    _write_wrapper_file(
+        build_dir,
+        f"operation_wrapper_{stage_name}_map_reduce_mapper.sh",
+        body_m,
+        logger,
+    )
+    if reducer_f:
+        r_rel = f"stages/{stage_name}/src/{reducer_f}"
+        body_r = _bash_wrapper_script_body(stage_name, r_rel, "map-reduce reducer (command mode)")
+        _write_wrapper_file(
+            build_dir,
+            f"operation_wrapper_{stage_name}_map_reduce_reducer.sh",
+            body_r,
+            logger,
+        )
+    else:
+        logger.warning(
+            "Stage %s: map_reduce_mapper wrapper created but no reducer script — "
+            "map-reduce command mode will fail until job.map_reduce_command.reducer_script is set",
+            stage_name,
+        )
 
-# Set PYTHONPATH to current directory so ytjobs and stages packages can be imported
-export PYTHONPATH="${{PYTHONPATH}}:${{SANDBOX_ROOT}}"
 
-# Set config path for ytjobs config loader
-# Config file is extracted to stages/{stage_name}/config.yaml
-export JOB_CONFIG_PATH="${{SANDBOX_ROOT}}/stages/{stage_name}/config.yaml"
-
-# Install requirements.txt if it exists
-if [ -f "{requirements_path}" ]; then
-    echo "Installing dependencies from requirements.txt..." >&2
-    pip install --quiet --no-cache-dir -r {requirements_path} || echo "Warning: Failed to install some dependencies" >&2
-fi
-
-# Execute the {operation_type} operation
-python3 {script_path}
-"""
-
-    # Unified naming convention for both operation types
-    wrapper_path = build_dir / f"operation_wrapper_{stage_name}_{operation_type}.sh"
-    wrapper_path.write_text(bash_script)
-    wrapper_path.chmod(0o755)
-    logger.debug(f"Created wrapper script: {wrapper_path}")
+def _create_reduce_command_wrapper(
+    stage_name: str,
+    stage_dir: Path,
+    build_dir: Path,
+    logger: logging.Logger,
+) -> None:
+    """Wrapper for reduce-only operations with ``tar_command_bootstrap``."""
+    red = _resolve_reduce_command_script(stage_dir, logger)
+    if not red:
+        return
+    r_rel = f"stages/{stage_name}/src/{red}"
+    body = _bash_wrapper_script_body(stage_name, r_rel, "reduce (command mode)")
+    _write_wrapper_file(
+        build_dir,
+        f"operation_wrapper_{stage_name}_reduce.sh",
+        body,
+        logger,
+    )
 
 
 def _create_wrappers_for_stage(
@@ -484,7 +629,9 @@ def _create_wrappers_for_stage(
         return
 
     # Check which operation types this stage supports
-    has_mapper = (src_dir / "mapper.py").exists()
+    has_mapper = (src_dir / "mapper.py").is_file() or bool(
+        list(src_dir.glob("partition_*.py"))
+    )
     has_vanilla = (src_dir / "vanilla.py").exists()
 
     # Create wrapper for each operation type found
@@ -500,6 +647,20 @@ def _create_wrappers_for_stage(
         _create_unified_wrapper_script(
             stage_name=stage_name,
             operation_type="vanilla",
+            build_dir=build_dir,
+            logger=logger,
+        )
+
+    if has_mapper:
+        _create_map_reduce_command_wrappers(
+            stage_name=stage_name,
+            stage_dir=stage_dir,
+            build_dir=build_dir,
+            logger=logger,
+        )
+        _create_reduce_command_wrapper(
+            stage_name=stage_name,
+            stage_dir=stage_dir,
             build_dir=build_dir,
             logger=logger,
         )

@@ -6,14 +6,16 @@ Utilities for managing checkpoint files in YTsaurus.
 """
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from omegaconf import DictConfig
 
-from yt_framework.core.stage import StageContext
+if TYPE_CHECKING:
+    from yt_framework.core.stage import StageContext
 
 
 def init_checkpoint_directory(
-    context: StageContext,
+    context: "StageContext",
     checkpoint_config: DictConfig,
 ) -> None:
     """

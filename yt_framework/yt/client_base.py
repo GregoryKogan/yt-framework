@@ -443,7 +443,7 @@ class BaseYTClient(ABC):
     @abstractmethod
     def run_map(
         self,
-        command: str,
+        command: Any,
         input_table: str,
         output_table: str,
         files: List[Tuple[str, str]],
@@ -452,12 +452,14 @@ class BaseYTClient(ABC):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
+        job: Any = None,
+        **kwargs: Any,
     ) -> Operation:
         """
         Run a map operation on YT.
 
         Args:
-            command: Command to execute (e.g., "python3 mapper.py")
+            command: Legacy mapper job argument (TypedJob instance or command string).
             input_table: Input table path
             output_table: Output table path
             files: List of (yt_path, local_path) tuples for files to upload
@@ -466,27 +468,127 @@ class BaseYTClient(ABC):
             output_schema: Optional YT TableSchema for typed output table
             max_failed_jobs: Maximum number of failed jobs before operation fails
             docker_auth: Optional Docker authentication dictionary
+            job: Preferred mapper job argument (TypedJob instance or command string).
+            **kwargs: Extra options forwarded to the underlying YT client.
+        """
+        pass
+
+    @abstractmethod
+    def run_map_reduce(
+        self,
+        mapper: Any,
+        reducer: Any,
+        input_table: str,
+        output_table: str,
+        reduce_by: List[str],
+        files: List[Tuple[str, str]],
+        resources: OperationResources,
+        env: Dict[str, str],
+        sort_by: Optional[List[str]] = None,
+        output_schema: Optional["TableSchema"] = None,
+        max_failed_jobs: int = 1,
+        docker_auth: Optional[Dict[str, str]] = None,
+        map_job: Any = None,
+        reduce_job: Any = None,
+        **kwargs: Any,
+    ) -> Operation:
+        """
+        Run a map-reduce operation on YT.
+
+        Args:
+            mapper: Mapper job (TypedJob instance or command string).
+            reducer: Reducer job (TypedJob instance or command string).
+            input_table: Input table path.
+            output_table: Output table path.
+            reduce_by: List of columns to reduce by.
+            files: List of (yt_path, local_path) tuples for dependencies.
+            resources: Operation resources.
+            env: Environment variables.
+            sort_by: Optional sort columns before reduce.
+            output_schema: Optional output table schema.
+            max_failed_jobs: Maximum failed jobs allowed.
+            docker_auth: Optional Docker auth.
+            map_job: Preferred mapper job alias (TypedJob instance or command string).
+            reduce_job: Preferred reducer job alias (TypedJob instance or command string).
+            **kwargs: Extra options applied to the spec builder where supported.
+        """
+        pass
+
+    @abstractmethod
+    def run_reduce(
+        self,
+        reducer: Any,
+        input_table: str,
+        output_table: str,
+        reduce_by: List[str],
+        files: List[Tuple[str, str]],
+        resources: OperationResources,
+        env: Dict[str, str],
+        output_schema: Optional["TableSchema"] = None,
+        max_failed_jobs: int = 1,
+        docker_auth: Optional[Dict[str, str]] = None,
+        job: Any = None,
+        **kwargs: Any,
+    ) -> Operation:
+        """
+        Run a reduce-only operation on YT.
+
+        Args:
+            reducer: Reducer job (TypedJob instance or command string).
+            input_table: Input table path.
+            output_table: Output table path.
+            reduce_by: List of columns to reduce by.
+            files: List of (yt_path, local_path) tuples for dependencies.
+            resources: Operation resources.
+            env: Environment variables.
+            output_schema: Optional output table schema.
+            max_failed_jobs: Maximum failed jobs allowed.
+            docker_auth: Optional Docker auth.
+            job: Preferred reducer job alias (TypedJob instance or command string).
+            **kwargs: Extra options applied to the spec builder where supported.
+        """
+        pass
+
+    @abstractmethod
+    def run_sort(
+        self,
+        table_path: str,
+        sort_by: List[str],
+        pool: Optional[str] = None,
+        pool_tree: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Sort a table in place by the given columns.
+
+        Args:
+            table_path: Table to sort.
+            sort_by: List of column names (or SortColumn objects) to sort by.
+            pool: Scheduler pool to run in.
+            pool_tree: Pool tree to run in.
+            **kwargs: Extra options forwarded to the underlying sort call.
         """
         pass
 
     @abstractmethod
     def run_vanilla(
         self,
-        command: str,
+        command: Any,
         files: List[Tuple[str, str]],
         env: Dict[str, str],
         task_name: str,
-        *args,
+        job: Any = None,
         **kwargs,
     ) -> Operation:
         """
         Run a vanilla operation on YT.
 
         Args:
-            command: Command to execute (e.g., "python3 vanilla.py")
+            command: Legacy vanilla command argument (e.g., "python3 vanilla.py")
             files: List of (yt_path, local_path) tuples for files to upload
             env: Environment variables dictionary
             task_name: Task name for the operation
+            job: Preferred vanilla command alias.
             *args: Additional positional arguments (implementation-specific)
             **kwargs: Additional keyword arguments. Common kwargs include:
                 - resources: OperationResources instance (pool, memory, CPU, GPU, etc.)
