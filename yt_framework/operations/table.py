@@ -1,8 +1,7 @@
-"""
-Table Operations
-================
+"""Helpers to count rows, load rows into memory, and export tables to JSONL.
 
-Operations for working with YT tables.
+For low-level access, use ``BaseYTClient`` methods (``read_table``, ``row_count``, etc.)
+directly on ``self.deps.yt_client``. These functions add logging and convenience.
 """
 
 import json

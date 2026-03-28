@@ -462,6 +462,6 @@ Always test your pipeline in prod mode with a small dataset before running on pr
 
 - Understand [Cluster Requirements](configuration/cluster-requirements.md) for production mode dependencies
 - Learn about [Configuration](configuration/index.md) management
-- Explore [Operations](operations/) for different operation types
+- Explore [Operations](operations/index.md) for different operation types
 - Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for mode-specific examples
 - Review [Troubleshooting](troubleshooting/configuration.md) for mode-specific issues

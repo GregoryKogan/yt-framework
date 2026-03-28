@@ -270,9 +270,13 @@ done
 Documentation lives in the `docs/` directory:
 
 - **Main docs**: `docs/index.md` - Installation and quick start
-- **Guides**: `docs/pipelines-and-stages.md`, `docs/configuration/index.md`, etc.
-- **API Reference**: `docs/reference/api.md`
+- **Guides**: `docs/pipelines-and-stages.md`, `docs/configuration/index.md`, `docs/operations/`, `docs/advanced/`, etc.
+- **API reference (framework)**: `docs/reference/api.md` — `yt_framework` modules (Sphinx autodoc)
+- **YT jobs library**: `docs/reference/ytjobs.md` — job-side `ytjobs` package (runs on cluster workers)
+- **Environment variables**: `docs/reference/environment-variables.md` — dev, driver, and sandbox vars
 - **Troubleshooting**: `docs/troubleshooting/index.md`
+
+After substantive doc edits, build locally: `pip install -e ".[docs]"` then `make -C docs html` (Python 3.11+).
 
 When adding features:
 

@@ -11,6 +11,8 @@ command-mode-map-reduce
 vanilla
 yql
 s3
+table
+sort
 ```
 
 ## Operation Types
@@ -52,6 +54,20 @@ Integrate with S3 for file listing, downloading, and processing. Perfect for wor
 
 +++
 [Learn More →](s3.md)
+
+**Table helpers**
+^^^
+Count rows, load a table into memory, or export to JSONL using framework helpers—or call `yt_client` directly.
+
++++
+[Learn More →](table.md)
+
+**Sort operation**
+^^^
+Run a YTsaurus sort on a table in-place with pool/resources from config (`run_sort`).
+
++++
+[Learn More →](sort.md)
 ```
 
 ## When to Use Each Operation
@@ -64,6 +80,8 @@ Integrate with S3 for file listing, downloading, and processing. Perfect for wor
 | **Vanilla** | Setup, cleanup, standalone tasks | None | Single job |
 | **YQL** | SQL-like queries, joins, aggregations | Table(s) → Table | Automatic (query-level) |
 | **S3** | External data integration | S3 → Table | File-level |
+| **Table helpers** | Row counts, bulk read, JSONL export | Table → Python / disk | Driver-side |
+| **Sort** | Sort table before reduce or YQL | Table → Table (sorted) | Cluster sort job |
 
 ## Quick Comparison
 
@@ -121,4 +139,6 @@ stages:
 - [Vanilla Operations](vanilla.md) - Detailed vanilla operation guide
 - [YQL Operations](yql.md) - Detailed YQL operation guide
 - [S3 Operations](s3.md) - Detailed S3 operation guide
+- [Table helpers](table.md) - `read_table`, `get_row_count`, `download_table`
+- [Sort operation](sort.md) - `run_sort` and YAML layout
 - [Multiple Operations](../advanced/multiple-operations.md) - Running multiple operations in one stage

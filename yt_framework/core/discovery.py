@@ -19,18 +19,13 @@ def discover_stages(
     logger: logging.Logger,
 ) -> List[Type[BaseStage]]:
     """
-    Automatically discover all stage classes from stages/ directory.
+    Automatically discover all stage classes from the ``stages`` directory tree.
 
-    Searches for stage.py files in stages/*/ subdirectories and imports
-    all BaseStage subclasses found in them.
+    Searches for ``stage.py`` under each ``stages`` child directory and imports
+    all ``BaseStage`` subclasses found.
 
-    Directory structure expected:
-        pipeline_dir/
-            stages/
-                stage_name_1/
-                    stage.py  # Contains Stage class inheriting from BaseStage
-                stage_name_2/
-                    stage.py
+    Expected layout: ``pipeline_dir/stages/<stage_name>/stage.py`` with a
+    ``BaseStage`` subclass in each module.
 
     Args:
         pipeline_dir: Path to pipeline directory

@@ -559,5 +559,5 @@ def main():
 ## Next Steps
 
 - Learn about [Map Operations](map.md)
-- Explore [Advanced Topics](../advanced/) (Docker, checkpoints)
+- Explore [Advanced Topics](../advanced/index.md) (Docker, checkpoints)
 - Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for more patterns
