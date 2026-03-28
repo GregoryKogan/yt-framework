@@ -2,6 +2,10 @@
 
 Checkpoint management allows you to use ML model files in your operations. The framework handles checkpoint upload, mounting, and access automatically.
 
+```{note}
+Mapper examples may import `ytjobs.config`; runtime state in Cypress via `ytjobs.checkpoint` is a separate concern—see [YT jobs library (`ytjobs`)](../reference/ytjobs.md).
+```
+
 ## Overview
 
 Checkpoints are model files (e.g., PyTorch `.pth` files, HuggingFace models) that need to be available to operations. The framework:

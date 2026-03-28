@@ -16,6 +16,7 @@ YT Framework is organized into several key modules:
 - **Operations**: Map, vanilla, YQL, S3, and table operations
 - **YT**: YT client implementations (dev and prod)
 - **Utils**: Logging, environment, ignore patterns, and utility functions
+- **YT jobs library**: Job-side helpers shipped with operations—see [YT jobs library (`ytjobs`)](ytjobs.md) for `mapper`, `s3`, `logging`, `config`, and `checkpoint` APIs
 
 ```{note}
 **Auto-Generated Documentation**

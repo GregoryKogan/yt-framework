@@ -12,6 +12,7 @@ configuration/index
 operations/index
 advanced/index
 reference/api
+reference/ytjobs
 troubleshooting/index
 ```
 

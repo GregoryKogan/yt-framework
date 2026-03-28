@@ -9,6 +9,10 @@ Production client (`client_prod`) treats each leg as either:
 
 Mapper and reducer **must use the same kind** (both TypedJob or both strings). Mixing them raises `ValueError` from `run_map_reduce`.
 
+```{note}
+Helpers such as `ytjobs.mapper.BatchMapper` are documented under [YT jobs library (`ytjobs`)](../reference/ytjobs.md).
+```
+
 ## Problem this solves
 
 For **map**, the framework always ships a bootstrap command: extract `source.tar.gz`, then run `operation_wrapper_<stage>_map.sh`.

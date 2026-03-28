@@ -17,16 +17,8 @@ class StreamMapper:
     Mapper that processes stdin one line at a time.
 
     Reads JSON lines from stdin, processes each individually,
-    and writes results to stdout.
-
-    Example:
-        def process_row(row):
-            # Process single row
-            result = {"output": row["input"] * 2}
-            yield result
-
-        mapper = StreamMapper()
-        mapper.map(process_row)
+    and writes results to stdout. Define ``processing_func(row)`` that yields
+    result dicts, then call ``StreamMapper().map(processing_func)``.
     """
 
     def map(
@@ -68,17 +60,9 @@ class BatchMapper:
     Mapper that processes stdin in batches.
 
     Reads JSON lines from stdin in batches, processes each batch,
-    and writes results to stdout.
-
-    Example:
-        def process_batch(rows):
-            # Process batch of rows
-            for row in rows:
-                result = {"output": row["input"] * 2}
-                yield result
-
-        mapper = BatchMapper(batch_size=100)  # or None for all rows
-        mapper.map(process_batch)
+    and writes results to stdout. Pass ``batch_size`` (or ``None`` to buffer all
+    stdin), define ``processing_func(rows)`` that yields result dicts, then
+    call ``mapper.map(processing_func)``.
     """
 
     def __init__(self, batch_size: Optional[int] = None):

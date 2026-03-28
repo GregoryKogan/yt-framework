@@ -1,5 +1,9 @@
 # Map-reduce: TypedJob mapper/reducer
 
+```{note}
+For JSON stdin/stdout command-mode mappers, see [YT jobs library (`ytjobs`)](../reference/ytjobs.md) (e.g. `BatchMapper` vs TypedJob pipelines).
+```
+
 ## Quick start
 
 ### 1. Define your mapper and reducer

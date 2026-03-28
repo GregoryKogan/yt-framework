@@ -6,21 +6,14 @@ import os
 
 def manage_output(mode="redirect"):
     """
-    Decorator factory that can either suppress all output or redirect stdout to stderr.
+    Decorator factory that either suppresses output or redirects stdout to stderr.
 
     Args:
-        mode: 'suppress' to suppress all output, 'redirect' to redirect stdout to stderr
+        mode: ``"suppress"`` for full silence, ``"redirect"`` to send stdout to stderr
+            (keeps job stdout clean for JSON lines).
 
-    Usage:
-        @manage_output(mode='redirect')
-        def process_video(...):
-            print("This goes to stderr")  # Won't corrupt stdout
-            return result
-
-        @manage_output(mode='suppress')
-        def noisy_function(...):
-            print("This is completely silenced")
-            return result
+    Returns:
+        A decorator, e.g. ``@manage_output(mode="redirect")`` above a function.
     """
 
     def decorator(func):
