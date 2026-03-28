@@ -116,12 +116,6 @@ def run_map(
         True if successful, False otherwise
     """
     logger = context.logger
-    log_header(
-        logger,
-        "Map Operation",
-        f"Input: {operation_config.input_table} | Output: {operation_config.output_table}",
-    )
-
     if not operation_config.get("input_table"):
         raise ValueError(
             "No input_table in operation_config; "
@@ -132,6 +126,12 @@ def run_map(
             "No output_table in operation_config; "
             "expected at client.operations.map.output_table"
         )
+
+    log_header(
+        logger,
+        "Map Operation",
+        f"Input: {operation_config.input_table} | Output: {operation_config.output_table}",
+    )
 
     env = build_operation_environment(
         context=context,

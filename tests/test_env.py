@@ -8,11 +8,15 @@ import pytest
 from yt_framework.utils.env import load_env_file, load_secrets
 
 
-def test_load_env_file_missing_warns_and_returns_empty(tmp_path: Path) -> None:
+def test_load_env_file_missing_returns_empty_without_warning(
+    tmp_path: Path,
+) -> None:
     missing = tmp_path / "nope.env"
-    with pytest.warns(UserWarning, match="Secrets file not found"):
+    with warnings.catch_warnings(record=True) as recorded:
+        warnings.simplefilter("always", UserWarning)
         result = load_env_file(missing)
     assert result == {}, "missing optional file should yield no keys"
+    assert recorded == [], "optional missing file must not emit UserWarning"
 
 
 def test_load_env_file_parses_non_comment_lines(tmp_path: Path) -> None:
