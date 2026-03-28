@@ -9,31 +9,37 @@ from yt_framework.operations.job_command import (
     is_typed_job,
 )
 
-
 # ---------------------------------------------------------------------------
 # resolve_aliased_job
 # ---------------------------------------------------------------------------
 
+
 def test_resolve_aliased_job_legacy_only():
     result = resolve_aliased_job(
-        legacy_name="command", legacy_value="cmd",
-        preferred_name="job", preferred_value=None,
+        legacy_name="command",
+        legacy_value="cmd",
+        preferred_name="job",
+        preferred_value=None,
     )
     assert result == "cmd"
 
 
 def test_resolve_aliased_job_preferred_only():
     result = resolve_aliased_job(
-        legacy_name="command", legacy_value=None,
-        preferred_name="job", preferred_value="preferred_cmd",
+        legacy_name="command",
+        legacy_value=None,
+        preferred_name="job",
+        preferred_value="preferred_cmd",
     )
     assert result == "preferred_cmd"
 
 
 def test_resolve_aliased_job_both_same_value():
     result = resolve_aliased_job(
-        legacy_name="command", legacy_value="cmd",
-        preferred_name="job", preferred_value="cmd",
+        legacy_name="command",
+        legacy_value="cmd",
+        preferred_name="job",
+        preferred_value="cmd",
     )
     assert result == "cmd"
 
@@ -41,23 +47,29 @@ def test_resolve_aliased_job_both_same_value():
 def test_resolve_aliased_job_both_different_raises():
     with pytest.raises(ValueError, match="different values"):
         resolve_aliased_job(
-            legacy_name="mapper", legacy_value="cmd_a",
-            preferred_name="map_job", preferred_value="cmd_b",
+            legacy_name="mapper",
+            legacy_value="cmd_a",
+            preferred_name="map_job",
+            preferred_value="cmd_b",
         )
 
 
 def test_resolve_aliased_job_both_none():
     result = resolve_aliased_job(
-        legacy_name="command", legacy_value=None,
-        preferred_name="job", preferred_value=None,
+        legacy_name="command",
+        legacy_value=None,
+        preferred_name="job",
+        preferred_value=None,
     )
     assert result is None
 
 
 def test_resolve_aliased_job_preferred_wins_over_none_legacy():
     result = resolve_aliased_job(
-        legacy_name="reducer", legacy_value=None,
-        preferred_name="job", preferred_value="my_reducer",
+        legacy_name="reducer",
+        legacy_value=None,
+        preferred_name="job",
+        preferred_value="my_reducer",
     )
     assert result == "my_reducer"
 
@@ -65,6 +77,7 @@ def test_resolve_aliased_job_preferred_wins_over_none_legacy():
 # ---------------------------------------------------------------------------
 # map_reduce_leg_kind
 # ---------------------------------------------------------------------------
+
 
 def test_map_reduce_leg_kind_string():
     assert map_reduce_leg_kind("my command") == "command"
@@ -79,6 +92,7 @@ def test_map_reduce_leg_kind_invalid_raises():
 # require_consistent_map_reduce_legs
 # ---------------------------------------------------------------------------
 
+
 def test_require_consistent_both_strings():
     require_consistent_map_reduce_legs("mapper_cmd", "reducer_cmd")
 
@@ -92,6 +106,7 @@ def test_require_consistent_invalid_type_raises():
 # ---------------------------------------------------------------------------
 # is_typed_job
 # ---------------------------------------------------------------------------
+
 
 def test_is_typed_job_string_is_false():
     assert not is_typed_job("some command")

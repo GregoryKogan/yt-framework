@@ -102,7 +102,9 @@ class TarArchiveDependencyBuilder:
         """Build dependencies using tar archive strategy."""
         from yt_framework.utils import log_header
 
-        effective_type = "map" if operation_type in ("map_reduce", "reduce") else operation_type
+        effective_type = (
+            "map" if operation_type in ("map_reduce", "reduce") else operation_type
+        )
         log_header(
             logger,
             f"{operation_type.replace('_', ' ').title()} Operation",

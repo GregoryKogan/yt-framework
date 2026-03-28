@@ -96,9 +96,13 @@ def run_map_reduce(
     resources = extract_operation_resources(operation_config, logger)
 
     if mapper is not None and map_job is not None and mapper != map_job:
-        raise ValueError("Both 'mapper' and 'map_job' are set with different values; use only one")
+        raise ValueError(
+            "Both 'mapper' and 'map_job' are set with different values; use only one"
+        )
     if reducer is not None and reduce_job is not None and reducer != reduce_job:
-        raise ValueError("Both 'reducer' and 'reduce_job' are set with different values; use only one")
+        raise ValueError(
+            "Both 'reducer' and 'reduce_job' are set with different values; use only one"
+        )
     mapper = map_job if map_job is not None else mapper
     reducer = reduce_job if reduce_job is not None else reducer
 
@@ -120,7 +124,9 @@ def run_map_reduce(
     if dep.mapper_command is not None and dep.reducer_command is not None:
         mapper = dep.mapper_command
         reducer = dep.reducer_command
-        logger.info("Using tar bootstrap commands for map-reduce mapper and reducer legs")
+        logger.info(
+            "Using tar bootstrap commands for map-reduce mapper and reducer legs"
+        )
     elif dep.mapper_command is not None or dep.reducer_command is not None:
         raise RuntimeError(
             "Internal error: partial map-reduce tar bootstrap (only one leg set); "
@@ -142,7 +148,9 @@ def run_map_reduce(
             logger.info(f"Operation label: {od}")
             spec_kwargs["title"] = od
         else:
-            spec_kwargs["operation_description"] = OmegaConf.to_container(od, resolve=True)
+            spec_kwargs["operation_description"] = OmegaConf.to_container(
+                od, resolve=True
+            )
 
     passthrough = collect_passthrough_kwargs(
         operation_config,
@@ -242,7 +250,9 @@ def run_reduce(
     resources = extract_operation_resources(operation_config, logger)
 
     if reducer is not None and job is not None and reducer != job:
-        raise ValueError("Both 'reducer' and 'job' are set with different values; use only one")
+        raise ValueError(
+            "Both 'reducer' and 'job' are set with different values; use only one"
+        )
     reducer = job if job is not None else reducer
 
     builder = TarArchiveDependencyBuilder()
@@ -272,7 +282,9 @@ def run_reduce(
             logger.info(f"Operation label: {rod}")
             reduce_kw["title"] = rod
         else:
-            reduce_kw["operation_description"] = OmegaConf.to_container(rod, resolve=True)
+            reduce_kw["operation_description"] = OmegaConf.to_container(
+                rod, resolve=True
+            )
 
     passthrough = collect_passthrough_kwargs(
         operation_config,

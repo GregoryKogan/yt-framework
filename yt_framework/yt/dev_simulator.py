@@ -68,12 +68,10 @@ class DuckDBSimulator:
 
         try:
             # DuckDB can read JSONL files directly
-            self.conn.execute(
-                f"""
+            self.conn.execute(f"""
                 CREATE TABLE {table_name} AS 
                 SELECT * FROM read_json_auto('{local_jsonl_path}', format='newline_delimited')
-            """
-            )
+            """)
 
             count_result = self.conn.execute(
                 f"SELECT COUNT(*) FROM {table_name}"
@@ -179,7 +177,7 @@ class DuckDBSimulator:
 
     def close(self) -> None:
         """Close DuckDB connection.
-        
+
         Returns:
             None
         """
@@ -188,9 +186,9 @@ class DuckDBSimulator:
 
     def __del__(self) -> None:
         """Cleanup on deletion.
-        
+
         Automatically closes DuckDB connection when simulator is garbage collected.
-        
+
         Returns:
             None
         """
