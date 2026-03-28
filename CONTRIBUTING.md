@@ -38,6 +38,7 @@ Contributions come in many forms:
 
 - Python 3.11 or higher
 - Git
+- [Conda](https://docs.conda.io/en/latest/miniconda.html) (Miniconda, Mambaforge, or similar) — recommended so you use one shared environment for tests, docs, and formatting
 - Access to YTsaurus cluster (for production mode testing)
 - YT credentials (for production mode testing)
 
@@ -50,21 +51,30 @@ Contributions come in many forms:
    cd yt-framework
    ```
 
-2. **Install in editable mode**:
+2. **Create and activate the project Conda environment** (recommended):
 
    ```bash
-   pip install -e .
+   conda create -n yt-framework python=3.11
+   conda activate yt-framework
    ```
 
-3. **Install development dependencies**:
+   Optionally use `conda-forge` (e.g. `conda create -n yt-framework python=3.11 -c conda-forge`).
+
+3. **Install the package in editable mode with dev and docs extras**:
 
    ```bash
-   pip install -e ".[dev]"
+   pip install -e ".[dev,docs]"
    ```
 
-   This installs additional tools like `black`, `pytest`, `pytest-cov`, and `pre-commit`.
+   If `which pip` points outside the Conda env (for example Homebrew), use `python -m pip install -e ".[dev,docs]"` instead. The same applies to one-off commands with `conda run -n yt-framework -- python -m pip ...`.
 
-4. **Install Git commit hooks** (recommended):
+   This installs runtime dependencies plus `black`, `pytest`, `pytest-cov`, `pre-commit`, and the Sphinx stack needed for `make -C docs html`. You do not need a separate `pip install -e ".[docs]"` step.
+
+   **Without Conda:** use a Python 3.11+ virtual environment, then `pip install -e ".[dev,docs]"` (or `pip install -e .` and `pip install -e ".[dev]"` if you will not build docs locally).
+
+4. **IDE / Cursor:** set the Python interpreter to the `yt-framework` Conda environment so the editor, integrated terminal, and agents target the same interpreter.
+
+5. **Install Git commit hooks** (recommended):
 
    ```bash
    pre-commit install
@@ -76,7 +86,7 @@ Contributions come in many forms:
    pre-commit run black --all-files
    ```
 
-5. **Set up YT credentials** (for production mode testing):
+6. **Set up YT credentials** (for production mode testing):
 
    Create a `secrets.env` file in any example's `configs/` directory:
 
@@ -88,7 +98,7 @@ Contributions come in many forms:
 
    See [Configuration Guide](docs/configuration/secrets.md) for more details.
 
-6. **Verify installation**:
+7. **Verify installation**:
 
    ```bash
    python -c "import yt_framework; print('YT Framework installed successfully')"
@@ -288,7 +298,7 @@ Documentation lives in the `docs/` directory:
 - **Environment variables**: `docs/reference/environment-variables.md` — dev, driver, and sandbox vars
 - **Troubleshooting**: `docs/troubleshooting/index.md`
 
-After substantive doc edits, build locally: `pip install -e ".[docs]"` then `make -C docs html` (Python 3.11+).
+After substantive doc edits, build locally with the same environment: `make -C docs html` (requires the `docs` extra — included in `pip install -e ".[dev,docs]"` above; Python 3.11+).
 
 When adding features:
 

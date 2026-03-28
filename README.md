@@ -40,7 +40,7 @@ YT Framework follows a pipeline-based architecture where pipelines consist of st
 
 ### For Users
 
-Install from [PyPI](https://pypi.org/project/yt-framework/):
+Install from [PyPI](https://pypi.org/project/yt-framework/) into any Python 3.11+ environment (system Python, a virtualenv, or a Conda env):
 
 ```bash
 pip install yt-framework
@@ -48,7 +48,19 @@ pip install yt-framework
 
 ### For Developers and Contributors
 
-Install in editable mode from source:
+**Recommended: one Conda environment** for tests, formatting, pre-commit, and local documentation builds (avoids reinstalling tooling for each task):
+
+```bash
+git clone https://github.com/GregoryKogan/yt-framework.git
+cd yt-framework
+conda create -n yt-framework python=3.11
+conda activate yt-framework
+pip install -e ".[dev,docs]"
+```
+
+Use `conda-forge` as the channel when creating the env if that matches your setup (`conda create -n yt-framework python=3.11 -c conda-forge`).
+
+**Alternative: pip only** — install in editable mode from source:
 
 ```bash
 git clone https://github.com/GregoryKogan/yt-framework.git
@@ -56,13 +68,15 @@ cd yt-framework
 pip install -e .
 ```
 
-For development with testing tools:
+For development with testing tools (without the docs extra):
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-See [Installation Guide](https://yt-framework.readthedocs.io/en/latest/#installation) for prerequisites and detailed setup instructions.
+For local Sphinx builds without the full dev extra, use `pip install -e ".[docs]"`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development setup and [Installation Guide](https://yt-framework.readthedocs.io/en/latest/#installation) for prerequisites.
 
 ## Quick Start
 
