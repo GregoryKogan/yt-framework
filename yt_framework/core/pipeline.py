@@ -1,22 +1,8 @@
-"""
-Provides common functionality for all pipelines, including code upload methods,
-CLI entry point, and stage execution.
+"""Pipeline base classes, CLI entry point (``main``), and code upload orchestration.
 
-To create a new pipeline:
-    1. Inherit from BasePipeline
-    2. In setup(), create StageRegistry and register stages
-    3. Optionally override run() for custom execution flow (rare)
-
-Example:
-    class Pipeline(BasePipeline):
-        def setup(self):
-            self.set_stage_registry(
-                StageRegistry()
-                .add_stage(MyStage)
-            )
-
-    if __name__ == "__main__":
-        Pipeline.main()
+Subclass ``BasePipeline``, implement ``setup()`` to register stages with
+``StageRegistry``, then run via ``Pipeline.main()`` from ``pipeline.py``.
+``DefaultPipeline`` auto-discovers stages under ``stages/*/stage.py``.
 """
 
 import sys
@@ -39,7 +25,6 @@ from yt_framework.utils.env import load_secrets
 from yt_framework.core.registry import StageRegistry
 from yt_framework.core.dependencies import PipelineStageDependencies
 from yt_framework.operations.upload import upload_all_code
-
 
 DebugContext: TypeAlias = Dict[str, Any]
 
@@ -75,9 +60,7 @@ def _normalize_upload_paths(raw: Any) -> List[Dict[str, str]]:
                 f"got {type(element).__name__!r}."
             )
         if "source" not in element:
-            raise ValueError(
-                f"upload_paths[{idx}] is missing required 'source' key."
-            )
+            raise ValueError(f"upload_paths[{idx}] is missing required 'source' key.")
         normalized.append({k: str(v) for k, v in element.items()})
 
     return normalized
@@ -258,9 +241,7 @@ class BasePipeline:
         upload_modules = _normalize_upload_modules(
             self.config.pipeline.get("upload_modules")
         )
-        upload_paths = _normalize_upload_paths(
-            self.config.pipeline.get("upload_paths")
-        )
+        upload_paths = _normalize_upload_paths(self.config.pipeline.get("upload_paths"))
 
         upload_all_code(
             yt_client=self.yt,
@@ -440,26 +421,17 @@ class DefaultPipeline(BasePipeline):
     """
     Pipeline with automatic stage discovery.
 
-    Automatically discovers and registers all stages from the stages/ directory.
-    No need to manually import or register stages - just put them in stages/
-    and they'll be automatically found.
-
-    Usage:
-        # pipeline.py
-        from yt_framework.core.pipeline import DefaultPipeline
-
-        if __name__ == "__main__":
-            DefaultPipeline.main()
-
-    The stages to run are still controlled by the enabled_stages configuration.
+    Discovers ``BaseStage`` subclasses from ``stages/<name>/stage.py`` and
+    registers them. Run with ``DefaultPipeline.main()`` from ``pipeline.py``.
+    Which stages execute is still controlled by ``enabled_stages`` in config.
     """
 
     def setup(self) -> None:
         """
-        Automatically discover and register stages from stages/ directory.
+        Automatically discover and register stages from the ``stages`` directory.
 
-        Looks for all stage.py files in stages/*/ subdirectories and
-        automatically imports and registers any BaseStage subclasses found.
+        Looks for ``stage.py`` under each ``stages/<name>/`` folder and registers
+        every ``BaseStage`` subclass found.
 
         Returns:
             None

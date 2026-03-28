@@ -219,4 +219,4 @@ client:
 - Learn about [Secrets Management](secrets.md) for credentials
 - Explore [Advanced Configuration](advanced.md) for multiple configs and merging
 - Check [Dev vs Prod](../dev-vs-prod.md) for mode-specific configuration
-- Review [Operations](../operations/) for operation-specific configuration
+- Review [Operations](../operations/index.md) for operation-specific configuration

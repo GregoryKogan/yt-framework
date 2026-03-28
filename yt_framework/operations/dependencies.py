@@ -1,6 +1,6 @@
 """
 Dependency Management
-====================
+=======================
 
 Build dependency file lists for YT map operations.
 Dependencies are files that need to be mounted in the YT job sandbox.

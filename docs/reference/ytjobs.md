@@ -5,6 +5,8 @@ The **`ytjobs`** package is part of the same distribution as `yt_framework` and 
 - **`yt_framework`**: pipeline layout, stage discovery, YT clients in dev/prod, operation configs.
 - **`ytjobs`**: small, job-safe helpers—JSON stdin/stdout mappers, S3 access from workers, stderr logging, `JOB_CONFIG_PATH`, and Cypress checkpoint I/O via `yt.wrapper`.
 
+See also [Environment variables](environment-variables.md) for `JOB_CONFIG_PATH` and related sandbox variables.
+
 ```{note}
 **Two “checkpoint” ideas**
 

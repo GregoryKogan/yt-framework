@@ -290,6 +290,10 @@ Stages are executed sequentially. If a stage fails, the pipeline stops. Make sur
 
 Stages are executed sequentially. If a stage fails, the pipeline stops.
 
+### Stage dependencies (`self.deps`)
+
+Each stage receives injected dependencies (YT client, configs directory, merged config) via `self.deps` and operation context via `self.context`. The protocol is implemented by `PipelineStageDependencies`; see **Core injection (`self.deps`)** in [API Reference](reference/api.md) (`yt_framework.core.dependencies`).
+
 ### Multiple Stages Example
 
 See [Example: 02_multi_stage_pipeline](https://github.com/GregoryKogan/yt-framework/tree/main/examples/02_multi_stage_pipeline/) for a complete example with multiple stages and context passing.
@@ -307,5 +311,5 @@ See [Example: 02_multi_stage_pipeline](https://github.com/GregoryKogan/yt-framew
 
 - Learn about [Configuration](configuration/index.md) management
 - Understand [Dev vs Prod](dev-vs-prod.md) modes
-- Explore [Operations](operations/) for different operation types
+- Explore [Operations](operations/index.md) for different operation types
 - Review [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for complete pipeline examples

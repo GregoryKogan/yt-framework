@@ -406,6 +406,16 @@ success = run_vanilla(...)
 self.logger.info("Validate operation completed")
 ```
 
+## YQL, map-reduce, and sort
+
+The examples above chain **`run_map`** and **`run_vanilla`**. The same **sequential** pattern applies to other entry points:
+
+- **YQL**: call methods on `self.deps.yt_client` (for example `join_tables`, `filter_table`) with config-driven paths—see [YQL operations](../operations/yql.md).
+- **Map-reduce / reduce**: use `run_map_reduce` or `run_reduce` from `yt_framework.operations.map_reduce` with `self.context` and `self.config.client.operations.*`—see [TypedJob map-reduce](../operations/map-reduce-typed-jobs.md) and [Command mode](../operations/command-mode-map-reduce.md).
+- **Sort**: use `run_sort` from `yt_framework.operations.sort`—see [Sort operations](../operations/sort.md).
+
+You can mix these in one `run()` method as long as each step’s inputs (tables, configs) match the previous output.
+
 ## Common Patterns
 
 ### Pipeline Pattern
