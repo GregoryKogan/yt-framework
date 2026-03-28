@@ -16,7 +16,9 @@ Thumbs.db
 
 # IDEs
 .vscode/
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 .idea/
 *.swp
 *.swo
