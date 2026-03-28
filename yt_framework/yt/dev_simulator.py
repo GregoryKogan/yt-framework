@@ -12,6 +12,8 @@ from typing import List, Dict, Any, Optional
 
 import duckdb
 
+_VALID_DUCKDB_TABLE_IDENT = re.compile(r"\Ayt_[a-zA-Z0-9_]*\Z")
+
 
 class DuckDBSimulator:
     """
@@ -45,6 +47,12 @@ class DuckDBSimulator:
         sanitized = re.sub(r"[^a-zA-Z0-9_]", "_", basename)
         return f"yt_{sanitized}"
 
+    def _validated_table_identifier(self, table_name: str) -> str:
+        """Return table_name if it matches the safe DuckDB identifier charset."""
+        if _VALID_DUCKDB_TABLE_IDENT.fullmatch(table_name) is None:
+            raise ValueError(f"invalid DuckDB table identifier: {table_name!r}")
+        return table_name
+
     def load_table(self, yt_path: str, local_jsonl_path: Path) -> str:
         """
         Load a .jsonl table file into DuckDB.
@@ -59,22 +67,28 @@ class DuckDBSimulator:
         if not local_jsonl_path.exists():
             self.logger.warning(f"Table file not found: {local_jsonl_path}")
             # Create empty table
-            table_name = self._sanitize_table_name(yt_path)
-            self.conn.execute(f"CREATE TABLE {table_name} (dummy INTEGER)")
+            table_name = self._validated_table_identifier(
+                self._sanitize_table_name(yt_path)
+            )
+            self.conn.execute("CREATE TABLE " + table_name + " (dummy INTEGER)")
             self.loaded_tables[yt_path] = table_name
             return table_name
 
-        table_name = self._sanitize_table_name(yt_path)
+        table_name = self._validated_table_identifier(
+            self._sanitize_table_name(yt_path)
+        )
 
         try:
-            # DuckDB can read JSONL files directly
-            self.conn.execute(f"""
-                CREATE TABLE {table_name} AS 
-                SELECT * FROM read_json_auto('{local_jsonl_path}', format='newline_delimited')
-            """)
+            # Path is bound; identifier is whitelist-validated (not parameterizable in SQL).
+            self.conn.execute(
+                "CREATE TABLE "
+                + table_name
+                + " AS SELECT * FROM read_json_auto(?, format='newline_delimited')",
+                [str(local_jsonl_path.resolve())],
+            )
 
             count_result = self.conn.execute(
-                f"SELECT COUNT(*) FROM {table_name}"
+                "SELECT COUNT(*) FROM " + table_name
             ).fetchone()
             if count_result is None:
                 row_count = 0
