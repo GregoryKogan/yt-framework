@@ -1,0 +1,33 @@
+---
+description: Keep automated and manual verification aligned with code; prove changes with pytest or documented alternatives
+alwaysApply: true
+---
+
+# Testing maintenance
+
+## Surfaces
+
+Treat as testing scope: `tests/**` for **pytest** (dev dependency in repo-root `pyproject.toml`). Complementary checks when automated coverage is thin or behavior is pipeline/integration-heavy: **dev mode** and **example pipelines** as described in `CONTRIBUTING.md` (Testing). Test code follows [standards.mdc](standards.mdc) for style and clarity (types, assertions, `black` on changed Python files).
+
+## When to add or update tests
+
+Add or extend tests in the same change set when you change behavior, fix bugs, adjust public contracts, or touch logic that already has pytest coverage. Prefer focused tests next to the modules they exercise under `tests/`. When the suite does not yet cover an area, use dev mode and/or a minimal example pipeline to verify—and add pytest when the behavior is stable enough to automate.
+
+## Obligation
+
+Do not claim a change is verified without evidence. Update or add tests so they match the new semantics; remove or rewrite assertions that encode obsolete behavior. If you rely on dev mode or examples instead of pytest, say what you ran and the outcome.
+
+## While working
+
+- **Early**: Identify which modules or flows changed and whether `tests/` already covers them; note gaps.
+- **Before done**: Run the relevant pytest scope (full suite or targeted). For integration-only or uncovered paths, run the dev-mode or example steps from `CONTRIBUTING.md` and record the result.
+
+## Proof
+
+Run commands through the project Conda env: [conda-environment.mdc](conda-environment.mdc) (e.g. `conda run -n yt-framework -- …`).
+
+- **Touches production code or existing tests**: run pytest from the repo root, e.g. `conda run -n yt-framework -- pytest`. For a narrow check: `conda run -n yt-framework -- pytest tests/<file>.py` or `pytest path::test_name`. Optional coverage: `conda run -n yt-framework -- pytest --cov=yt_framework`.
+- **Integration-heavy or uncovered areas**: cite dev-mode or example runs per `CONTRIBUTING.md` (and add pytest when practical).
+- **Test-only or rule-only edits (no `docs/` or user-facing README/CONTRIBUTING changes)**: Sphinx is not required; still run pytest if Python tests changed.
+
+Done = proof, same spirit as [standards.mdc](standards.mdc): do not claim completion without evidence appropriate to what changed.

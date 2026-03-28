@@ -78,9 +78,10 @@ Contributions come in many forms:
 
    ```bash
    pre-commit install
+   pre-commit install --hook-type pre-push
    ```
 
-   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Black](https://github.com/psf/black) on staged Python files using [.pre-commit-config.yaml](.pre-commit-config.yaml). To format or check the whole repository (for example before a large change), run:
+   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Black](https://github.com/psf/black) on staged Python files using [.pre-commit-config.yaml](.pre-commit-config.yaml). On each **push**, the pre-push hook runs the full test suite via `conda run -n yt-framework -- pytest` (requires Conda and the `yt-framework` env on your `PATH`, as when pushing from a normal shell). To skip the hook in an emergency, use `git push --no-verify`. To format or check the whole repository (for example before a large change), run:
 
    ```bash
    pre-commit run black --all-files
@@ -255,6 +256,10 @@ pytest --cov=yt_framework
 # Run specific test file
 pytest tests/test_stage.py
 ```
+
+### CI (GitHub Actions)
+
+The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `pytest` on every **push** and **pull request** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). To require a green check before merging, configure branch protection on GitHub and add the `test` job as a required status check.
 
 ### Testing with Dev Mode
 
