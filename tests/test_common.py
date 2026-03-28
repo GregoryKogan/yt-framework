@@ -2,17 +2,22 @@
 
 import logging
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from omegaconf import OmegaConf
 
+from yt_framework.core.dependencies import PipelineStageDependencies
+from yt_framework.core.stage import StageContext
 from yt_framework.operations.common import (
     build_environment,
+    build_operation_environment,
     collect_passthrough_kwargs,
     extract_docker_auth_from_operation_config,
     extract_max_failed_jobs,
     extract_operation_resources,
     prepare_docker_auth,
 )
+from yt_framework.yt.client_base import BaseYTClient
 
 _LOG = logging.getLogger("tests.common")
 
@@ -71,6 +76,114 @@ def test_extract_max_failed_jobs_default_when_missing() -> None:
 def test_extract_max_failed_jobs_reads_config_value() -> None:
     cfg = OmegaConf.create({"max_failed_job_count": 5})
     assert extract_max_failed_jobs(cfg, _LOG) == 5
+
+
+def test_extract_max_failed_jobs_uses_default_when_config_value_is_none() -> None:
+    cfg = OmegaConf.create({"max_failed_job_count": None})
+    assert extract_max_failed_jobs(cfg, _LOG) == 1
+
+
+def test_extract_operation_resources_uses_default_when_nested_value_is_none() -> None:
+    cfg = OmegaConf.create({"resources": {"pool": None}})
+    res = extract_operation_resources(cfg, _LOG)
+    assert res.pool == "default"
+
+
+class _ConfigThatRaisesOnAccess:
+    """Stand-in config object that forces the generic fallback in _get_config_value_with_default."""
+
+    def __contains__(self, _key: object) -> bool:
+        raise RuntimeError("config access failed")
+
+    def get(self, _key: str) -> None:
+        raise RuntimeError("config access failed")
+
+
+def test_extract_max_failed_jobs_falls_back_to_default_on_config_access_error() -> None:
+    assert extract_max_failed_jobs(_ConfigThatRaisesOnAccess(), _LOG) == 1
+
+
+def _stage_context_with_configs(
+    tmp_path: Path, secrets: str = "K=secret\n"
+) -> StageContext:
+    cfg_dir = tmp_path / "configs"
+    cfg_dir.mkdir()
+    (cfg_dir / "secrets.env").write_text(secrets, encoding="utf-8")
+    fake_yt = MagicMock(spec=BaseYTClient)
+    deps = PipelineStageDependencies(
+        yt_client=fake_yt,
+        pipeline_config=OmegaConf.create({}),
+        configs_dir=cfg_dir,
+    )
+    stage_dir = tmp_path / "stage"
+    stage_dir.mkdir()
+    return StageContext(
+        name="train",
+        config=OmegaConf.create({}),
+        stage_dir=stage_dir,
+        logger=_LOG,
+        deps=deps,
+    )
+
+
+def test_build_operation_environment_merges_secrets_env_and_stage_name(
+    tmp_path: Path,
+) -> None:
+    ctx = _stage_context_with_configs(tmp_path)
+    op_cfg = OmegaConf.create({"env": {"EXTRA": "x", "SKIP": None}})
+    env = build_operation_environment(
+        ctx,
+        op_cfg,
+        _LOG,
+        include_tokenizer_artifact=False,
+        include_stage_name=True,
+    )
+    assert (env.get("K"), env.get("EXTRA"), env.get("YT_STAGE_NAME")) == (
+        "secret",
+        "x",
+        "train",
+    )
+
+
+def test_build_operation_environment_omits_stage_name_when_disabled(
+    tmp_path: Path,
+) -> None:
+    ctx = _stage_context_with_configs(tmp_path)
+    env = build_operation_environment(
+        ctx,
+        OmegaConf.create({}),
+        _LOG,
+        include_tokenizer_artifact=False,
+        include_stage_name=False,
+    )
+    assert "YT_STAGE_NAME" not in env
+
+
+def test_build_operation_environment_sets_tokenizer_env_when_artifact_configured(
+    tmp_path: Path,
+) -> None:
+    ctx = _stage_context_with_configs(tmp_path)
+    op_cfg = OmegaConf.create(
+        {
+            "tokenizer_artifact": {
+                "artifact_base": "//home/artifacts",
+                "artifact_name": "tok",
+            }
+        }
+    )
+    with patch("yt_framework.operations.common.init_tokenizer_artifact_directory"):
+        env = build_operation_environment(
+            ctx,
+            op_cfg,
+            _LOG,
+            include_tokenizer_artifact=True,
+            include_stage_name=False,
+        )
+    assert (
+        env.get("TOKENIZER_ARTIFACT_FILE"),
+        env.get("TOKENIZER_ARTIFACT_DIR"),
+        env.get("TOKENIZER_ARTIFACT_NAME"),
+    ) == ("tok.tar.gz", "tokenizer_artifacts/tok", "tok")
 
 
 def test_build_environment_loads_secrets_from_configs_dir(tmp_path: Path) -> None:

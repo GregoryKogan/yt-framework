@@ -1,5 +1,7 @@
 """Tests for job_command utilities: resolve_aliased_job and require_consistent_map_reduce_legs."""
 
+import builtins
+
 import pytest
 from yt.wrapper import TypedJob  # pyright: ignore[reportMissingImports]
 
@@ -125,6 +127,20 @@ def test_is_typed_job_none_is_false():
 
 def test_is_typed_job_int_is_false():
     assert not is_typed_job(42)
+
+
+def test_is_typed_job_returns_false_when_yt_wrapper_import_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_import = builtins.__import__
+
+    def fake_import(name: str, *args: object, **kwargs: object):
+        if name == "yt.wrapper":
+            raise ImportError("simulated missing yt.wrapper")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    assert not is_typed_job(_MinimalTypedJob())
 
 
 def test_is_typed_job_subclass_instance_is_true():
