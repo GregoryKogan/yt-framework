@@ -62,9 +62,21 @@ Contributions come in many forms:
    pip install -e ".[dev]"
    ```
 
-   This installs additional tools like `pytest` and `pytest-cov` for testing.
+   This installs additional tools like `black`, `pytest`, `pytest-cov`, and `pre-commit`.
 
-4. **Set up YT credentials** (for production mode testing):
+4. **Install Git commit hooks** (recommended):
+
+   ```bash
+   pre-commit install
+   ```
+
+   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Black](https://github.com/psf/black) on staged Python files using [.pre-commit-config.yaml](.pre-commit-config.yaml). To format or check the whole repository (for example before a large change), run:
+
+   ```bash
+   pre-commit run black --all-files
+   ```
+
+5. **Set up YT credentials** (for production mode testing):
 
    Create a `secrets.env` file in any example's `configs/` directory:
 
@@ -76,7 +88,7 @@ Contributions come in many forms:
 
    See [Configuration Guide](docs/configuration/secrets.md) for more details.
 
-5. **Verify installation**:
+6. **Verify installation**:
 
    ```bash
    python -c "import yt_framework; print('YT Framework installed successfully')"
@@ -152,7 +164,7 @@ This helps ensure you haven't broken existing functionality.
 ### Python Style
 
 - Follow **PEP 8** style guidelines
-- Use **black** or similar formatter
+- Use **Black** for formatting (line length 88; see `[tool.black]` in `pyproject.toml`). With `pre-commit install`, Black runs automatically on staged `.py` files when you commit.
 - Use type hints where appropriate
 
 ### Naming Conventions
