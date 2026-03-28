@@ -81,7 +81,9 @@ def _copy_ytjobs_to_build_dir(
     return file_count
 
 
-def _resolve_upload_target(source: str, target: Optional[str], pipeline_dir: Path) -> str:
+def _resolve_upload_target(
+    source: str, target: Optional[str], pipeline_dir: Path
+) -> str:
     """Resolve target name for upload_paths entry.
 
     Args:
@@ -274,14 +276,10 @@ def _copy_path_to_build_dir(
         )
 
     if not resolved.exists():
-        raise FileNotFoundError(
-            f"Upload path source does not exist: {resolved}."
-        )
+        raise FileNotFoundError(f"Upload path source does not exist: {resolved}.")
 
     if not resolved.is_dir():
-        raise ValueError(
-            f"Upload path source must be a directory: {resolved}."
-        )
+        raise ValueError(f"Upload path source must be a directory: {resolved}.")
 
     target_dir = build_dir / target_name
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -395,7 +393,9 @@ def _copy_stage_to_build_dir(
     return file_count
 
 
-def _bash_wrapper_script_body(stage_name: str, python_script_relative: str, label: str) -> str:
+def _bash_wrapper_script_body(
+    stage_name: str, python_script_relative: str, label: str
+) -> str:
     """Shared body for operation wrappers (map, vanilla, map-reduce legs, reduce)."""
     requirements_path = f"stages/{stage_name}/requirements.txt"
     return f"""
@@ -487,7 +487,9 @@ def _resolve_map_reduce_command_scripts(
     return mapper, reducer
 
 
-def _resolve_reduce_command_script(stage_dir: Path, logger: logging.Logger) -> Optional[str]:
+def _resolve_reduce_command_script(
+    stage_dir: Path, logger: logging.Logger
+) -> Optional[str]:
     """Reducer entrypoint for reduce-only command mode (``job.reduce_command``)."""
     job = _load_stage_job_section(stage_dir, logger)
     rc = job.get("reduce_command") or {}
@@ -498,7 +500,11 @@ def _resolve_reduce_command_script(stage_dir: Path, logger: logging.Logger) -> O
         name = str(explicit)
         if (stage_dir / "src" / name).is_file():
             return name
-        logger.warning("reduce_command.reducer_script %s not found under %s", name, stage_dir / "src")
+        logger.warning(
+            "reduce_command.reducer_script %s not found under %s",
+            name,
+            stage_dir / "src",
+        )
     src = stage_dir / "src"
     for candidate in (
         "reducer.py",
@@ -541,7 +547,9 @@ def _create_unified_wrapper_script(
     else:
         script_path = f"stages/{stage_name}/src/vanilla.py"
 
-    body = _bash_wrapper_script_body(stage_name, script_path, f"{operation_type} operation")
+    body = _bash_wrapper_script_body(
+        stage_name, script_path, f"{operation_type} operation"
+    )
     _write_wrapper_file(
         build_dir,
         f"operation_wrapper_{stage_name}_{operation_type}.sh",
@@ -561,7 +569,9 @@ def _create_map_reduce_command_wrappers(
     if not mapper_f:
         return
     m_rel = f"stages/{stage_name}/src/{mapper_f}"
-    body_m = _bash_wrapper_script_body(stage_name, m_rel, "map-reduce mapper (command mode)")
+    body_m = _bash_wrapper_script_body(
+        stage_name, m_rel, "map-reduce mapper (command mode)"
+    )
     _write_wrapper_file(
         build_dir,
         f"operation_wrapper_{stage_name}_map_reduce_mapper.sh",
@@ -570,7 +580,9 @@ def _create_map_reduce_command_wrappers(
     )
     if reducer_f:
         r_rel = f"stages/{stage_name}/src/{reducer_f}"
-        body_r = _bash_wrapper_script_body(stage_name, r_rel, "map-reduce reducer (command mode)")
+        body_r = _bash_wrapper_script_body(
+            stage_name, r_rel, "map-reduce reducer (command mode)"
+        )
         _write_wrapper_file(
             build_dir,
             f"operation_wrapper_{stage_name}_map_reduce_reducer.sh",
@@ -887,10 +899,7 @@ def upload_all_code(
     )
 
     # Resolve build directory path
-    build_code_dir = _resolve_build_code_dir(
-        pipeline_dir=pipeline_dir,
-        logger=logger
-    )
+    build_code_dir = _resolve_build_code_dir(pipeline_dir=pipeline_dir, logger=logger)
 
     # Build code locally (including wrapper scripts for tar archive mode)
     build_dir = build_code_dir / "source"

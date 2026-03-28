@@ -117,13 +117,21 @@ def extract_operation_resources(
     """Extract OperationResources from operation config with fallback defaults."""
     resources_config = operation_config.get("resources") or operation_config
     pool = _get_config_value_with_default(resources_config, "pool", "default", logger)
-    pool_tree = _get_config_value_with_default(resources_config, "pool_tree", None, logger)
-    docker_image = _get_config_value_with_default(resources_config, "docker_image", None, logger)
-    memory_gb = _get_config_value_with_default(resources_config, "memory_limit_gb", 4, logger)
+    pool_tree = _get_config_value_with_default(
+        resources_config, "pool_tree", None, logger
+    )
+    docker_image = _get_config_value_with_default(
+        resources_config, "docker_image", None, logger
+    )
+    memory_gb = _get_config_value_with_default(
+        resources_config, "memory_limit_gb", 4, logger
+    )
     cpu_limit = _get_config_value_with_default(resources_config, "cpu_limit", 2, logger)
     gpu_limit = _get_config_value_with_default(resources_config, "gpu_limit", 0, logger)
     job_count = _get_config_value_with_default(resources_config, "job_count", 1, logger)
-    user_slots = _get_config_value_with_default(resources_config, "user_slots", None, logger)
+    user_slots = _get_config_value_with_default(
+        resources_config, "user_slots", None, logger
+    )
     return OperationResources(
         pool=pool,
         pool_tree=pool_tree,
@@ -207,7 +215,9 @@ def extract_docker_auth_from_operation_config(
     env: Dict[str, str],
 ) -> Optional[Dict[str, str]]:
     """Resolve docker image from config and return auth payload if credentials exist."""
-    docker_image = (operation_config.get("resources") or {}).get("docker_image") or operation_config.get("docker_image")
+    docker_image = (operation_config.get("resources") or {}).get(
+        "docker_image"
+    ) or operation_config.get("docker_image")
     return prepare_docker_auth(
         docker_image=docker_image,
         docker_username=env.get("DOCKER_AUTH_USERNAME"),
@@ -220,4 +230,6 @@ def extract_max_failed_jobs(
     logger: logging.Logger,
 ) -> int:
     """Extract max_failed_job_count with default."""
-    return _get_config_value_with_default(operation_config, "max_failed_job_count", 1, logger)
+    return _get_config_value_with_default(
+        operation_config, "max_failed_job_count", 1, logger
+    )

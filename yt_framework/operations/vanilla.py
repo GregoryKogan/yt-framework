@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 @dataclass
 class VanillaOperationData:
     """Data container for vanilla operation configuration.
-    
+
     Attributes:
         script_path: Path to vanilla.py script in YT (or placeholder if tar mode).
         dependencies: List of (yt_path, local_path) tuples for files to upload.
@@ -36,6 +36,7 @@ class VanillaOperationData:
         docker_auth: Optional Docker authentication dictionary for private registries.
         command: Optional command to execute (used in tar archive mode).
     """
+
     script_path: str
     dependencies: List[Tuple[str, str]]
     environment: Dict[str, str]

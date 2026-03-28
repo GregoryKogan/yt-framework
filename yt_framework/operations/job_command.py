@@ -45,7 +45,11 @@ def resolve_aliased_job(
     Raises ``ValueError`` when both are set to different values, so callers
     can support both names while preventing silently-conflicting configs.
     """
-    if legacy_value is not None and preferred_value is not None and legacy_value != preferred_value:
+    if (
+        legacy_value is not None
+        and preferred_value is not None
+        and legacy_value != preferred_value
+    ):
         raise ValueError(
             f"Both '{legacy_name}' and '{preferred_name}' are set with different values; "
             "please provide only one"

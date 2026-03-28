@@ -27,7 +27,9 @@ from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImport
 
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
 from yt_framework.utils.ignore import YTIgnoreMatcher
-from yt_framework.operations.job_command import resolve_aliased_job as _resolve_aliased_job
+from yt_framework.operations.job_command import (
+    resolve_aliased_job as _resolve_aliased_job,
+)
 
 # YtClient.run_operation() only accepts these keyword args; everything else must be
 # applied via SpecBuilder chain methods (weight, title, description, …).
@@ -136,14 +138,14 @@ class YTProdClient(BaseYTClient):
         ] = "map_node",
     ) -> None:
         """Create a path in YT.
-        
+
         Args:
             path: YT path to create.
             node_type: Type of node to create (default: "map_node").
-            
+
         Returns:
             None
-            
+
         Raises:
             Exception: If path creation fails.
         """
@@ -155,13 +157,13 @@ class YTProdClient(BaseYTClient):
 
     def exists(self, path: str) -> bool:
         """Check if a path exists in YT.
-        
+
         Args:
             path: YT path to check.
-            
+
         Returns:
             bool: True if path exists, False otherwise.
-            
+
         Raises:
             Exception: If check fails.
         """
@@ -221,13 +223,13 @@ class YTProdClient(BaseYTClient):
 
     def read_table(self, table_path: str) -> List[Dict[str, Any]]:
         """Read rows from a YT table.
-        
+
         Args:
             table_path: YT table path to read.
-            
+
         Returns:
             List[Dict[str, Any]]: List of dictionaries representing table rows.
-            
+
         Raises:
             Exception: If table read fails.
         """
@@ -248,13 +250,13 @@ class YTProdClient(BaseYTClient):
 
     def row_count(self, table_path: str) -> int:
         """Get number of rows in a YT table.
-        
+
         Args:
             table_path: YT table path.
-            
+
         Returns:
             int: Number of rows in the table.
-            
+
         Raises:
             Exception: If row count query fails.
         """
@@ -848,11 +850,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         **kwargs: Any,
     ) -> Operation:
         """Run a map operation on YT cluster.
-        
+
         Submits a map operation that processes each row of the input table independently
         and writes results to the output table. The operation runs on the YT cluster
         with the specified resources and dependencies.
-        
+
         Args:
             command: Legacy mapper job argument (TypedJob instance or command string).
             input_table: Input YT table path.
@@ -864,10 +866,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             max_failed_jobs: Maximum failed jobs allowed before operation fails.
             docker_auth: Optional Docker authentication for private registries.
             job: Preferred mapper job alias.
-            
+
         Returns:
             Operation: YT operation object that can be monitored and waited on.
-            
+
         Raises:
             Exception: If operation submission fails.
         """
@@ -954,10 +956,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         **kwargs: Any,
     ) -> Operation:
         """Run a vanilla operation on YT cluster.
-        
+
         Submits a vanilla operation that runs a standalone job without input/output tables.
         The operation runs on the YT cluster with the specified resources and dependencies.
-        
+
         Args:
             command: Legacy command argument (typically bash command with script path).
             files: List of (yt_path, local_path) tuples for dependencies.
@@ -969,10 +971,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             job: Preferred command alias.
             **kwargs: Extra options applied to the spec builder (e.g. weight, title) or
                 forwarded to run_operation (sync, enable_optimizations).
-            
+
         Returns:
             Operation: YT operation object that can be monitored and waited on.
-            
+
         Raises:
             Exception: If operation submission fails.
         """
@@ -1097,7 +1099,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             if resources.pool_tree:
                 spec_builder = spec_builder.pool_trees([resources.pool_tree])
             if resources.user_slots:
-                spec_builder = spec_builder.resource_limits({"user_slots": resources.user_slots})
+                spec_builder = spec_builder.resource_limits(
+                    {"user_slots": resources.user_slots}
+                )
 
             od = kwargs.pop("operation_description", None)
             if isinstance(od, dict):
@@ -1115,7 +1119,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             mapper_builder = _apply_command_leg_format(mapper_builder, mapper_leg)
             if resources.docker_image:
                 mapper_builder = mapper_builder.docker_image(resources.docker_image)
-                spec_builder = spec_builder.secure_vault({"docker_auth": docker_auth or {}})
+                spec_builder = spec_builder.secure_vault(
+                    {"docker_auth": docker_auth or {}}
+                )
             mapper_builder.end_mapper()
 
             reducer_builder = (
@@ -1196,7 +1202,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             if resources.pool_tree:
                 spec_builder = spec_builder.pool_trees([resources.pool_tree])
             if resources.user_slots:
-                spec_builder = spec_builder.resource_limits({"user_slots": resources.user_slots})
+                spec_builder = spec_builder.resource_limits(
+                    {"user_slots": resources.user_slots}
+                )
 
             rod = kwargs.pop("operation_description", None)
             if isinstance(rod, dict):
@@ -1214,7 +1222,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             reducer_builder = _apply_command_leg_format(reducer_builder, reducer_leg)
             if resources.docker_image:
                 reducer_builder = reducer_builder.docker_image(resources.docker_image)
-                spec_builder = spec_builder.secure_vault({"docker_auth": docker_auth or {}})
+                spec_builder = spec_builder.secure_vault(
+                    {"docker_auth": docker_auth or {}}
+                )
             reducer_builder.end_reducer()
 
             spec_builder = spec_builder.reduce_by(reduce_by)
@@ -1243,7 +1253,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         """Sort a table in place by the given columns."""
         self.logger.info(f"Sorting table {table_path} by {sort_by}")
         try:
-            from yt.wrapper import schema as yt_schema  # pyright: ignore[reportMissingImports]
+            from yt.wrapper import (
+                schema as yt_schema,
+            )  # pyright: ignore[reportMissingImports]
+
             sort_columns = [
                 yt_schema.SortColumn(col, sort_order="ascending") for col in sort_by
             ]

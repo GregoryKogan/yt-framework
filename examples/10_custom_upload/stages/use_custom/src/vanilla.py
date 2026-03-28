@@ -6,6 +6,7 @@ Custom Upload Vanilla Script
 Demonstrates using a custom local package uploaded via upload_paths.
 The my_utils package is copied from lib/my_utils to the job sandbox.
 """
+
 import logging
 from my_utils.helpers import greet  # pylint: disable=import-error
 

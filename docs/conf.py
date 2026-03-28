@@ -3,53 +3,53 @@ import os
 import sys
 
 # Add project root to path for autodoc
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath(".."))
 
 import yt_framework
 
 # -- Project information -----------------------------------------------------
-project = 'YT Framework'
-copyright = '2026, Artem Zavarzin, Gregory Koganovsky'
-author = 'Artem Zavarzin, Gregory Koganovsky'
+project = "YT Framework"
+copyright = "2026, Artem Zavarzin, Gregory Koganovsky"
+author = "Artem Zavarzin, Gregory Koganovsky"
 release = yt_framework.__version__
 
 # -- General configuration ---------------------------------------------------
 extensions = [
-    'myst_parser',                  # Markdown support
-    'sphinx.ext.autodoc',           # Auto-generate API docs from docstrings
-    'sphinx.ext.napoleon',          # Google/NumPy docstring styles
-    'sphinx.ext.viewcode',          # Add links to source code
-    'sphinx.ext.intersphinx',       # Link to other project docs
-    'sphinx.ext.githubpages',       # GitHub Pages support (.nojekyll)
-    'sphinx_copybutton',            # Copy button for code blocks
-    'sphinx_design',                # UI components (cards, tabs, etc.)
+    "myst_parser",  # Markdown support
+    "sphinx.ext.autodoc",  # Auto-generate API docs from docstrings
+    "sphinx.ext.napoleon",  # Google/NumPy docstring styles
+    "sphinx.ext.viewcode",  # Add links to source code
+    "sphinx.ext.intersphinx",  # Link to other project docs
+    "sphinx.ext.githubpages",  # GitHub Pages support (.nojekyll)
+    "sphinx_copybutton",  # Copy button for code blocks
+    "sphinx_design",  # UI components (cards, tabs, etc.)
 ]
 
 # MyST Parser configuration for Markdown
 myst_enable_extensions = [
-    "colon_fence",      # ::: for directives
-    "deflist",          # Definition lists
-    "html_image",       # HTML images
-    "linkify",          # Auto-detect links
-    "replacements",     # Smart quotes, arrows, etc.
-    "smartquotes",      # Smart quotes
-    "tasklist",         # GitHub-style [ ] task lists
+    "colon_fence",  # ::: for directives
+    "deflist",  # Definition lists
+    "html_image",  # HTML images
+    "linkify",  # Auto-detect links
+    "replacements",  # Smart quotes, arrows, etc.
+    "smartquotes",  # Smart quotes
+    "tasklist",  # GitHub-style [ ] task lists
 ]
 
 # Source file suffixes
 source_suffix = {
-    '.rst': 'restructuredtext',
-    '.md': 'markdown',
+    ".rst": "restructuredtext",
+    ".md": "markdown",
 }
 
 # The master document
-master_doc = 'index'
+master_doc = "index"
 
 # List of patterns to exclude
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Options for HTML output -------------------------------------------------
-html_theme = 'pydata_sphinx_theme'
+html_theme = "pydata_sphinx_theme"
 
 html_theme_options = {
     "github_url": "https://github.com/GregoryKogan/yt-framework",
@@ -78,14 +78,14 @@ napoleon_include_init_with_doc = True
 
 # Intersphinx mapping (link to other project docs)
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
+    "python": ("https://docs.python.org/3", None),
 }
 
 # Autodoc configuration
 autodoc_default_options = {
-    'members': True,
-    'member-order': 'bysource',
-    'undoc-members': True,
-    'show-inheritance': True,
+    "members": True,
+    "member-order": "bysource",
+    "undoc-members": True,
+    "show-inheritance": True,
 }
-autodoc_typehints = 'description'
+autodoc_typehints = "description"

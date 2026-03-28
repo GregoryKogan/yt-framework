@@ -10,10 +10,10 @@ from typing import List, Dict, Union, Optional, Tuple
 
 def _escape_table_name(table: str) -> str:
     """Escape table name with backticks for YQL.
-    
+
     Args:
         table: Table path (e.g., "//tmp/my_table").
-        
+
     Returns:
         str: Escaped table name (e.g., "`//tmp/my_table`").
     """
@@ -22,10 +22,10 @@ def _escape_table_name(table: str) -> str:
 
 def _format_column_list(columns: List[str]) -> str:
     """Format column list for SELECT clause.
-    
+
     Args:
         columns: List of column names or expressions (e.g., ["a.id", "b.name"]).
-        
+
     Returns:
         str: Formatted column list with indentation (e.g., "a.id,\n    b.name").
     """
@@ -38,7 +38,7 @@ def _format_join_conditions(
     right_alias: str = "b",
 ) -> str:
     """Format JOIN ON conditions.
-    
+
     Args:
         on: Join key specification:
             - str: Single column name (same on both sides).
@@ -48,7 +48,7 @@ def _format_join_conditions(
               table column name (e.g., {"left": "user_id", "right": "id"}).
         left_alias: Alias for left table (default: "a").
         right_alias: Alias for right table (default: "b").
-        
+
     Returns:
         str: Formatted JOIN condition (e.g., "a.id = b.id" or "a.user_id = b.id AND a.region = b.region_code").
     """
@@ -78,10 +78,10 @@ def _format_join_conditions(
 
 def _format_group_by_list(group_by: Union[str, List[str]]) -> str:
     """Format GROUP BY column list.
-    
+
     Args:
         group_by: Column name(s) to group by.
-        
+
     Returns:
         str: Formatted GROUP BY clause (e.g., "region" or "region, status").
     """
@@ -141,11 +141,11 @@ def _format_order_by_list(
     order_by: Union[str, List[str]], ascending: bool = True
 ) -> str:
     """Format ORDER BY column list.
-    
+
     Args:
         order_by: Column name(s) to sort by.
         ascending: Sort direction (True for ASC, False for DESC). Applies to all columns.
-        
+
     Returns:
         str: Formatted ORDER BY clause (e.g., "id ASC" or "id ASC, name ASC").
              All columns use the same sort direction (mixed directions not supported).
