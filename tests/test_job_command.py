@@ -1,6 +1,7 @@
 """Tests for job_command utilities: resolve_aliased_job and require_consistent_map_reduce_legs."""
 
 import pytest
+from yt.wrapper import TypedJob  # pyright: ignore[reportMissingImports]
 
 from yt_framework.operations.job_command import (
     resolve_aliased_job,
@@ -8,6 +9,12 @@ from yt_framework.operations.job_command import (
     map_reduce_leg_kind,
     is_typed_job,
 )
+
+
+class _MinimalTypedJob(TypedJob):
+    def prepare_operation(self, *args, **kwargs):  # type: ignore[override]
+        pass
+
 
 # ---------------------------------------------------------------------------
 # resolve_aliased_job
@@ -118,3 +125,20 @@ def test_is_typed_job_none_is_false():
 
 def test_is_typed_job_int_is_false():
     assert not is_typed_job(42)
+
+
+def test_is_typed_job_subclass_instance_is_true():
+    assert is_typed_job(_MinimalTypedJob())
+
+
+def test_map_reduce_leg_kind_typed_job_returns_typed():
+    assert map_reduce_leg_kind(_MinimalTypedJob()) == "typed"
+
+
+def test_require_consistent_both_typed_jobs():
+    require_consistent_map_reduce_legs(_MinimalTypedJob(), _MinimalTypedJob())
+
+
+def test_require_consistent_typed_mapper_and_string_reducer_raises():
+    with pytest.raises(ValueError, match="same job kind"):
+        require_consistent_map_reduce_legs(_MinimalTypedJob(), "reducer_cmd")

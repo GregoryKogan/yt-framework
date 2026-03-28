@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Testing maintenance
 
+For **how** to write and debug tests (Angry Tests–aligned pytest style and mandatory fix loop), use [test-authoring.mdc](test-authoring.mdc). This file focuses on **when** to test and **proof** obligations.
+
 ## Surfaces
 
 Treat as testing scope: `tests/**` for **pytest** (dev dependency in repo-root `pyproject.toml`). Complementary checks when automated coverage is thin or behavior is pipeline/integration-heavy: **dev mode** and **example pipelines** as described in `CONTRIBUTING.md` (Testing). Test code follows [standards.mdc](standards.mdc) for style and clarity (types, assertions, `black` on changed Python files).
