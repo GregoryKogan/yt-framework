@@ -6,6 +6,8 @@ from .utils import (
     load_checkpoint,
     list_checkpoints,
     delete_checkpoint,
+    save_processing_state,
+    load_processing_state,
 )
 
 __all__ = [
@@ -14,4 +16,6 @@ __all__ = [
     "load_checkpoint",
     "list_checkpoints",
     "delete_checkpoint",
+    "save_processing_state",
+    "load_processing_state",
 ]

@@ -52,6 +52,8 @@ def _decode_http_chunked_if_present(data: bytes, logger: logging.Logger) -> byte
 
 
 class S3Client:
+    """Thin boto3 S3 wrapper for job code (list, download, upload, head)."""
+
     def __init__(
         self,
         endpoint: str,
@@ -64,6 +66,19 @@ class S3Client:
         region_name: Optional[str] = None,
         boto_config: Optional[BotoConfig] = None,
     ):
+        """
+        Build a boto3 S3 client for the given endpoint and credentials.
+
+        Args:
+            endpoint: S3 API endpoint URL (e.g. from ``S3_ENDPOINT``).
+            access_key: Access key id for this client.
+            secret_key: Secret access key for this client.
+            max_retries: Boto3 retry ``max_attempts`` when ``boto_config`` is omitted.
+            timeout: Read timeout in seconds when ``boto_config`` is omitted.
+            logger: Optional logger; defaults to the module logger.
+            region_name: Optional AWS region passed to ``boto3.client``.
+            boto_config: If set, used as-is instead of the default ``BotoConfig``.
+        """
         self.logger = logger or logging.getLogger(__name__)
 
         if boto_config is None:
@@ -94,6 +109,12 @@ class S3Client:
         """
         Split ``s3://bucket/key/path`` into ``(bucket, key)``.
 
+        Args:
+            uri: S3 URI with non-empty bucket and key path.
+
+        Returns:
+            ``(bucket, key)`` where ``key`` has no leading slash.
+
         Raises:
             ValueError: If the URI is not a valid S3 URI.
         """
@@ -116,10 +137,13 @@ class S3Client:
                     - S3_DOWNLOAD_SECRET_KEY
                     - S3_UPLOAD_ACCESS_KEY
                     - S3_UPLOAD_SECRET_KEY
-            client_type: 'download' or 'upload' (default: 'download')
+            client_type: ``download`` or ``upload`` (default: ``download``).
 
         Returns:
-            Configured S3Client instance
+            Configured ``S3Client`` instance.
+
+        Raises:
+            ValueError: If ``client_type`` is unknown or required secrets are missing.
         """
 
         if client_type == "upload":
@@ -149,6 +173,21 @@ class S3Client:
         extension: Optional[str] = None,
         max_files: Optional[int] = None,
     ) -> List[str]:
+        """
+        List object keys under ``prefix`` in ``bucket``.
+
+        Args:
+            bucket: Bucket name.
+            prefix: Key prefix filter; use ``""`` to list from the bucket root.
+            extension: If set, keep only keys ending with ``.<extension>``.
+            max_files: If set, stop after this many keys (best-effort).
+
+        Returns:
+            List of S3 object keys (not full ``s3://`` URIs).
+
+        Raises:
+            Exception: Propagates boto3/client errors after logging.
+        """
         self.logger.info(f"Listing files: s3://{bucket}/{prefix}")
 
         result = []
@@ -187,6 +226,19 @@ class S3Client:
         return result
 
     def download(self, bucket: str, key: str) -> bytes:
+        """
+        Download one object body as bytes.
+
+        Args:
+            bucket: Bucket name.
+            key: Object key.
+
+        Returns:
+            Raw object bytes (HTTP-chunked payloads may be normalized).
+
+        Raises:
+            Exception: Propagates boto3/client errors after logging.
+        """
         self.logger.debug(f"Downloading: s3://{bucket}/{key}")
 
         try:
@@ -200,13 +252,37 @@ class S3Client:
             raise
 
     def download_by_uri(self, s3_uri: str) -> bytes:
-        """Download object bytes from ``s3://bucket/key``."""
+        """
+        Download object bytes from ``s3://bucket/key``.
+
+        Args:
+            s3_uri: Valid S3 URI.
+
+        Returns:
+            Same as ``download``.
+
+        Raises:
+            ValueError: If ``s3_uri`` is invalid (via ``parse_s3_uri``).
+            Exception: Propagates boto3/client errors from ``download``.
+        """
         bucket, key = S3Client.parse_s3_uri(s3_uri)
         return self.download(bucket, key)
 
     def upload(
         self, data: bytes, bucket: str, key: str, content_type: Optional[str] = None
     ) -> None:
+        """
+        Upload bytes to ``s3://bucket/key`` via ``put_object``.
+
+        Args:
+            data: Object body.
+            bucket: Bucket name.
+            key: Object key.
+            content_type: Optional ``ContentType`` header.
+
+        Raises:
+            Exception: Propagates boto3/client errors after logging.
+        """
         self.logger.debug(f"Uploading {len(data)} bytes to s3://{bucket}/{key}")
 
         try:
@@ -221,6 +297,16 @@ class S3Client:
             raise
 
     def exists(self, bucket: str, key: str) -> bool:
+        """
+        Return whether an object exists (``head_object`` succeeds).
+
+        Args:
+            bucket: Bucket name.
+            key: Object key.
+
+        Returns:
+            ``True`` if the object exists; ``False`` on any ``head_object`` error.
+        """
         try:
             self.client.head_object(Bucket=bucket, Key=key)
             return True
