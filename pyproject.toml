@@ -75,6 +75,10 @@ markers = [
 line-length = 88
 target-version = ["py311"]
 
+[tool.coverage.run]
+branch = true
+source = ["yt_framework", "ytjobs"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["yt_framework*", "ytjobs*"]
