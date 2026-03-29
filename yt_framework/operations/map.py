@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 @dataclass
 class MapOperationData:
     """Data container for map operation configuration.
-    
+
     Attributes:
         mapper_path: Path to mapper.py script in YT (or bash wrapper if tar mode).
         dependencies: List of (yt_path, local_path) tuples for files to upload.
@@ -38,6 +38,7 @@ class MapOperationData:
         docker_auth: Optional Docker authentication dictionary for private registries.
         command: Optional command to execute (used in tar archive mode).
     """
+
     mapper_path: str
     dependencies: List[Tuple[str, str]]
     environment: Dict[str, str]
@@ -115,12 +116,6 @@ def run_map(
         True if successful, False otherwise
     """
     logger = context.logger
-    log_header(
-        logger,
-        "Map Operation",
-        f"Input: {operation_config.input_table} | Output: {operation_config.output_table}",
-    )
-
     if not operation_config.get("input_table"):
         raise ValueError(
             "No input_table in operation_config; "
@@ -131,6 +126,12 @@ def run_map(
             "No output_table in operation_config; "
             "expected at client.operations.map.output_table"
         )
+
+    log_header(
+        logger,
+        "Map Operation",
+        f"Input: {operation_config.input_table} | Output: {operation_config.output_table}",
+    )
 
     env = build_operation_environment(
         context=context,
@@ -148,12 +149,16 @@ def run_map(
         logger=logger,
     )
     map_operation_data.environment = env
-    map_operation_data.docker_auth = extract_docker_auth_from_operation_config(operation_config, env)
+    map_operation_data.docker_auth = extract_docker_auth_from_operation_config(
+        operation_config, env
+    )
 
     logger.debug(f"Dependencies: {len(map_operation_data.dependencies)} files")
 
     if mapper is not None and job is not None and mapper != job:
-        raise ValueError("Both 'mapper' and 'job' are set with different values; use only one")
+        raise ValueError(
+            "Both 'mapper' and 'job' are set with different values; use only one"
+        )
     mapper_leg = job if job is not None else mapper
     if mapper_leg is None:
         mapper_leg = map_operation_data.command
@@ -161,7 +166,9 @@ def run_map(
         raise ValueError("Command not provided by dependency builder")
 
     logger.debug("Extracting operation resources from config")
-    resources: OperationResources = extract_operation_resources(operation_config, logger)
+    resources: OperationResources = extract_operation_resources(
+        operation_config, logger
+    )
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
     map_kwargs: dict = {}
@@ -172,7 +179,10 @@ def run_map(
             map_kwargs["title"] = od
         else:
             from omegaconf import OmegaConf as _OmegaConf
-            map_kwargs["operation_description"] = _OmegaConf.to_container(od, resolve=True)
+
+            map_kwargs["operation_description"] = _OmegaConf.to_container(
+                od, resolve=True
+            )
 
     reserved_keys = {
         "input_table",

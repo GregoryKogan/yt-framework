@@ -19,7 +19,6 @@ from typing import Any, Optional
 
 import yt.wrapper as yt
 
-
 _BOOTSTRAPPED_LOCK = threading.Lock()
 _BOOTSTRAPPED_KEYS: set[str] = set()
 
@@ -107,7 +106,10 @@ def _bootstrap_once(stage_name: str) -> None:
     if tokenizer_artifact_file:
         artifact_tar = os.path.join(root, tokenizer_artifact_file)
         if not tokenizer_artifact_dir:
-            artifact_name = os.environ.get("TOKENIZER_ARTIFACT_NAME", "default").strip() or "default"
+            artifact_name = (
+                os.environ.get("TOKENIZER_ARTIFACT_NAME", "default").strip()
+                or "default"
+            )
             tokenizer_artifact_dir = os.path.join("tokenizer_artifacts", artifact_name)
             os.environ["TOKENIZER_ARTIFACT_DIR"] = tokenizer_artifact_dir
         artifact_dir_abs = os.path.join(root, tokenizer_artifact_dir)
@@ -123,16 +125,12 @@ def _bootstrap_once(stage_name: str) -> None:
 
 class StageBootstrapTypedJob(yt.TypedJob):
     """
-    Base class for TypedJob legs.
+    Base class for TypedJob legs with worker-side bootstrap.
 
-    It bootstraps worker-side imports by:
-    - extracting `source.tar.gz` (if still present)
-    - ensuring `sys.path` includes archive root + `stages/<stage>/src`
-    - setting `JOB_CONFIG_PATH` (if available)
-
-    Implementation detail:
-    - `__getstate__` + `__setstate__` runs on the worker during unpickling of the job instance,
-      which is early enough before `__call__` starts executing.
+    On unpickle, extracts ``source.tar.gz`` when needed, prepends the archive root
+    and ``stages/<stage>/src`` to ``sys.path``, and sets ``JOB_CONFIG_PATH`` when
+    the stage config file exists. Uses ``__getstate__`` / ``__setstate__`` so
+    bootstrap runs on the worker before ``__call__``.
     """
 
     def __getstate__(self) -> Any:  # pragma: no cover (driver-side)
@@ -154,4 +152,3 @@ class StageBootstrapTypedJob(yt.TypedJob):
                 self.__dict__.update(state.__dict__)
             except Exception:
                 pass
-

@@ -51,6 +51,8 @@ Issues = "https://github.com/GregoryKogan/yt-framework/issues"
 
 [project.optional-dependencies]
 dev = [
+    "black==26.3.1",
+    "pre-commit>=4.0.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
 ]
@@ -61,6 +63,21 @@ docs = [
     "sphinx-copybutton>=0.5.2",
     "sphinx-design>=0.5.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: fast deterministic tests (default scope)",
+    "integration: tests that need dev mode, fakes, or external boundaries",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.coverage.run]
+branch = true
+source = ["yt_framework", "ytjobs"]
 
 [tool.setuptools.packages.find]
 where = ["."]

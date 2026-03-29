@@ -61,4 +61,4 @@ If you're new to troubleshooting:
 
 - [Configuration Guide](../configuration/index.md) - Complete configuration reference
 - [Dev vs Prod](../dev-vs-prod.md) - Understanding execution modes
-- [Operations Guide](../operations/) - Operation-specific documentation
+- [Operations Guide](../operations/index.md) - Operation-specific documentation

@@ -1,0 +1,31 @@
+---
+description: Keep user-facing docs aligned with code; verify coverage while working
+alwaysApply: true
+---
+
+# Documentation maintenance
+
+## Surfaces
+
+Treat as documentation: `docs/**`, root `README.md`, `CONTRIBUTING.md`, and `examples/**/README.md` when the change touches behavior, CLI, config, or workflows those files describe. Public API docstrings follow [standards.mdc](standards.mdc); keep them consistent with any narrative docs that mention the same API.
+
+## When to update docs
+
+Update docs in the same change set when behavior could confuse a reader: new/changed CLI commands or flags, defaults, config keys, env vars, user- or operator-visible errors, pipeline/stage semantics, YT/S3 integration, Docker or code upload flows, troubleshooting symptoms, or anything else someone would look up under `docs/` or READMEs.
+
+## Obligation
+
+Update every affected surface (or add a focused new section for new behavior). Do not leave stale commands, options, or explanations that contradict the code.
+
+## While working
+
+- **Early**: Map edited modules/features to the relevant `docs/` pages and READMEs; read them and note gaps or drift.
+- **Before done**: Reconcile implementation with those docs; if public API changed, fix docstrings per `standards.mdc` and any prose that describes that API.
+
+## Proof
+
+- **Touches `docs/` or example/root README/CONTRIBUTING**: run `make -C docs html` after installing doc dependencies (e.g. `pip install -e ".[docs]"` using the `docs` optional extra in repo-root `pyproject.toml`); cite success or fix warnings/errors Sphinx reports.
+- **Docstrings only, no prose under `docs/` or those READMEs**: state that Sphinx was not required; still ensure docstrings match behavior.
+- **Pure prose doc edits**: `make -C docs html` is the primary verification.
+
+Done = proof, same spirit as Standards: do not claim completion without evidence appropriate to what changed.

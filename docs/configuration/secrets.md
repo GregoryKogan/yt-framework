@@ -16,6 +16,8 @@ S3_UPLOAD_ACCESS_KEY=your-upload-access-key
 S3_UPLOAD_SECRET_KEY=your-upload-secret-key
 ```
 
+Non-secret runtime variables (dev paths, job sandbox bootstrap) are listed in [Environment variables](../reference/environment-variables.md).
+
 ## YT Credentials
 
 Required for production mode:

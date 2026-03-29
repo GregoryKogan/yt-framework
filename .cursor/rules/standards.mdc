@@ -1,0 +1,33 @@
+---
+description: Plan-first, minimal-impact, verifiable changes; SOLID/DRY/KISS/YAGNI; types & style
+alwaysApply: true
+---
+
+# Standards
+
+## Plan & approval
+
+- Non-trivial (3+ steps or architecture): Research → Plan → implement only after human approval. Artifacts: `./agent-artifacts/tasks/<task>/research.md`, `plan.md`, todo list. No implementation before approval.
+- Never deviate from an approved plan without asking; one approval does not cover later deviations.
+
+## Impact & verification
+
+- Touch only required files. Root-cause fixes over rewrites. No destructive git without request. No dead code.
+- Done = proof (test/log/command output). No "done" without evidence. Divergence → re-plan, don’t patch.
+
+## Code
+
+- SOLID, DRY, KISS, YAGNI. Explicit intent; no dead code. Clarify ambiguity before implementing.
+- Types: prefer dataclasses over `tuple[str,str,int]`, `Union[...]`, or big `dict[str, Any]`; use `Optional`, `List`, etc.; `TYPE_CHECKING` for type-only imports.
+- Public API: type hints + docstrings (Args/Returns); Literal for constrained params. Small, single-purpose functions; early returns; compact style (single-line calls, chained transforms, 88-char line). Prefer `assert` with message; comments only as `TODO:` for team decisions.
+- Quality: run `black --check --diff` on changed files; after changes, align diff with style and update .cursor/rules if needed.
+
+## Artifacts & files
+
+- Artifacts under `./cursor/artifacts/`: `tasks/<task>/`, `user-preferences/`, `project-details/`.
+- Ensure .cursor/rules exists and is up to date.
+
+## Shell
+
+- Use `cp`/`mv` for new/renamed files.
+- Avoid `| head`, `| tail`, `less`, `more` for monitoring; use command-native limits (e.g. `git log -n 10`) or read files directly.

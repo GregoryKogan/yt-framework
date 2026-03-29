@@ -13,6 +13,7 @@ Thank you for your interest in contributing to YT Framework! This document provi
 - [Development Workflow](#development-workflow)
 - [Code Style and Conventions](#code-style-and-conventions)
 - [Testing](#testing)
+  - [Coverage badge (maintainers)](#coverage-badge-maintainers)
 - [Documentation](#documentation)
 - [Submitting Contributions](#submitting-contributions)
 - [Additional Guidelines](#additional-guidelines)
@@ -38,6 +39,7 @@ Contributions come in many forms:
 
 - Python 3.11 or higher
 - Git
+- [Conda](https://docs.conda.io/en/latest/miniconda.html) (Miniconda, Mambaforge, or similar) — recommended so you use one shared environment for tests, docs, and formatting
 - Access to YTsaurus cluster (for production mode testing)
 - YT credentials (for production mode testing)
 
@@ -50,21 +52,43 @@ Contributions come in many forms:
    cd yt-framework
    ```
 
-2. **Install in editable mode**:
+2. **Create and activate the project Conda environment** (recommended):
 
    ```bash
-   pip install -e .
+   conda create -n yt-framework python=3.11
+   conda activate yt-framework
    ```
 
-3. **Install development dependencies**:
+   Optionally use `conda-forge` (e.g. `conda create -n yt-framework python=3.11 -c conda-forge`).
+
+3. **Install the package in editable mode with dev and docs extras**:
 
    ```bash
-   pip install -e ".[dev]"
+   pip install -e ".[dev,docs]"
    ```
 
-   This installs additional tools like `pytest` and `pytest-cov` for testing.
+   If `which pip` points outside the Conda env (for example Homebrew), use `python -m pip install -e ".[dev,docs]"` instead. The same applies to one-off commands with `conda run -n yt-framework -- python -m pip ...`.
 
-4. **Set up YT credentials** (for production mode testing):
+   This installs runtime dependencies plus `black`, `pytest`, `pytest-cov`, `pre-commit`, and the Sphinx stack needed for `make -C docs html`. You do not need a separate `pip install -e ".[docs]"` step.
+
+   **Without Conda:** use a Python 3.11+ virtual environment, then `pip install -e ".[dev,docs]"` (or `pip install -e .` and `pip install -e ".[dev]"` if you will not build docs locally).
+
+4. **IDE / Cursor:** set the Python interpreter to the `yt-framework` Conda environment so the editor, integrated terminal, and agents target the same interpreter.
+
+5. **Install Git commit hooks** (recommended):
+
+   ```bash
+   pre-commit install
+   pre-commit install --hook-type pre-push
+   ```
+
+   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Black](https://github.com/psf/black) on staged Python files using [.pre-commit-config.yaml](.pre-commit-config.yaml). On each **push**, the pre-push hook runs the full test suite via `conda run -n yt-framework -- pytest` (requires Conda and the `yt-framework` env on your `PATH`, as when pushing from a normal shell). To skip the hook in an emergency, use `git push --no-verify`. To format or check the whole repository (for example before a large change), run:
+
+   ```bash
+   pre-commit run black --all-files
+   ```
+
+6. **Set up YT credentials** (for production mode testing):
 
    Create a `secrets.env` file in any example's `configs/` directory:
 
@@ -76,7 +100,7 @@ Contributions come in many forms:
 
    See [Configuration Guide](docs/configuration/secrets.md) for more details.
 
-5. **Verify installation**:
+7. **Verify installation**:
 
    ```bash
    python -c "import yt_framework; print('YT Framework installed successfully')"
@@ -152,7 +176,7 @@ This helps ensure you haven't broken existing functionality.
 ### Python Style
 
 - Follow **PEP 8** style guidelines
-- Use **black** or similar formatter
+- Use **Black** for formatting (line length 88; see `[tool.black]` in `pyproject.toml`). With `pre-commit install`, Black runs automatically on staged `.py` files when you commit.
 - Use type hints where appropriate
 
 ### Naming Conventions
@@ -227,12 +251,40 @@ When tests are available, run them with:
 # Run all tests
 pytest
 
-# Run with coverage
-pytest --cov=yt_framework
+# Run with coverage (matches CI)
+pytest --cov=yt_framework --cov=ytjobs
 
 # Run specific test file
 pytest tests/test_stage.py
 ```
+
+### CI (GitHub Actions)
+
+The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `pytest` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). To require a green check before merging, configure branch protection on GitHub and add the `test` job as a required status check.
+
+### Coverage badge (maintainers)
+
+The README coverage badge is powered by [shields.io endpoint badges](https://shields.io/badges/endpoint-badge) reading JSON from a **public GitHub Gist**. CI on **`push` to `main`** updates that file when repository configuration is present. Forks and PRs from forks do not run the gist step.
+
+Complete these steps **in order** (each step is one action):
+
+1. Create a **classic personal access token** with scope **`gist`** only: GitHub → **Settings** → **Developer settings** → **Personal access tokens**. Store the token securely after creation.
+
+2. Create a **public gist** (**Your gists** → create). Add a single file named **`yt-framework-coverage.json`** with this content: `{"schemaVersion":1,"label":"coverage","message":"0%","color":"lightgrey"}`. Save the gist.
+
+3. Copy the **gist ID** from the gist URL `https://gist.github.com/<you>/<GIST_ID>` (the hex segment after your username).
+
+4. In the **`yt-framework` repository**: **Settings** → **Secrets and variables** → **Actions** → **Variables** → **New repository variable**. Name: **`COVERAGE_GIST_ID`**. Value: the gist ID from step 3. Save.
+
+5. In the same repository: **Secrets and variables** → **Actions** → **Secrets** → **New repository secret**. Name: **`COVERAGE_GIST_TOKEN`**. Value: the PAT from step 1. Save.
+
+6. Confirm the **gist owner and the PAT owner are the same** GitHub user (or that the PAT can edit that gist).
+
+7. Edit [README.md](README.md): in the coverage badge URL, replace **`YOUR_GIST_ID`** with the gist ID from step 3 (leave the rest of the shields.io URL unchanged).
+
+8. Push or merge to **`main`** and confirm in **Actions** that CI succeeded; open the gist and check that **`coverage-shields.json`** shows the real percentage.
+
+9. If the README badge looks stale, hard-refresh the page or wait briefly; shields.io and proxies may cache images. The badge URL includes `cacheSeconds=60` to limit caching.
 
 ### Testing with Dev Mode
 
@@ -270,9 +322,13 @@ done
 Documentation lives in the `docs/` directory:
 
 - **Main docs**: `docs/index.md` - Installation and quick start
-- **Guides**: `docs/pipelines-and-stages.md`, `docs/configuration/index.md`, etc.
-- **API Reference**: `docs/reference/api.md`
+- **Guides**: `docs/pipelines-and-stages.md`, `docs/configuration/index.md`, `docs/operations/`, `docs/advanced/`, etc.
+- **API reference (framework)**: `docs/reference/api.md` — `yt_framework` modules (Sphinx autodoc)
+- **YT jobs library**: `docs/reference/ytjobs.md` — job-side `ytjobs` package (runs on cluster workers)
+- **Environment variables**: `docs/reference/environment-variables.md` — dev, driver, and sandbox vars
 - **Troubleshooting**: `docs/troubleshooting/index.md`
+
+After substantive doc edits, build locally with the same environment: `make -C docs html` (requires the `docs` extra — included in `pip install -e ".[dev,docs]"` above; Python 3.11+).
 
 When adding features:
 

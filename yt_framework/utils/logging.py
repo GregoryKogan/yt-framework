@@ -33,10 +33,10 @@ class ColoredFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """Format log record with colors and icons.
-        
+
         Args:
             record: Log record to format.
-            
+
         Returns:
             str: Formatted log message with ANSI color codes and icons.
         """

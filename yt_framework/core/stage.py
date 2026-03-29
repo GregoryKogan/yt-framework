@@ -29,7 +29,7 @@ else:
 @dataclass
 class StageContext:
     """Stage context containing all stage-related information.
-    
+
     Attributes:
         name: Stage name (automatically detected from directory name).
         config: Stage-specific configuration loaded from config.yaml.
@@ -151,7 +151,7 @@ class BaseStage(ABC):
     @property
     def stage_dir(self) -> Path:
         """Path to the stage directory.
-        
+
         Returns:
             Path: Absolute path to the stage directory (stages/<stage_name>/).
         """
@@ -176,7 +176,7 @@ class BaseStage(ABC):
     @property
     def context(self) -> StageContext:
         """Stage context containing all stage-related information.
-        
+
         Returns:
             StageContext: Dataclass instance with name, config, stage_dir,
                          logger, and deps attributes.

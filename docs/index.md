@@ -12,6 +12,8 @@ configuration/index
 operations/index
 advanced/index
 reference/api
+reference/ytjobs
+reference/environment-variables
 troubleshooting/index
 ```
 
@@ -70,6 +72,8 @@ pip install -e .
 ```bash
 python -c "import yt_framework; print(yt_framework.__version__)"
 ```
+
+The PyPI package name is `yt-framework`; Python imports are `yt_framework` and `ytjobs`.
 
 ### Configuration Setup
 
@@ -283,8 +287,10 @@ Run multiple operations in a single stage.
 
 ## Reference
 
-- [API Reference](reference/api.md) - Complete API documentation
-- [Troubleshooting](troubleshooting/index.md) - Common issues and solutions
+- [API Reference](reference/api.md) — `yt_framework` modules (generated from docstrings)
+- [YT jobs library (`ytjobs`)](reference/ytjobs.md) — job-side helpers (mappers, S3, logging, config, Cypress checkpoints)
+- [Environment variables](reference/environment-variables.md) — dev, driver, and sandbox variables
+- [Troubleshooting](troubleshooting/index.md) — Common issues and solutions
 
 ## Examples
 

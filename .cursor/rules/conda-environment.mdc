@@ -1,0 +1,30 @@
+---
+description: Use the project Conda env yt-framework for all shell/Python commands; no ad-hoc venvs
+alwaysApply: true
+---
+
+# Python environment (Conda)
+
+Human-readable setup: [CONTRIBUTING.md](CONTRIBUTING.md) (Development Setup). Environment name: **`yt-framework`**.
+
+## Default for agents
+
+- Run verification and tooling through that env, for example:
+  - `conda run -n yt-framework -- <command>`
+- Prefer `conda run` so activation hooks are not required. For compound commands from the repo root:
+  - `conda run -n yt-framework -- bash -lc '...'`
+
+## Do not
+
+- Create `.venv` / `venv` or run `python -m venv` for routine tests, docs, or formatting unless the user explicitly asks.
+
+## If Conda or the env is missing
+
+- Do not silently fall back to a disposable venv; tell the user to follow [CONTRIBUTING.md](CONTRIBUTING.md).
+- If Conda is available but `yt-framework` does not exist, a one-time setup is acceptable (keep commands aligned with CONTRIBUTING):
+  - `conda create -n yt-framework python=3.11 -y`
+  - `conda run -n yt-framework -- python -m pip install -e ".[dev,docs]"` (from the repository root; use `python -m pip` so installs target the env, not a system/Homebrew `pip`)
+
+## If Conda is not installed
+
+- State that clearly; do not invent a replacement workflow without user direction.

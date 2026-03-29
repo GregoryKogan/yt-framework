@@ -331,6 +331,15 @@ sandbox/
 - Input files are in sandbox
 - Output goes to stdout (for map operations)
 
+## Programmatic API
+
+Custom tooling or framework extensions can call the same helpers the pipeline uses:
+
+- **Upload / archive**: `upload_all_code`, `build_code_locally`, `create_code_archive`, `upload_code_archive` in `yt_framework.operations.upload`.
+- **Dependency file lists**: `build_stage_dependencies`, `build_ytjobs_dependencies`, `build_map_dependencies`, `add_checkpoint` in `yt_framework.operations.dependencies`.
+
+Autodoc and signatures: [API Reference](../reference/api.md) (sections **Upload and local build**, **Stage dependency file lists**, and **Shared operation utilities**).
+
 ## Debugging Code Upload
 
 ### Check Upload Status

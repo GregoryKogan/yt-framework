@@ -2,6 +2,8 @@
 
 When running pipelines in production mode, code from the `ytjobs` package executes on YT cluster nodes. This means the cluster's Docker image (whether default or custom) must include all dependencies required by your `ytjobs` code.
 
+For autodoc of `ytjobs` modules (`mapper`, `s3`, `logging`, `config`, `checkpoint`), see [YT jobs library (`ytjobs`)](../reference/ytjobs.md).
+
 ```{warning}
 **Critical: Cluster Dependencies**
 

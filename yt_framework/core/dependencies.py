@@ -1,11 +1,7 @@
-"""
-Stage Dependencies
-==================
+"""Injection protocol and ``PipelineStageDependencies`` for stage ``run()`` methods.
 
-Dependency injection container for stages.
-
-This module provides a clean separation between stages and the pipeline,
-following SOLID principles (especially Dependency Inversion and Interface Segregation).
+Defines ``StageDependencies`` (protocol) and the concrete dataclass the pipeline
+passes as ``self.deps`` (YT client, pipeline config, configs directory).
 """
 
 from dataclasses import dataclass
@@ -33,7 +29,7 @@ class StageDependencies(Protocol):
     @property
     def yt_client(self) -> BaseYTClient:
         """YT client for operations.
-        
+
         Returns:
             BaseYTClient: YT client instance (either YTDevClient or YTProdClient)
                 for performing table operations, running map/vanilla jobs, etc.
@@ -43,7 +39,7 @@ class StageDependencies(Protocol):
     @property
     def pipeline_config(self) -> DictConfig:
         """Pipeline-level configuration (contains build_folder and secrets).
-        
+
         Returns:
             DictConfig: OmegaConf configuration object containing pipeline-wide
                 settings like mode, build_folder, and other pipeline parameters.
@@ -53,7 +49,7 @@ class StageDependencies(Protocol):
     @property
     def configs_dir(self) -> Path:
         """Directory containing secrets.env and other config files.
-        
+
         Returns:
             Path: Absolute path to the configs directory where secrets.env
                 and other configuration files are stored.
@@ -68,7 +64,7 @@ class PipelineStageDependencies:
 
     Used by BasePipeline to inject dependencies into stages.
     This class is instantiated by the pipeline and passed to each stage.
-    
+
     Attributes:
         yt_client: YT client instance for performing operations on YTsaurus cluster
             or local filesystem (dev mode).

@@ -462,5 +462,5 @@ for line in sys.stdin:
 ## Next Steps
 
 - Learn about [Vanilla Operations](vanilla.md)
-- Explore [Advanced Topics](../advanced/) (Docker, checkpoints)
+- Explore [Advanced Topics](../advanced/index.md) (Docker, checkpoints)
 - Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for more patterns

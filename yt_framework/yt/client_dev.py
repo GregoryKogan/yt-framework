@@ -98,11 +98,11 @@ class YTDevClient(BaseYTClient):
         ] = "map_node",
     ) -> None:
         """Create a path in YT (no-op in dev mode).
-        
+
         Args:
             path: YT path to create (not used in dev mode).
             node_type: Type of node to create (not used in dev mode).
-            
+
         Returns:
             None
         """
@@ -130,19 +130,19 @@ class YTDevClient(BaseYTClient):
         replication_factor: int = 1,
     ) -> None:
         """Write rows to a YT table (saves as local .jsonl file).
-        
+
         In dev mode, tables are stored as JSONL files in the .dev directory.
         Each row is written as a JSON object on a single line.
-        
+
         Args:
             table_path: YT table path (e.g., "//tmp/my_table").
             rows: List of dictionaries representing table rows.
             append: If True, append to existing file; otherwise overwrite.
             replication_factor: Not used in dev mode (kept for API compatibility).
-            
+
         Returns:
             None
-            
+
         Example:
             >>> client.write_table("//tmp/data", [{"id": 1, "name": "Alice"}])
             >>> # Creates .dev/data.jsonl with: {"id":1,"name":"Alice"}\\n
@@ -158,10 +158,10 @@ class YTDevClient(BaseYTClient):
 
     def read_table(self, table_path: str) -> List[Dict[str, Any]]:
         """Read rows from a YT table (reads from local .jsonl file).
-        
+
         Args:
             table_path: YT table path (e.g., "//tmp/my_table").
-            
+
         Returns:
             List[Dict[str, Any]]: List of dictionaries representing table rows.
                                   Returns empty list if file doesn't exist.
@@ -183,10 +183,10 @@ class YTDevClient(BaseYTClient):
 
     def row_count(self, table_path: str) -> int:
         """Get number of rows in a YT table (counts lines in local .jsonl file).
-        
+
         Args:
             table_path: YT table path (e.g., "//tmp/my_table").
-            
+
         Returns:
             int: Number of non-empty lines in the JSONL file. Returns 0 if file doesn't exist.
         """
@@ -509,12 +509,12 @@ class YTDevClient(BaseYTClient):
         self, local_dir: Path, yt_dir: str, pattern: str = "*"
     ) -> List[str]:
         """Upload a directory to YT (no-op in dev mode).
-        
+
         Args:
             local_dir: Local directory path to upload.
             yt_dir: YT destination directory path.
             pattern: File pattern to match (not used in dev mode).
-            
+
         Returns:
             List[str]: Empty list in dev mode.
         """
@@ -536,11 +536,11 @@ class YTDevClient(BaseYTClient):
         **kwargs: Any,
     ) -> Operation:
         """Run a map operation locally using subprocess.
-        
+
         In dev mode, executes the mapper script locally with input/output tables
         as JSONL files. The command is executed in a temporary sandbox directory
         with all dependencies available.
-        
+
         Args:
             command: Mapper job (command string in dev mode).
             input_table: Input YT table path (read from local JSONL).
@@ -552,10 +552,10 @@ class YTDevClient(BaseYTClient):
             max_failed_jobs: Maximum failed jobs allowed (not used in dev mode).
             docker_auth: Optional Docker authentication (not used in dev mode).
             **kwargs: Additional arguments (not used in dev mode).
-            
+
         Returns:
             Operation: Mock operation object that simulates YT operation.
-            
+
         Example:
             >>> op = client.run_map(
             ...     command="python3 mapper.py",
@@ -623,17 +623,17 @@ class YTDevClient(BaseYTClient):
         **kwargs,
     ) -> Operation:
         """Run a vanilla operation locally using subprocess.
-        
+
         In dev mode, executes the vanilla script locally in a temporary sandbox
         directory with all dependencies available. No input/output tables are involved.
-        
+
         Args:
             command: Command to execute (typically bash command with script path).
             files: List of (yt_path, local_path) tuples for dependencies.
             env: Environment variables dictionary.
             task_name: Task name for logging (default: "main").
             **kwargs: Additional arguments (not used in dev mode).
-            
+
         Returns:
             Operation: Mock operation object that simulates YT operation.
         """
@@ -678,7 +678,9 @@ class YTDevClient(BaseYTClient):
                 yt_path_pattern = r"//[^/\s]+(?:/[^/\s]+)*/build/" + re.escape(
                     local_path.split()[0]
                 )
-                local_command = re.sub(yt_path_pattern, local_path.split()[0], vanilla_job)
+                local_command = re.sub(
+                    yt_path_pattern, local_path.split()[0], vanilla_job
+                )
                 if local_command != vanilla_job:
                     self.logger.debug(
                         f"  Dev: converted command: {vanilla_job} -> {local_command}"
@@ -740,12 +742,16 @@ class YTDevClient(BaseYTClient):
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
         mapper_leg = resolve_aliased_job(
-            legacy_name="mapper", legacy_value=mapper,
-            preferred_name="map_job", preferred_value=map_job,
+            legacy_name="mapper",
+            legacy_value=mapper,
+            preferred_name="map_job",
+            preferred_value=map_job,
         )
         reducer_leg = resolve_aliased_job(
-            legacy_name="reducer", legacy_value=reducer,
-            preferred_name="reduce_job", preferred_value=reduce_job,
+            legacy_name="reducer",
+            legacy_value=reducer,
+            preferred_name="reduce_job",
+            preferred_value=reduce_job,
         )
 
         def _leg_desc(obj: Any) -> str:
@@ -789,8 +795,10 @@ class YTDevClient(BaseYTClient):
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
         reducer_leg = resolve_aliased_job(
-            legacy_name="reducer", legacy_value=reducer,
-            preferred_name="job", preferred_value=job,
+            legacy_name="reducer",
+            legacy_value=reducer,
+            preferred_name="job",
+            preferred_value=job,
         )
         if is_typed_job(reducer_leg):
             rdesc = "TypedJob"

@@ -8,6 +8,7 @@ Advanced features and techniques for complex YT Framework pipelines.
 code-upload
 docker
 checkpoints
+tokenizer-artifact
 multiple-operations
 ```
 
@@ -37,6 +38,13 @@ Handle ML model checkpoints for inference pipelines. Upload, version, and manage
 +++
 [Learn More →](checkpoints.md)
 
+**Tokenizer artifacts**
+^^^
+Upload tokenizer or processor tarballs to Cypress, wire sandbox extraction (separate from single-file checkpoints).
+
++++
+[Learn More →](tokenizer-artifact.md)
+
 **Multiple Operations**
 ^^^
 Run multiple operations (map, vanilla, YQL) in a single stage. Optimize pipeline execution and reduce overhead.
@@ -51,7 +59,7 @@ Before diving into advanced topics, make sure you understand:
 
 - [Pipelines and Stages](../pipelines-and-stages.md) - Basic pipeline structure
 - [Configuration](../configuration/index.md) - Configuration system
-- [Operations](../operations/) - Basic operation types
+- [Operations](../operations/index.md) - Basic operation types
 
 ## When to Use Advanced Features
 
@@ -76,6 +84,12 @@ Use when:
 - Need to version model checkpoints
 - Managing large model files
 
+### Tokenizer artifacts
+
+Use when:
+- Workers need a tarball of tokenizer/processor files (not only a single checkpoint file)
+- You want idempotent upload to a Cypress file path and env wiring for TypedJob bootstrap
+
 ### Multiple Operations
 
 Use when:
@@ -88,4 +102,5 @@ Use when:
 - [Code Upload Guide](code-upload.md) - Complete code upload documentation
 - [Docker Guide](docker.md) - Docker configuration guide
 - [Checkpoints Guide](checkpoints.md) - Checkpoint management guide
+- [Tokenizer artifacts](tokenizer-artifact.md) - Tarball upload and sandbox extraction
 - [Multiple Operations Guide](multiple-operations.md) - Running multiple operations
