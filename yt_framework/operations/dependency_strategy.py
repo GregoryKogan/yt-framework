@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, Tuple, List, Optional, Literal
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 
 from yt_framework.operations.job_command import (
     require_consistent_map_reduce_legs,
@@ -166,7 +166,7 @@ class TarArchiveDependencyBuilder:
 
         # Add extra file_paths from operation_config (e.g. secrets, extra files)
         for item in operation_config.get("file_paths") or []:
-            if isinstance(item, (list, tuple)) and len(item) >= 2:
+            if isinstance(item, (list, tuple, ListConfig)) and len(item) >= 2:
                 yt_path, local_path = item[0], item[1]
                 dependencies.append((yt_path, local_path))
                 logger.info(f"Added file dependency: {yt_path}")

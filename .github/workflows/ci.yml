@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        run: |
+          pytest \
+            --cov=yt_framework \
+            --cov=ytjobs \
+            --cov-report=term-missing \
+            --cov-report=json:coverage.json
+
+      - name: Publish coverage badge to gist
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.COVERAGE_GIST_ID != ''
+        env:
+          COVERAGE_GIST_ID: ${{ vars.COVERAGE_GIST_ID }}
+          COVERAGE_GIST_TOKEN: ${{ secrets.COVERAGE_GIST_TOKEN }}
+        run: |
+          python <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          with open("coverage.json", encoding="utf-8") as f:
+              cov = json.load(f)
+          pct = round(float(cov["totals"]["percent_covered"]), 1)
+          if pct >= 80.0:
+              color = "brightgreen"
+          elif pct >= 60.0:
+              color = "yellow"
+          else:
+              color = "red"
+          payload = {
+              "schemaVersion": 1,
+              "label": "coverage",
+              "message": f"{pct}%",
+              "color": color,
+          }
+          body = json.dumps(
+              {"files": {"coverage-shields.json": {"content": json.dumps(payload)}}}
+          )
+          req = urllib.request.Request(
+              f"https://api.github.com/gists/{os.environ['COVERAGE_GIST_ID']}",
+              data=body.encode(),
+              method="PATCH",
+              headers={
+                  "Authorization": f"Bearer {os.environ['COVERAGE_GIST_TOKEN']}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  assert 200 <= resp.status < 300, resp.status
+          except urllib.error.HTTPError as e:
+              raise SystemExit(f"gist PATCH failed: HTTP {e.code}") from e
+          PY

@@ -34,7 +34,8 @@ def _normalize_upload_modules(raw: Any) -> List[str]:
     if raw is None:
         return []
     if isinstance(raw, str):
-        return [raw] if raw.strip() else []
+        s = raw.strip()
+        return [s] if s else []
     if isinstance(raw, (list, tuple, ListConfig)):
         return [str(m).strip() for m in raw if str(m).strip()]
     raise ValueError(

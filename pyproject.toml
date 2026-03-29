@@ -64,9 +64,20 @@ docs = [
     "sphinx-design>=0.5.0",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: fast deterministic tests (default scope)",
+    "integration: tests that need dev mode, fakes, or external boundaries",
+]
+
 [tool.black]
 line-length = 88
 target-version = ["py311"]
+
+[tool.coverage.run]
+branch = true
+source = ["yt_framework", "ytjobs"]
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -25,7 +25,8 @@ def load_env_file(env_path: Path) -> Dict[str, str]:
         Returns empty dict if file doesn't exist or cannot be read.
 
     Warns:
-        UserWarning: If file doesn't exist or cannot be parsed (non-fatal).
+        UserWarning: If the file exists but cannot be read or parsed (non-fatal).
+        Missing file is silent (returns empty dict).
 
     Example:
         >>> env_vars = load_env_file(Path("configs/secrets.env"))
@@ -33,12 +34,8 @@ def load_env_file(env_path: Path) -> Dict[str, str]:
     """
     env_vars = {}
 
-    # Skip if file doesn't exist (optional file)
+    # Skip if file doesn't exist (optional file — no warning; callers treat as empty)
     if not env_path.exists():
-        warnings.warn(
-            f"Secrets file not found: {env_path} (optional, continuing without it)",
-            UserWarning,
-        )
         return env_vars
 
     try:
@@ -69,7 +66,7 @@ def load_secrets(secrets_dir: Path, env_file: str = "secrets.env") -> Dict[str, 
         Returns empty dict if file doesn't exist or cannot be read.
 
     Warns:
-        UserWarning: If file doesn't exist or cannot be parsed (non-fatal).
+        UserWarning: If the secrets file exists but cannot be read or parsed (non-fatal).
 
     Example:
         >>> secrets = load_secrets(Path("configs"))
