@@ -31,6 +31,10 @@ Thumbs.db
 # Checkpoints
 *.pt
 
+# Coverage
+.coverage
+coverage.json
+
 # Virtual environment
 .venv/
 venv/
