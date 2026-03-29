@@ -64,6 +64,20 @@ def test_dev_client_warns_when_pipeline_dir_defaults_to_cwd(
     assert "using cwd as pipeline_dir" in caplog.text
 
 
+def test_dev_client_resolves_pipeline_dir_from_yt_pipeline_dir_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("YT_PIPELINE_DIR", str(tmp_path))
+    client = YTDevClient(_null_logger("tests.client_dev.env_pd"), pipeline_dir=None)
+    assert client.pipeline_dir == tmp_path.resolve()
+
+
+def test_dev_client_create_path_returns_none(tmp_path: Path) -> None:
+    client = YTDevClient(_null_logger("tests.client_dev.cp"), pipeline_dir=tmp_path)
+    assert client.create_path("//cluster/nodes/x", node_type="map_node") is None
+
+
 def test_dev_client_row_count_is_zero_when_jsonl_missing(tmp_path: Path) -> None:
     client = YTDevClient(_null_logger("tests.client_dev.rc"), pipeline_dir=tmp_path)
     assert client.row_count("//tmp/missing_table") == 0
@@ -75,6 +89,18 @@ def test_dev_client_get_table_columns_raises_when_table_has_no_rows(
     client = YTDevClient(_null_logger("tests.client_dev.cols"), pipeline_dir=tmp_path)
     with pytest.raises(ValueError, match="empty, cannot determine columns"):
         client._get_table_columns("//tmp/only_internal")
+
+
+def test_dev_client_get_table_columns_falls_back_to_internal_column_names(
+    tmp_path: Path,
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.cols_int"), pipeline_dir=tmp_path
+    )
+    client.write_table("//tmp/internal_cols", [{"_yql_meta": 1}], append=False)
+    assert client._get_table_columns("//tmp/internal_cols") == [
+        "_yql_meta"
+    ], "when every key is filtered, use full key list"
 
 
 def test_dev_client_get_local_checkpoint_path_returns_existing_file_from_config(
@@ -90,6 +116,22 @@ def test_dev_client_get_local_checkpoint_path_returns_existing_file_from_config(
     client = YTDevClient(_null_logger("tests.client_dev.ckpt"), pipeline_dir=tmp_path)
     resolved = client._get_local_checkpoint_path()
     assert resolved == str(ckpt.resolve())
+
+
+def test_dev_client_get_local_checkpoint_path_skips_unreadable_stage_config(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG)
+    bad = tmp_path / "stages" / "bad_yaml"
+    bad.mkdir(parents=True)
+    (bad / "config.yaml").write_text("{not: valid: yaml\n", encoding="utf-8")
+    client = YTDevClient(
+        _null_logger("tests.client_dev.ckpt_bad"), pipeline_dir=tmp_path
+    )
+    assert (
+        client._get_local_checkpoint_path() is None and "error reading" in caplog.text
+    ), "unreadable stage config should log and continue"
 
 
 def test_dev_client_find_checkpoint_in_config_reads_nested_operation_checkpoint(
@@ -108,6 +150,17 @@ def test_dev_client_find_checkpoint_in_config_reads_nested_operation_checkpoint(
         }
     )
     assert client._find_checkpoint_in_config(cfg) == "/data/model.ckpt"
+
+
+def test_dev_client_find_checkpoint_in_config_returns_none_without_paths(
+    tmp_path: Path,
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.fcc_none"), pipeline_dir=tmp_path
+    )
+    assert (
+        client._find_checkpoint_in_config(OmegaConf.create({"client": {}})) is None
+    ), "no legacy path and no operations → None"
 
 
 def test_dev_client_run_map_raises_not_implemented_for_typed_job_mapper(
@@ -167,6 +220,37 @@ def test_dev_client_run_vanilla_rewrites_double_slash_build_prefix_to_local_stag
     ), "dev should map //…/build/stages/… to sandbox stages/…"
 
 
+def test_dev_client_run_vanilla_falls_back_to_plain_replace_when_no_double_slash_prefix(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Primary ``re.sub`` expects ``//…/build/``; single-slash YT-like paths use fallback."""
+    task = "fb"
+    script = tmp_path / "stages" / task / "src" / "x.py"
+    script.parent.mkdir(parents=True)
+    script.write_text(
+        "#!/usr/bin/env python3\nimport sys\nsys.exit(0)\n", encoding="utf-8"
+    )
+    script.chmod(0o755)
+    client = YTDevClient(
+        _null_logger("tests.client_dev.vbuild_fb"), pipeline_dir=tmp_path
+    )
+    rel = f"stages/{task}/src/x.py"
+    # Fallback replaces the full YT-like token with ``rel`` only, so the script must be
+    # executable (shebang) — no ``python3`` prefix remains after replace.
+    cmd = f"python3 /tmp/one_segment/build/{rel}"
+    caplog.set_level(logging.DEBUG)
+    op = client.run_vanilla(
+        cmd,
+        [("//yt/deps/x.py", rel)],
+        {},
+        task,
+    )
+    assert (
+        op.get_state() == "completed" and "converted command (fallback)" in caplog.text
+    ), "vanilla job without //…/build/ should still rewrite via string replace"
+
+
 def test_dev_client_run_vanilla_succeeds_for_trivial_bash_command(
     tmp_path: Path,
 ) -> None:
@@ -175,6 +259,22 @@ def test_dev_client_run_vanilla_succeeds_for_trivial_bash_command(
     )
     op = client.run_vanilla("true", [], {}, "noop_task")
     assert op.get_state() == "completed"
+
+
+def test_dev_client_run_vanilla_failed_command_exposes_failed_state_and_error(
+    tmp_path: Path,
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.vanilla_fail"), pipeline_dir=tmp_path
+    )
+    op = client.run_vanilla("false", [], {}, "fail_task")
+    op.wait()
+    err = op.get_error()
+    assert (
+        op.get_state() == "failed"
+        and err is not None
+        and ("code 1" in err or "Output written to" in err)
+    ), "non-zero bash exit should surface via _DevOperation (stderr hint or log path)"
 
 
 def test_dev_client_run_vanilla_warns_when_stage_config_missing(
@@ -304,6 +404,26 @@ def test_dev_client_setup_checkpoint_config_sets_job_path_and_checkpoint_file(
     ), "_setup_checkpoint_config should expose JOB_CONFIG_PATH and CHECKPOINT_FILE"
 
 
+def test_dev_client_setup_checkpoint_config_warns_when_stage_yaml_invalid(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING)
+    st = tmp_path / "stages" / "broken"
+    st.mkdir(parents=True)
+    cfg = st / "config.yaml"
+    cfg.write_text("{bad\n", encoding="utf-8")
+    client = YTDevClient(
+        _null_logger("tests.client_dev.scc_bad"), pipeline_dir=tmp_path
+    )
+    env: dict[str, str] = {}
+    client._setup_checkpoint_config(env)
+    assert (
+        env.get("JOB_CONFIG_PATH") == str(cfg)
+        and "failed to load checkpoint config" in caplog.text
+    ), "OmegaConf errors should warn while JOB_CONFIG_PATH still set"
+
+
 def test_dev_client_setup_checkpoint_config_warns_when_checkpoint_path_missing(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
@@ -339,6 +459,25 @@ def test_dev_client_run_yql_copies_select_into_output_jsonl(
     assert client.read_table("//cluster/dst") == [
         {"n": 1}
     ], "dev run_yql should materialize INSERT … SELECT into .dev basename jsonl"
+
+
+def test_dev_client_run_yql_warns_when_input_table_jsonl_missing(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING)
+    client = YTDevClient(
+        _null_logger("tests.client_dev.yql_miss"), pipeline_dir=tmp_path
+    )
+    yql = (
+        "INSERT INTO `//cluster/out` WITH TRUNCATE "
+        "SELECT * FROM `//cluster/not_there`;"
+    )
+    with pytest.raises(Exception):
+        client.run_yql(yql)
+    assert (
+        "Input table not found" in caplog.text
+    ), "missing .dev jsonl should warn before SQL fails"
 
 
 def test_dev_client_run_map_reduce_copies_input_jsonl_to_output(

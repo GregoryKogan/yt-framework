@@ -2,13 +2,14 @@
 
 import logging
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from omegaconf import OmegaConf
 
 from yt_framework.core.dependencies import PipelineStageDependencies
 from yt_framework.core.stage import StageContext
+from yt_framework.operations.dependency_strategy import DependencyBuildResult
 from yt_framework.operations.vanilla import run_vanilla
 from yt_framework.yt.client_base import BaseYTClient
 
@@ -73,3 +74,32 @@ def test_run_vanilla_forwards_string_operation_description_as_title(
     )
     assert run_vanilla(ctx, cfg) is True
     assert ctx.deps.yt_client.run_vanilla.call_args.kwargs.get("title") == "vanilla-job"
+
+
+@patch("yt_framework.operations.vanilla.TarArchiveDependencyBuilder.build_dependencies")
+def test_run_vanilla_raises_when_command_missing_from_builder(
+    mock_build: MagicMock, tmp_path: Path
+) -> None:
+    mock_build.return_value = DependencyBuildResult(
+        script_path="//yt/vanilla.py",
+        dependencies=[],
+        command=None,
+    )
+    ctx = _vanilla_stage_context(tmp_path)
+    with pytest.raises(ValueError, match="Command not provided"):
+        run_vanilla(ctx, _minimal_vanilla_config())
+
+
+def test_run_vanilla_forwards_dict_operation_description(
+    tmp_path: Path,
+) -> None:
+    ctx = _vanilla_stage_context(tmp_path)
+    cfg = OmegaConf.create(
+        {
+            "resources": {"pool": "p"},
+            "operation_description": {"label": "dict-v"},
+        }
+    )
+    assert run_vanilla(ctx, cfg) is True
+    kw = ctx.deps.yt_client.run_vanilla.call_args.kwargs
+    assert kw.get("operation_description") == {"label": "dict-v"}

@@ -73,6 +73,14 @@ def test_resolve_tokenizer_artifact_yt_path_returns_none_without_artifact_base()
     assert resolve_tokenizer_artifact_yt_path(stage, tok) is None
 
 
+def test_resolve_tokenizer_artifact_yt_path_returns_none_when_name_unresolvable() -> (
+    None
+):
+    stage = OmegaConf.create({})
+    tok = OmegaConf.create({"artifact_base": "//yt/pool/artifacts"})
+    assert resolve_tokenizer_artifact_yt_path(stage, tok) is None
+
+
 def test_resolve_tokenizer_artifact_yt_path_joins_base_and_archive_name() -> None:
     stage = OmegaConf.create({})
     tok = OmegaConf.create({"artifact_base": "//tmp/artifacts", "artifact_name": "t"})
@@ -105,6 +113,27 @@ def test_prepare_local_archive_raises_for_non_tar_file(
     f.write_bytes(b"no")
     with pytest.raises(ValueError, match="directory or to a .tar.gz file"):
         _prepare_local_archive(f, "p")
+
+
+def test_init_tokenizer_artifact_directory_raises_when_base_set_but_name_unresolvable(
+    tmp_path: Path,
+) -> None:
+    yt = MagicMock()
+    deps = PipelineStageDependencies(
+        yt_client=yt,
+        pipeline_config=OmegaConf.create({}),
+        configs_dir=tmp_path,
+    )
+    ctx = StageContext(
+        name="tok_st",
+        config=OmegaConf.create({}),
+        stage_dir=tmp_path,
+        logger=_null_logger("tests.tok.bad_name"),
+        deps=deps,
+    )
+    tok = OmegaConf.create({"artifact_base": "//yt/artifacts"})
+    with pytest.raises(ValueError, match="artifact_name cannot be resolved"):
+        init_tokenizer_artifact_directory(ctx, tok)
 
 
 def test_init_tokenizer_artifact_directory_no_ops_without_artifact_base(
@@ -218,6 +247,39 @@ def test_init_tokenizer_artifact_directory_warns_when_local_path_missing_but_yt_
         "local_artifact_path does not exist" in caplog.text
         and not yt.upload_file.called
     ), "missing local path should warn and skip upload when YT already has the file"
+
+
+def test_init_tokenizer_artifact_directory_skips_upload_when_local_exists_and_yt_has_artifact(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
+    yt = MagicMock()
+    yt.exists.return_value = True
+    deps = PipelineStageDependencies(
+        yt_client=yt,
+        pipeline_config=OmegaConf.create({}),
+        configs_dir=tmp_path,
+    )
+    ctx = StageContext(
+        name="tok_st",
+        config=OmegaConf.create({"job": {"tokenizer_name": "tok"}}),
+        stage_dir=tmp_path,
+        logger=_null_logger("tests.tok.skip_up"),
+        deps=deps,
+    )
+    local_tgz = tmp_path / "tok.tar.gz"
+    local_tgz.write_bytes(b"x")
+    tok = OmegaConf.create(
+        {
+            "artifact_base": "//yt/art",
+            "local_artifact_path": str(local_tgz),
+        }
+    )
+    init_tokenizer_artifact_directory(ctx, tok)
+    assert (
+        "already exists in YT" in caplog.text and not yt.upload_file.called
+    ), "existing YT artifact should log skip and not upload"
 
 
 def test_init_tokenizer_artifact_directory_raises_when_local_missing_and_yt_has_no_artifact(

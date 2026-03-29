@@ -634,6 +634,57 @@ def test_yt_prod_client_create_path_calls_client_create(
     )
 
 
+def test_yt_prod_client_create_path_raises_after_logging_when_create_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake_inner = MagicMock()
+    fake_inner.create.side_effect = OSError("yt create denied")
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+    caplog.set_level(logging.ERROR)
+    client = YTProdClient(
+        _null_logger("tests.client_prod.cp_err"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    with pytest.raises(OSError, match="yt create denied"):
+        client.create_path("//tmp/bad")
+    assert "Failed to create path" in caplog.text
+
+
+def test_yt_prod_client_exists_raises_after_logging_when_exists_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake_inner = MagicMock()
+    fake_inner.exists.side_effect = RuntimeError("network down")
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+    caplog.set_level(logging.ERROR)
+    client = YTProdClient(
+        _null_logger("tests.client_prod.exists_err"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    with pytest.raises(RuntimeError, match="network down"):
+        client.exists("//tmp/x")
+    assert "Failed to check if path exists" in caplog.text
+
+
+def test_yt_prod_client_upload_directory_propagates_after_upload_file_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    root = tmp_path / "src"
+    root.mkdir()
+    (root / "a.txt").write_text("a", encoding="utf-8")
+    fake_inner.write_file.side_effect = OSError("write_file failed")
+    with pytest.raises(OSError, match="write_file failed"):
+        client.upload_directory(root, "//yt/out")
+
+
 def test_yt_prod_client_run_map_raises_runtime_error_when_run_operation_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1024,3 +1075,276 @@ def test_yt_prod_client_get_table_columns_raises_binary_help_when_remove_raises_
 
     with pytest.raises(ValueError, match="binary columns that cannot be decoded"):
         client._get_table_columns("//tmp/rm_fail_yql_ex")
+
+
+def test_yt_prod_client_init_warns_when_proxy_discovery_config_unusable(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class _BadCfg:
+        def __contains__(self, _item: object) -> bool:
+            raise RuntimeError("config unreadable")
+
+    fake_inner = MagicMock()
+    fake_inner.config = _BadCfg()
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+    caplog.set_level(logging.WARNING)
+    YTProdClient(
+        _null_logger("tests.client_prod.init_proxy_warn"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    assert "Could not disable proxy discovery" in caplog.text
+
+
+def test_yt_prod_client_write_table_overwrite_removes_existing_table_before_create(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    fake_inner.exists.return_value = True
+    client.write_table("//tmp/exists", [{"n": 1}], append=False)
+    fake_inner.remove.assert_called_once_with("//tmp/exists", force=True)
+
+
+def test_yt_prod_client_write_table_append_skips_table_recreate_branch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    client.write_table("//tmp/t", [{"k": 1}], append=True)
+    table_ops = [c for c in fake_inner.create.call_args_list if c[0][0] == "table"]
+    assert table_ops == [], "append mode must not create/overwrite the table node"
+
+
+def test_yt_prod_client_write_table_make_parents_false_skips_map_node_parents(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    fake_inner.exists.return_value = False
+    client.write_table("//ns/table", [{"a": 1}], make_parents=False)
+    map_nodes = [c for c in fake_inner.create.call_args_list if c[0][0] == "map_node"]
+    assert map_nodes == [], "make_parents=False must not create parent map_nodes"
+
+
+def test_yt_prod_client_write_table_raises_after_log_on_client_write_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    fake_inner.exists.return_value = False
+    fake_inner.write_table.side_effect = OSError("yt write_table failed")
+    caplog.set_level(logging.ERROR)
+    with pytest.raises(OSError, match="yt write_table failed"):
+        client.write_table("//tmp/one", [{"x": 1}])
+    assert "Failed to write table" in caplog.text
+
+
+def test_yt_prod_client_row_count_raises_after_log_on_client_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    fake_inner.row_count.side_effect = RuntimeError("count failed")
+    caplog.set_level(logging.ERROR)
+    with pytest.raises(RuntimeError, match="count failed"):
+        client.row_count("//tmp/t")
+    assert "Failed to get row count" in caplog.text
+
+
+def test_yt_prod_client_get_table_columns_uses_read_path_when_schema_get_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    fake_inner.get.side_effect = OSError("schema unavailable")
+    fake_inner.read_table.return_value = iter([{"col_a": 1}])
+    assert client._get_table_columns("//tmp/fallback_read") == ["col_a"]
+
+
+def test_yt_prod_client_get_table_columns_keeps_underscore_only_names_from_read_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    fake_inner.get.return_value = {"schema": []}
+    fake_inner.read_table.return_value = iter([{"_internal": 1}])
+    assert client._get_table_columns("//tmp/underscore_only") == ["_internal"]
+
+
+def test_yt_prod_client_join_tables_dry_run_returns_query_without_run_yql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    q = client.join_tables("//l", "//r", "//o", "id", dry_run=True)
+    assert (
+        isinstance(q, str) and "JOIN" in q.upper() and not fake_inner.run_query.called
+    )
+
+
+def test_yt_prod_client_filter_table_dry_run_returns_query_without_run_yql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    fake_inner.get.return_value = {"schema": [{"name": "status"}]}
+    q = client.filter_table("//i", "//o", "status = 1", dry_run=True)
+    assert "WHERE" in q and not fake_inner.run_query.called
+
+
+def test_yt_prod_client_select_columns_dry_run_returns_query_without_run_yql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    q = client.select_columns("//i", "//o", ["a", "b"], dry_run=True)
+    assert "//i" in q and "//o" in q and not fake_inner.run_query.called
+
+
+def test_yt_prod_client_group_by_aggregate_dry_run_returns_query_without_run_yql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    q = client.group_by_aggregate("//i", "//o", "g", {"n": "count"}, dry_run=True)
+    assert "GROUP BY" in q.upper() and not fake_inner.run_query.called
+
+
+def test_yt_prod_client_union_tables_dry_run_returns_query_without_run_yql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    fake_inner.get.return_value = {"schema": [{"name": "id"}]}
+    q = client.union_tables(["//a", "//b"], "//u", dry_run=True)
+    assert "UNION" in q.upper() and not fake_inner.run_query.called
+
+
+def test_yt_prod_client_distinct_dry_run_returns_query_without_run_yql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    q = client.distinct("//d_in", "//d_out", columns=["k"], dry_run=True)
+    assert "//d_in" in q and not fake_inner.run_query.called
+
+
+def test_yt_prod_client_sort_table_dry_run_returns_query_without_run_yql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    fake_inner.get.return_value = {"schema": [{"name": "ts"}]}
+    q = client.sort_table("//s_in", "//s_out", order_by="ts", dry_run=True)
+    assert "//s_in" in q and not fake_inner.run_query.called
+
+
+def test_yt_prod_client_limit_table_dry_run_returns_query_without_run_yql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    fake_inner.get.return_value = {"schema": [{"name": "id"}]}
+    q = client.limit_table("//l_in", "//l_out", limit=3, dry_run=True)
+    assert "LIMIT" in q.upper() and not fake_inner.run_query.called
+
+
+def test_yt_prod_client_upload_directory_skips_ytignored_files_and_logs_count(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    root = tmp_path / "udir"
+    root.mkdir()
+    (root / ".ytignore").write_text("skipme.txt\n", encoding="utf-8")
+    (root / "keep.txt").write_text("a", encoding="utf-8")
+    (root / "skipme.txt").write_text("b", encoding="utf-8")
+    caplog.set_level(logging.INFO)
+    out = sorted(client.upload_directory(root, "//yt/out"))
+    assert out == ["//yt/out/keep.txt"] and "Ignored" in caplog.text
+
+
+def test_yt_prod_client_run_vanilla_raises_when_run_operation_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_inner = MagicMock()
+    fake_inner.run_operation.return_value = None
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+    client = YTProdClient(
+        _null_logger("tests.client_prod.v_none"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    with pytest.raises(RuntimeError, match="run_operation returned None"):
+        client.run_vanilla("true", [], {}, "t", OperationResources())
+
+
+def test_yt_prod_client_run_map_reduce_raises_when_run_operation_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_inner = MagicMock()
+    fake_inner.run_operation.return_value = None
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+    client = YTProdClient(
+        _null_logger("tests.client_prod.mr_none"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    with pytest.raises(RuntimeError, match="Failed to submit map-reduce"):
+        client.run_map_reduce(
+            "m",
+            "r",
+            "//i",
+            "//o",
+            ["k"],
+            [],
+            OperationResources(),
+            {},
+        )
+
+
+def test_yt_prod_client_run_reduce_raises_when_run_operation_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_inner = MagicMock()
+    fake_inner.run_operation.return_value = None
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+    client = YTProdClient(
+        _null_logger("tests.client_prod.red_none"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    with pytest.raises(RuntimeError, match="Failed to submit reduce"):
+        client.run_reduce("r", "//i", "//o", ["k"], [], OperationResources(), {})
+
+
+def test_yt_prod_client_run_vanilla_propagates_submit_exception_after_error_log(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake_inner = MagicMock()
+    fake_inner.run_operation.side_effect = ValueError("bad spec")
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+    caplog.set_level(logging.ERROR)
+    client = YTProdClient(
+        _null_logger("tests.client_prod.v_exc"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    with pytest.raises(ValueError, match="bad spec"):
+        client.run_vanilla("true", [], {}, "t", OperationResources())
+    assert "Failed to submit vanilla operation" in caplog.text
+
+
+def test_yt_prod_client_run_sort_raises_after_log_on_client_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake_inner = MagicMock()
+    fake_inner.run_sort.side_effect = OSError("sort cluster error")
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+    caplog.set_level(logging.ERROR)
+    client = YTProdClient(
+        _null_logger("tests.client_prod.sort_exc"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    with pytest.raises(OSError, match="sort cluster error"):
+        client.run_sort("//tmp/t", ["c"])
+    assert "Failed to sort table" in caplog.text

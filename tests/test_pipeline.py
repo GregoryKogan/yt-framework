@@ -3,7 +3,7 @@
 import importlib.util
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
@@ -54,6 +54,11 @@ def test_normalize_upload_paths_requires_source_key() -> None:
         _normalize_upload_paths([{"target": "only"}])
 
 
+def test_normalize_upload_paths_rejects_non_mapping_element() -> None:
+    with pytest.raises(ValueError, match=r"upload_paths\[0\] must be a mapping"):
+        _normalize_upload_paths(["not-a-dict"])
+
+
 def test_normalize_upload_paths_converts_dictconfig_element_to_str_mapping() -> None:
     raw = OmegaConf.create([{"source": "/src", "target": "//yt/t"}])
     out = _normalize_upload_paths(raw)
@@ -89,6 +94,24 @@ def _write_stage_module(pipeline_root: Path, stage_name: str) -> type:
     sys.modules[mod_name] = mod
     spec.loader.exec_module(mod)
     return mod.MinimalStage
+
+
+def test_base_pipeline_init_raises_when_pipeline_dir_does_not_exist() -> None:
+    cfg = OmegaConf.create({"pipeline": {"mode": "dev"}})
+    missing = Path("/nonexistent/pipeline/root/yt_framework_test")
+    with pytest.raises(ValueError, match="Pipeline directory not found"):
+        BasePipeline(cfg, missing)
+
+
+def test_base_pipeline_default_setup_leaves_registry_unset(tmp_path: Path) -> None:
+    _touch_configs_secrets(tmp_path)
+    cfg = OmegaConf.create({"pipeline": {"mode": "dev"}})
+
+    class _UsesBaseSetup(BasePipeline):
+        pass
+
+    pipe = _UsesBaseSetup(cfg, tmp_path)
+    assert pipe._stage_registry is None, "BasePipeline.setup is a no-op by default"
 
 
 def test_stages_need_code_execution_is_false_when_no_enabled_stages(
@@ -291,6 +314,18 @@ def _write_packaged_stage(pipeline_root: Path, folder_name: str) -> None:
     )
 
 
+def test_default_pipeline_warns_when_discovery_finds_no_stages(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _touch_configs_secrets(tmp_path)
+    cfg = OmegaConf.create(
+        {"pipeline": {"mode": "dev"}, "stages": {"enabled_stages": []}}
+    )
+    with patch("yt_framework.core.discovery.discover_stages", return_value=[]):
+        DefaultPipeline(cfg, tmp_path)
+    assert "No stages discovered" in capsys.readouterr().out
+
+
 def test_default_pipeline_setup_registers_discovered_stages(tmp_path: Path) -> None:
     for key in list(sys.modules):
         if key == "stages" or key.startswith("stages."):
@@ -334,6 +369,52 @@ def test_main_exits_with_code_1_when_config_root_is_not_mapping(
     with pytest.raises(SystemExit) as exc_info:
         BasePipeline.main(["--config", "configs/config.yaml"])
     assert exc_info.value.code == 1
+
+
+def test_main_exits_with_code_1_when_config_file_is_unparseable_yaml(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OmegaConf.load failures hit the except branch (logger + sys.exit(1))."""
+    script = tmp_path / "pipeline_entry.py"
+    script.write_text("# entry\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", [str(script)])
+    _touch_configs_secrets(tmp_path)
+    bad = tmp_path / "configs" / "config.yaml"
+    bad.parent.mkdir(parents=True, exist_ok=True)
+    bad.write_text("{ not: valid: yaml: [[", encoding="utf-8")
+    with pytest.raises(SystemExit) as exc_info:
+        BasePipeline.main(["--config", "configs/config.yaml"])
+    assert exc_info.value.code == 1, "parse error must surface as exit code 1"
+
+
+def test_main_uses_dev_mode_when_config_probe_load_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    script = tmp_path / "pipeline_entry.py"
+    script.write_text("# entry\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", [str(script)])
+    _touch_configs_secrets(tmp_path)
+    stage_name = "probe_ok"
+    stage_cls = _write_stage_module(tmp_path, stage_name)
+    _write_yaml_config(
+        tmp_path,
+        "configs/config.yaml",
+        {"pipeline": {"mode": "dev"}, "stages": {"enabled_stages": [stage_name]}},
+    )
+    loaded = OmegaConf.create(
+        {"pipeline": {"mode": "dev"}, "stages": {"enabled_stages": [stage_name]}}
+    )
+
+    class _ProbeOkPipeline(BasePipeline):
+        def setup(self) -> None:
+            self.set_stage_registry(StageRegistry().add_stage(stage_cls))
+
+    stage_cfg = OmegaConf.create({"k": 1})
+    with patch("yt_framework.core.pipeline.OmegaConf.load", MagicMock()) as mock_load:
+        mock_load.side_effect = [RuntimeError("probe"), loaded, stage_cfg]
+        with pytest.raises(SystemExit) as exc_info:
+            _ProbeOkPipeline.main(["--config", "configs/config.yaml"])
+    assert exc_info.value.code == 0
 
 
 def test_main_exits_with_code_0_when_pipeline_run_succeeds(

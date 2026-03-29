@@ -221,3 +221,136 @@ def test_load_processing_state_returns_decoded_dict_from_json_blob(
     assert load_processing_state(
         state_name="s", base_path="//m", logger=_silent_logger("test_lps_ok")
     ) == {"ok": True}
+
+
+def test_save_checkpoint_logs_warning_when_base_directory_create_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_yt = MagicMock()
+    mock_yt.create.side_effect = OSError("mkdir denied")
+    monkeypatch.setattr(ckpt_utils, "yt", mock_yt)
+    caplog.set_level(logging.WARNING)
+    save_checkpoint(
+        b"a", "n.bin", base_path="//x", logger=_silent_logger("test_ckpt_mkdir")
+    )
+    assert (
+        "Could not create checkpoint directory" in caplog.text
+        and mock_yt.write_file.call_count == 1
+    ), "create failure is non-fatal; main blob write should still run"
+
+
+def test_save_checkpoint_raises_when_main_blob_write_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mock_yt = MagicMock()
+    mock_yt.write_file.side_effect = RuntimeError("write denied")
+    monkeypatch.setattr(ckpt_utils, "yt", mock_yt)
+    with pytest.raises(RuntimeError, match="write denied"):
+        save_checkpoint(
+            b"a", "n.bin", base_path="//y", logger=_silent_logger("test_ckpt_wfail")
+        )
+
+
+def test_save_checkpoint_warns_when_metadata_write_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_yt = MagicMock()
+
+    def _write(path: str, *_a, **_k) -> None:
+        if str(path).endswith(".meta"):
+            raise OSError("meta write fail")
+
+    mock_yt.write_file.side_effect = _write
+    monkeypatch.setattr(ckpt_utils, "yt", mock_yt)
+    caplog.set_level(logging.WARNING)
+    path = save_checkpoint(
+        b"b",
+        "m.bin",
+        base_path="//z",
+        metadata={"a": 1},
+        logger=_silent_logger("test_ckpt_meta_w"),
+    )
+    assert path == "//z/m.bin" and "Failed to save checkpoint metadata" in caplog.text
+
+
+def test_load_checkpoint_returns_none_tuple_when_read_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_yt = MagicMock()
+    mock_yt.exists.return_value = True
+    mock_yt.read_file.side_effect = OSError("read broke")
+    monkeypatch.setattr(ckpt_utils, "yt", mock_yt)
+    caplog.set_level(logging.ERROR)
+    out = load_checkpoint(
+        "x", base_path="//b", logger=_silent_logger("test_ld_read_exc")
+    )
+    assert out == (None, None) and "Failed to load checkpoint" in caplog.text
+
+
+def test_load_checkpoint_returns_body_and_warns_when_metadata_json_invalid(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_yt = MagicMock()
+    mock_yt.exists.side_effect = [True, True]
+    body_buf = MagicMock()
+    body_buf.read.return_value = b"body"
+    meta_buf = MagicMock()
+    meta_buf.read.return_value = b"not-json{"
+    mock_yt.read_file.side_effect = [body_buf, meta_buf]
+    monkeypatch.setattr(ckpt_utils, "yt", mock_yt)
+    caplog.set_level(logging.WARNING)
+    out = load_checkpoint(
+        "p.bin", base_path="//z", logger=_silent_logger("test_ld_bad_meta")
+    )
+    assert (
+        out == (b"body", None) and "Failed to load checkpoint metadata" in caplog.text
+    )
+
+
+def test_list_checkpoints_returns_empty_when_list_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_yt = MagicMock()
+    mock_yt.exists.return_value = True
+    mock_yt.list.side_effect = RuntimeError("list failed")
+    monkeypatch.setattr(ckpt_utils, "yt", mock_yt)
+    caplog.set_level(logging.ERROR)
+    assert (
+        list_checkpoints(base_path="//d", logger=_silent_logger("test_list_exc")) == []
+        and "Failed to list checkpoints" in caplog.text
+    )
+
+
+def test_delete_checkpoint_returns_false_when_remove_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mock_yt = MagicMock()
+    mock_yt.exists.return_value = True
+    mock_yt.remove.side_effect = OSError("rm failed")
+    monkeypatch.setattr(ckpt_utils, "yt", mock_yt)
+    assert (
+        delete_checkpoint("c", base_path="//d", logger=_silent_logger("test_del_exc"))
+        is False
+    )
+
+
+def test_load_processing_state_returns_none_when_json_unmarshalling_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mock_yt = MagicMock()
+    mock_yt.exists.return_value = True
+    buf = MagicMock()
+    buf.read.return_value = b"not-json"
+    mock_yt.read_file.return_value = buf
+    monkeypatch.setattr(ckpt_utils, "yt", mock_yt)
+    caplog.set_level(logging.ERROR)
+    out = load_processing_state(
+        state_name="bad", base_path="//p", logger=_silent_logger("test_lps_badjson")
+    )
+    assert out is None and "Failed to parse processing state" in caplog.text

@@ -14,8 +14,10 @@ from yt_framework.operations.upload import (
     _copy_path_to_build_dir,
     _copy_stage_to_build_dir,
     _create_map_reduce_command_wrappers,
+    _create_wrappers_for_stage,
     _load_stage_job_section,
     _resolve_build_code_dir,
+    _resolve_map_reduce_command_scripts,
     _resolve_reduce_command_script,
     _resolve_upload_target,
     _validate_upload_config,
@@ -317,6 +319,265 @@ def test_copy_path_to_build_dir_copies_directory_tree(tmp_path: Path) -> None:
         logger=logger,
     )
     assert n == 1 and (build / "my_extra" / "a.txt").read_text(encoding="utf-8") == "1"
+
+
+def test_copy_path_to_build_dir_skips_ytignored_files(tmp_path: Path) -> None:
+    src = tmp_path / "extra_ig"
+    src.mkdir()
+    (src / "keep.txt").write_text("k", encoding="utf-8")
+    (src / "drop.txt").write_text("d", encoding="utf-8")
+    (src / ".ytignore").write_text("drop.txt\n", encoding="utf-8")
+    logger = logging.getLogger("tests.upload.path_ytignore")
+    logger.addHandler(logging.NullHandler())
+    build = tmp_path / "build_igpath"
+    n = _copy_path_to_build_dir(
+        source_path="extra_ig",
+        target_name="out",
+        build_dir=build,
+        pipeline_dir=tmp_path,
+        logger=logger,
+    )
+    out = build / "out"
+    assert (
+        n == 1
+        and (out / "keep.txt").read_text(encoding="utf-8") == "k"
+        and not (out / "drop.txt").exists()
+    ), ".ytignore must exclude drop.txt; .ytignore file is never copied"
+
+
+def test_copy_stage_to_build_dir_skips_src_file_when_matched_by_ytignore(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.stage_src_ig")
+    logger.addHandler(logging.NullHandler())
+    stage = tmp_path / "st_igsrc"
+    (stage / "src").mkdir(parents=True)
+    (stage / "src" / "keep.py").write_text("#\n", encoding="utf-8")
+    (stage / "src" / "skip.py").write_text("#\n", encoding="utf-8")
+    (stage / ".ytignore").write_text("src/skip.py\n", encoding="utf-8")
+    (stage / "config.yaml").write_text("job:\n  type: map\n", encoding="utf-8")
+    build = tmp_path / "b_igsrc"
+    n = _copy_stage_to_build_dir(build, stage, logger)
+    tgt = build / "stages" / "st_igsrc" / "src"
+    assert (
+        n == 2 and (tgt / "keep.py").is_file() and not (tgt / "skip.py").exists()
+    ), "patterned src file must be skipped; config and keep.py copy"
+
+
+def test_load_stage_job_section_returns_empty_when_config_yaml_missing(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.lj_miss")
+    logger.addHandler(logging.NullHandler())
+    stage = tmp_path / "st_nocfg"
+    stage.mkdir()
+    assert _load_stage_job_section(stage, logger) == {}
+
+
+def test_load_stage_job_section_returns_empty_when_yaml_root_is_sequence(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.lj_seq")
+    logger.addHandler(logging.NullHandler())
+    stage = tmp_path / "st_seqroot"
+    stage.mkdir()
+    (stage / "config.yaml").write_text("- item\n", encoding="utf-8")
+    assert _load_stage_job_section(stage, logger) == {}
+
+
+def test_resolve_map_reduce_command_scripts_treats_non_mapping_as_empty(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.mrc_nm")
+    logger.addHandler(logging.NullHandler())
+    stage = tmp_path / "st_mrc_scalar"
+    (stage / "src").mkdir(parents=True)
+    (stage / "src" / "mapper.py").write_text("#\n", encoding="utf-8")
+    (stage / "config.yaml").write_text(
+        "job:\n  map_reduce_command: not_a_mapping\n",
+        encoding="utf-8",
+    )
+    mapper, reducer = _resolve_map_reduce_command_scripts(stage, logger)
+    assert (
+        mapper == "mapper.py" and reducer is None
+    ), "scalar map_reduce_command must fall back like empty dict"
+
+
+def test_resolve_map_reduce_command_scripts_returns_none_when_mapper_missing(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG)
+    logger = logging.getLogger("tests.upload.mrc_nom")
+    logger.addHandler(logging.NullHandler())
+    stage = tmp_path / "st_nomapper"
+    (stage / "src").mkdir(parents=True)
+    (stage / "config.yaml").write_text(
+        "job:\n  map_reduce_command:\n    mapper_script: ghost.py\n",
+        encoding="utf-8",
+    )
+    mapper, reducer = _resolve_map_reduce_command_scripts(stage, logger)
+    assert (
+        mapper is None
+        and reducer is None
+        and "ghost.py" in caplog.text
+        and "skipping map_reduce_mapper" in caplog.text
+    )
+
+
+def test_resolve_map_reduce_command_scripts_writes_both_wrappers_when_reducer_resolved(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.mrc_both")
+    logger.addHandler(logging.NullHandler())
+    stage = tmp_path / "st_mrboth"
+    (stage / "src").mkdir(parents=True)
+    (stage / "src" / "mapper.py").write_text("#\n", encoding="utf-8")
+    (stage / "src" / "r_side.py").write_text("#\n", encoding="utf-8")
+    (stage / "config.yaml").write_text(
+        "job:\n"
+        "  map_reduce_command:\n"
+        "    mapper_script: mapper.py\n"
+        "    reducer_script: r_side.py\n",
+        encoding="utf-8",
+    )
+    build = tmp_path / "build_mrboth"
+    build.mkdir()
+    _create_map_reduce_command_wrappers("st_mrboth", stage, build, logger)
+    assert (build / "operation_wrapper_st_mrboth_map_reduce_mapper.sh").is_file() and (
+        build / "operation_wrapper_st_mrboth_map_reduce_reducer.sh"
+    ).is_file(), "mapper and reducer shell wrappers must both exist"
+
+
+def test_create_map_reduce_command_wrappers_writes_nothing_when_mapper_unresolvable(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.mrc_early_ret")
+    logger.addHandler(logging.NullHandler())
+    stage = tmp_path / "st_mr_empty"
+    (stage / "src").mkdir(parents=True)
+    (stage / "config.yaml").write_text(
+        "job:\n  map_reduce_command:\n    mapper_script: absent.py\n",
+        encoding="utf-8",
+    )
+    build = tmp_path / "build_mr_empty"
+    build.mkdir()
+    _create_map_reduce_command_wrappers("st_mr_empty", stage, build, logger)
+    assert (
+        list(build.glob("operation_wrapper_*")) == []
+    ), "no mapper script means no wrapper files"
+
+
+def test_resolve_map_reduce_command_scripts_auto_discovers_reducer_mds_file(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.mrc_autored")
+    logger.addHandler(logging.NullHandler())
+    stage = tmp_path / "st_autored"
+    (stage / "src").mkdir(parents=True)
+    (stage / "src" / "mapper.py").write_text("#\n", encoding="utf-8")
+    (stage / "src" / "reducer_mds.py").write_text("#\n", encoding="utf-8")
+    (stage / "config.yaml").write_text(
+        "job:\n  map_reduce_command:\n    mapper_script: mapper.py\n",
+        encoding="utf-8",
+    )
+    mapper, reducer = _resolve_map_reduce_command_scripts(stage, logger)
+    assert (
+        mapper == "mapper.py" and reducer == "reducer_mds.py"
+    ), "candidate list should pick reducer_mds.py when reducer_script omitted"
+
+
+def test_resolve_reduce_command_script_ignores_scalar_reduce_command_value(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.rc_scalar")
+    logger.addHandler(logging.NullHandler())
+    stage = tmp_path / "st_rc_scalar"
+    (stage / "src").mkdir(parents=True)
+    (stage / "src" / "reducer.py").write_text("#\n", encoding="utf-8")
+    (stage / "config.yaml").write_text(
+        "job:\n  reduce_command: not_a_mapping\n",
+        encoding="utf-8",
+    )
+    assert (
+        _resolve_reduce_command_script(stage, logger) == "reducer.py"
+    ), "non-dict reduce_command must fall back to default reducer filename"
+
+
+def test_resolve_reduce_command_script_returns_explicit_name_when_file_exists(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.red_ok")
+    logger.addHandler(logging.NullHandler())
+    stage = tmp_path / "st_red_explicit"
+    (stage / "src").mkdir(parents=True)
+    (stage / "src" / "my_red.py").write_text("#\n", encoding="utf-8")
+    (stage / "config.yaml").write_text(
+        "job:\n  reduce_command:\n    reducer_script: my_red.py\n",
+        encoding="utf-8",
+    )
+    assert _resolve_reduce_command_script(stage, logger) == "my_red.py"
+
+
+def test_create_wrappers_for_stage_is_no_op_when_stage_has_no_src_dir(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.wrap_nosrc")
+    logger.addHandler(logging.NullHandler())
+    stage = tmp_path / "st_only_cfg"
+    stage.mkdir()
+    (stage / "config.yaml").write_text("job:\n  type: map\n", encoding="utf-8")
+    build = tmp_path / "build_nosrc"
+    build.mkdir()
+    _create_wrappers_for_stage("only_cfg", stage, build, logger)
+    assert list(build.glob("operation_wrapper_*")) == [], "no src means no wrappers"
+
+
+def test_build_code_locally_creates_vanilla_wrapper_for_vanilla_only_stage(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.vanilla_only")
+    logger.addHandler(logging.NullHandler())
+    st = tmp_path / "stages" / "van_only"
+    (st / "src").mkdir(parents=True)
+    (st / "src" / "vanilla.py").write_text("#\n", encoding="utf-8")
+    build_dir = tmp_path / "out_vanilla"
+    build_code_locally(
+        build_dir=build_dir,
+        pipeline_dir=tmp_path,
+        logger=logger,
+        create_wrappers=True,
+    )
+    wrap = build_dir / "operation_wrapper_van_only_vanilla.sh"
+    assert wrap.is_file() and "vanilla.py" in wrap.read_text(
+        encoding="utf-8"
+    ), "vanilla-only stage should get vanilla operation wrapper"
+
+
+def test_build_code_locally_creates_reduce_wrapper_when_reduce_command_configured(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.reduce_wrap")
+    logger.addHandler(logging.NullHandler())
+    st = tmp_path / "stages" / "red_wrap_st"
+    (st / "src").mkdir(parents=True)
+    (st / "src" / "mapper.py").write_text("#\n", encoding="utf-8")
+    (st / "src" / "red_only.py").write_text("#\n", encoding="utf-8")
+    (st / "config.yaml").write_text(
+        "job:\n  reduce_command:\n    reducer_script: red_only.py\n",
+        encoding="utf-8",
+    )
+    build_dir = tmp_path / "out_reduce_wrap"
+    build_code_locally(
+        build_dir=build_dir,
+        pipeline_dir=tmp_path,
+        logger=logger,
+        create_wrappers=True,
+    )
+    sh = build_dir / "operation_wrapper_red_wrap_st_reduce.sh"
+    assert sh.is_file() and "red_only.py" in sh.read_text(
+        encoding="utf-8"
+    ), "reduce_command should produce reduce shell wrapper"
 
 
 def test_build_code_locally_copies_upload_modules_package_into_build_dir(
