@@ -64,7 +64,7 @@ jobs:
               "color": color,
           }
           body = json.dumps(
-              {"files": {"coverage-shields.json": {"content": json.dumps(payload)}}}
+              {"files": {"yt-framework-coverage.json": {"content": json.dumps(payload)}}}
           )
           req = urllib.request.Request(
               f"https://api.github.com/gists/{os.environ['COVERAGE_GIST_ID']}",

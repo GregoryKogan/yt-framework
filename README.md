@@ -5,7 +5,7 @@
 [![CI](https://github.com/GregoryKogan/yt-framework/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/GregoryKogan/yt-framework/actions/workflows/ci.yml)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/GregoryKogan/yt-framework)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/yt_framework)
-[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FGregoryKogan%2F293242803e295690b612e93aff8c151e%2Fraw%2Fcoverage-shields.json&cacheSeconds=60)](https://github.com/GregoryKogan/yt-framework/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FGregoryKogan%2F293242803e295690b612e93aff8c151e%2Fraw%2Fyt-framework-coverage.json&cacheSeconds=60)](https://github.com/GregoryKogan/yt-framework/actions/workflows/ci.yml)
 ![GitHub License](https://img.shields.io/github/license/GregoryKogan/yt-framework)
 
 **[PyPI](https://pypi.org/project/yt-framework/) | [Docs](https://yt-framework.readthedocs.io/en/latest/) | [DeepWiki](https://deepwiki.com/GregoryKogan/yt-framework) | [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples)**

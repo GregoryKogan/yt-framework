@@ -282,7 +282,7 @@ Complete these steps **in order** (each step is one action):
 
 7. Edit [README.md](README.md): in the coverage badge URL, replace **`YOUR_GIST_ID`** with the gist ID from step 3 (leave the rest of the shields.io URL unchanged).
 
-8. Push or merge to **`main`** and confirm in **Actions** that CI succeeded; open the gist and check that **`coverage-shields.json`** shows the real percentage.
+8. Push or merge to **`main`** and confirm in **Actions** that CI succeeded; open the gist and check that **`yt-framework-coverage.json`** shows the real percentage.
 
 9. If the README badge looks stale, hard-refresh the page or wait briefly; shields.io and proxies may cache images. The badge URL includes `cacheSeconds=60` to limit caching.
 
