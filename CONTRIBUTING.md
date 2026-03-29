@@ -260,7 +260,7 @@ pytest tests/test_stage.py
 
 ### CI (GitHub Actions)
 
-The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `pytest` with coverage over `yt_framework` and `ytjobs` on every **push** and **pull request** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). To require a green check before merging, configure branch protection on GitHub and add the `test` job as a required status check.
+The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `pytest` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). To require a green check before merging, configure branch protection on GitHub and add the `test` job as a required status check.
 
 ### Coverage badge (maintainers)
 
