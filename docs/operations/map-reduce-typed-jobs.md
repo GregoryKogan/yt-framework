@@ -110,6 +110,30 @@ Mappers typically do lightweight filtering or partitioning using only `@yt_datac
 **Why reducers often need `StageBootstrapTypedJob`:**
 Reducers typically import tokenizers, model wrappers, or other heavy dependencies at call time. These cannot be cloudpickled at submission time — they must be imported fresh inside the sandbox after `source.tar.gz` is extracted.
 
+## Driver module uploads and pickling controls
+
+YTsaurus `TypedJob` submission uses Python pickling. In addition to YT Framework's explicit `source.tar.gz` archive, the YTsaurus Python client may build an automatic modules archive from modules already present in the driver process `sys.modules`.
+
+That automatic archive is independent from `pipeline.upload_modules`. For example, `upload_modules: [my_lib]` controls what YT Framework copies into `source.tar.gz`; it does not by itself prevent the YTsaurus client from also uploading imported site-packages into `tmpfs/modules`.
+
+For Docker-based jobs, prefer using the Docker image for installed packages and `source.tar.gz` only for project code. Configure this at pipeline level:
+
+```yaml
+pipeline:
+  mode: "prod"
+  build_folder: "//path/to/build"
+  upload_modules:
+    - my_pipeline_lib
+  pickling:
+    ignore_system_modules: true
+    # disable_module_upload: true
+```
+
+- `ignore_system_modules: true` skips stdlib and installed site-packages from the automatic modules archive. This prevents shadow copies of packages such as `certifi`, `boto3`, or `importlib` from overriding the Docker image inside the worker sandbox.
+- `disable_module_upload: true` disables automatic module uploads completely. Use it only when the Docker image plus `source.tar.gz` contain everything the job imports at runtime.
+
+`StageBootstrapTypedJob` still extracts `source.tar.gz` on the worker and adds the archive root plus `stages/<stage>/src` to `sys.path`; these flags only control the YTsaurus client's extra pickled modules archive.
+
 ### Example: bare `yt.TypedJob` mapper (cloudpickle-safe)
 
 ```python

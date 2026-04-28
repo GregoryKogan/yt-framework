@@ -91,6 +91,7 @@ class YTProdClient(BaseYTClient):
         self,
         logger: logging.Logger,
         secrets: Dict[str, str],
+        pickling: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Initialize production YT client.
@@ -116,6 +117,7 @@ class YTProdClient(BaseYTClient):
             )
 
         self.client = YtClient(proxy=yt_proxy, token=yt_token)
+        self._apply_pickling_config(pickling or {})
         try:
             if "proxy" in self.client.config:
                 self.client.config["proxy"]["enable_proxy_discovery"] = False  # type: ignore[index]
@@ -129,6 +131,26 @@ class YTProdClient(BaseYTClient):
                 f"Could not disable proxy discovery: {e}. Continuing with default settings."
             )
             self.logger.debug(f"YT Client initialized with proxy: {yt_proxy}")
+
+    def _apply_pickling_config(self, pickling: Dict[str, Any]) -> None:
+        """Apply pickling flags from pipeline config to the YT client.
+
+        Supported flags:
+          ignore_system_modules (bool): Skip stdlib/site-packages from auto-upload.
+              Prevents shadow packages (certifi, importlib, boto3, etc.) from polluting
+              the worker sandbox. Safe default for Docker-based jobs.
+          disable_module_upload (bool): Skip ALL automatic module uploads.
+              Worker relies entirely on the Docker image + source.tar.gz.
+        """
+        if not pickling:
+            return
+        cfg = self.client.config["pickling"]  # type: ignore[index]
+        if pickling.get("ignore_system_modules"):
+            cfg["ignore_system_modules"] = True
+            self.logger.debug("Pickling: ignore_system_modules=True")
+        if pickling.get("disable_module_upload"):
+            cfg["module_filter"] = lambda _module: False
+            self.logger.debug("Pickling: module_filter=<upload nothing>")
 
     def create_path(
         self,

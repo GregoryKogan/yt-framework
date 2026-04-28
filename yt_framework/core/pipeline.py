@@ -123,11 +123,14 @@ class BasePipeline:
         secrets = load_secrets(self.configs_dir)
 
         # Initialize YT client
+        pickling_cfg = self.config.pipeline.get("pickling")
+        pickling_dict = OmegaConf.to_container(pickling_cfg, resolve=True) if pickling_cfg else {}
         self.yt = create_yt_client(
             logger=self.logger,
             mode=self.config.pipeline.get("mode"),
             pipeline_dir=self.pipeline_dir,
             secrets=secrets if secrets else None,
+            pickling=pickling_dict,
         )
 
         # Initialize stage registry (set by setup())
