@@ -144,12 +144,19 @@ class YTProdClient(BaseYTClient):
         """
         if not pickling:
             return
-        cfg = self.client.config["pickling"]  # type: ignore[index]
+        cfg = self.client.config.setdefault("pickling", {})  # type: ignore[attr-defined]
         if pickling.get("ignore_system_modules"):
             cfg["ignore_system_modules"] = True
             self.logger.debug("Pickling: ignore_system_modules=True")
         if pickling.get("disable_module_upload"):
-            cfg["module_filter"] = lambda _module: False
+            existing_module_filter = cfg.get("module_filter")
+
+            def module_filter(module: Any) -> bool:
+                if callable(existing_module_filter):
+                    existing_module_filter(module)
+                return False
+
+            cfg["module_filter"] = module_filter
             self.logger.debug("Pickling: module_filter=<upload nothing>")
 
     def create_path(
