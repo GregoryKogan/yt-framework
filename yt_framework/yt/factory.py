@@ -7,7 +7,7 @@ Reusable YT client for any YT operations.
 
 import logging
 from pathlib import Path
-from typing import Dict, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 from yt_framework.yt.client_base import BaseYTClient
 from yt_framework.yt.client_prod import YTProdClient
@@ -19,6 +19,7 @@ def create_yt_client(
     mode: Optional[Literal["prod", "dev"]] = "dev",
     pipeline_dir: Optional[Union[Path, str]] = None,
     secrets: Optional[Dict[str, str]] = None,
+    pickling: Optional[Dict[str, Any]] = None,
 ) -> BaseYTClient:
     """
     Factory function to create appropriate YT client based on mode.
@@ -50,7 +51,7 @@ def create_yt_client(
     if mode == "prod":
         if secrets is None:
             raise ValueError("secrets are required for prod mode")
-        return YTProdClient(logger=_logger, secrets=secrets)
+        return YTProdClient(logger=_logger, secrets=secrets, pickling=pickling or {})
     else:
         _pipeline_dir: Optional[Path] = None
         if pipeline_dir is not None:
