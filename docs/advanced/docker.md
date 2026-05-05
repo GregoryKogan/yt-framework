@@ -43,7 +43,7 @@ client:
   operations:
     map:
       resources:
-        docker_image: nvidia/cuda:11.8.0-runtime-ubuntu22.04
+        docker_image: docker.io/nvidia/cuda:11.8.0-runtime-ubuntu22.04
         gpu_limit: 1
         memory_limit_gb: 16
 ```
@@ -70,7 +70,7 @@ client:
   operations:
     map:
       resources:
-        docker_image: my-registry/standard-python:3.11
+        docker_image: docker.io/library/python:3.11-slim
         memory_limit_gb: 4
 ```
 
@@ -169,11 +169,11 @@ client:
 
 ### Docker Image Location
 
-Docker images can be:
+Use a fully qualified image reference so the cluster resolves the registry unambiguously:
 
-- **Public registry**: `python:3.11-slim`, `nvidia/cuda:11.8.0`
-- **Private registry**: `my-registry/my-image:latest`
-- **YT registry**: `//path/to/image` (if using YT's Docker registry)
+- **Docker Hub (user or org image)**: `docker.io/<namespace>/<repository>:<tag>` — e.g. `docker.io/gregorykogan/yt-framework:latest`
+- **Docker Hub (official / “library” image)**: `docker.io/library/<name>:<tag>` — e.g. `docker.io/library/python:3.11-slim`
+- **Other registry**: `<registry-host>/<path>:<tag>` — e.g. `registry.example.com/acme/my-service:1.0`
 
 ### GPU Configuration
 
@@ -184,7 +184,7 @@ client:
   operations:
     map:
       resources:
-        docker_image: nvidia/cuda:11.8.0-runtime-ubuntu22.04
+        docker_image: docker.io/nvidia/cuda:11.8.0-runtime-ubuntu22.04
         gpu_limit: 1              # Request 1 GPU
         memory_limit_gb: 16       # More memory for GPU workloads
         cpu_limit: 4
@@ -217,7 +217,7 @@ client:
   operations:
     map:
       resources:
-        docker_image: my-registry/private-image:latest
+        docker_image: registry.example.com/acme/private-image:latest
         # Docker auth is automatically loaded from secrets.env
 ```
 
@@ -358,7 +358,7 @@ WORKDIR /app
 
 **Tag images with versions:**
 
-```dockerfile
+```bash
 # Build with version tag
 docker buildx build --platform linux/amd64 \
     --tag my-registry/my-image:v1.2.3 \
@@ -377,10 +377,12 @@ docker_image: my-registry/my-image:v1.2.3
 
 ```bash
 # Build image
-docker buildx build --platform linux/amd64 --tag my-image:test --load .
+docker buildx build --platform linux/amd64 \
+    --tag docker.io/myuser/my-image:test --load .
 
 # Test image
-docker run --rm my-image:test python3 -c "import numpy; print(numpy.__version__)"
+docker run --rm docker.io/myuser/my-image:test \
+    python3 -c "import numpy; print(numpy.__version__)"
 ```
 
 ## Common Patterns
