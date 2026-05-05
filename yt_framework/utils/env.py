@@ -1,9 +1,4 @@
-"""
-Environment Variable Utilities
-===============================
-
-Simple utilities for loading environment variables from .env files.
-"""
+"""Load `KEY=value` files such as `configs/secrets.env` into plain dicts."""
 
 import warnings
 from pathlib import Path

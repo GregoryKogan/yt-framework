@@ -1,8 +1,4 @@
-"""
-Operations for working with S3 data in pipelines.
-
-This module provides functions for integrating S3 storage with YT Framework pipelines.
-"""
+"""Driver-side helpers to list S3 keys and persist paths into Cypress tables."""
 
 import logging
 from typing import List, Optional

@@ -1,35 +1,29 @@
-# YQL Operations
+# YQL operations
 
-YQL (YTsaurus Query Language) operations provide a high-level interface for table manipulation operations like joins, filters, aggregations, and more. These operations are executed efficiently on the YT cluster.
+YQL helpers on `self.deps.yt_client` run YTsaurus SQL against Cypress tables. In **prod** that is cluster YQL; in **dev** many helpers go through DuckDB-backed simulation (behavior may differ for edge cases).
 
 ## Overview
 
 ```{tip}
-**When to Use YQL Operations**
+**When YQL fits**
 
-Use YQL operations for SQL-like table manipulations (joins, filters, aggregations). They're more efficient than custom Python code for these operations and don't require writing mapper scripts.
+Use YQL helpers for joins, filters, aggregates, unions, and similar set operations. Use map when you need arbitrary Python per row or libraries YQL cannot call.
 ```
 
-YQL operations use YT's distributed query engine to perform table operations. They're perfect for:
+Typical uses:
 
-- Joining multiple tables
-- Filtering and selecting data
-- Aggregations and grouping
-- Union and distinct operations
-- Sorting and limiting
+- Join or reshape tables without shipping `mapper.py`.
+- Let YT choose execution plans for large inputs.
+- Preview SQL with dry-run APIs where supported.
 
-**Key characteristics:**
+**Defaults**
 
-- High-level table operations
-- Efficient distributed execution
-- No custom code required
-- Dry run support for query preview
-- Automatic `PRAGMA yt.MaxRowWeight` management (default `128M`)
+- `PRAGMA yt.MaxRowWeight` is injected at `128M` unless you override (max `128M`).
 
 ```{note}
-**YQL vs Map**
+**YQL vs map**
 
-Use YQL for SQL-like operations (joins, aggregations). Use map for custom Python logic per row. YQL is often faster for standard operations.
+YQL expresses set logic declaratively. Map runs your Python on each row stream.
 ```
 
 ## Row Weight Defaults

@@ -1,33 +1,25 @@
-# Vanilla Operations
+# Vanilla operations
 
-Vanilla operations run standalone jobs without input/output tables. They're perfect for setup tasks, cleanup, validation, or any work that doesn't process table data row-by-row.
+Vanilla runs `src/vanilla.py` once as a standalone job: no stdin row stream, no required input/output tables. Use it for bootstrap, teardown, health checks, or anything that should not be modeled as per-row map work.
 
 ## Overview
 
 ```{tip}
-**When to Use Vanilla Operations**
+**When vanilla fits**
 
-Use vanilla operations for setup tasks, cleanup, validation, or any work that doesn't require processing table rows. Perfect for initialization and maintenance tasks.
+Pick vanilla when you do not need table-based map I/O. If you are emitting one output row per input row, map is usually clearer.
 ```
 
-A **vanilla operation** executes a standalone script on the YT cluster (or locally in dev mode). Unlike map operations, vanilla operations:
+Compared with map:
 
-- Don't process table rows
-- Run once per operation (not per row)
-- Don't require input/output tables
-- Perfect for setup, cleanup, validation tasks
-
-**Key characteristics:**
-
-- Standalone execution
-- Single job (no parallelism)
-- No table I/O required
-- Custom code execution (vanilla.py)
+- One process per operation (no row fan-out).
+- Optional tables only if you open the client yourself inside the script.
+- Same upload/wrapper machinery as map in prod.
 
 ```{note}
-**Vanilla vs Map**
+**Vanilla vs map**
 
-Use vanilla when you don't need table I/O. Use map when you need to process table rows. Vanilla is simpler but less parallelizable.
+Vanilla = single script invocation. Map = streaming JSON rows through `mapper.py`.
 ```
 
 ## Quick Start
@@ -394,7 +386,7 @@ def main():
     logger.info("Environment logged")
 ```
 
-See [Example: environment_log](https://github.com/GregoryKogan/yt-framework/tree/main/examples/environment_log/) for comprehensive environment logging.
+See [Example: environment_log](https://github.com/GregoryKogan/yt-framework/tree/main/examples/environment_log/) for logging environment variables from a vanilla job.
 
 ## Advanced Topics
 

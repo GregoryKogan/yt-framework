@@ -1,9 +1,4 @@
-"""
-Upload Operations
-=================
-
-Operations for uploading code and configuration files to YT.
-"""
+"""Build `source.tar.gz`, merge extra modules/paths, and push artifacts to Cypress."""
 
 import importlib
 import logging

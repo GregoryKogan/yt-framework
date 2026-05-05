@@ -1,9 +1,4 @@
-"""
-S3 Operations
-=============
-
-Reusable S3 client for any S3 operations.
-"""
+"""Minimal boto3 wrapper for job-side list/get/put helpers."""
 
 import boto3
 import logging

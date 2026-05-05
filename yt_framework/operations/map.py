@@ -1,8 +1,4 @@
-"""
-High-level orchestration for YT map operations.
-
-This module provides functions for running map operations on YTsaurus clusters.
-"""
+"""Driver helpers to package `src/mapper.py` and submit YT map operations."""
 
 import logging
 from pathlib import Path

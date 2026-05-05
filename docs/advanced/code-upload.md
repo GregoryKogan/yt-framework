@@ -1,6 +1,6 @@
 # Code Upload
 
-Understanding how code upload works is essential for debugging and optimizing your pipelines. This guide explains the code upload mechanism and how to configure it.
+This page describes how the framework packs `stages/<name>/src`, dependency metadata, and optional extras into the archive YT runs in prod, and how to tune `upload_modules` / `upload_paths`.
 
 ## Overview
 
@@ -25,7 +25,7 @@ The framework automatically detects if code upload is needed:
 
 **Example:**
 
-```plaintext
+```text
 stages/
 └── my_stage/
     ├── stage.py
@@ -45,13 +45,13 @@ stages/
 
 2. **Upload to YT**: Uploads archive to `build_folder`:
 
-   ```plaintext
+   ```text
    //tmp/my_pipeline/build/source.tar.gz
    ```
 
 3. **Wrapper Scripts**: Generates wrapper scripts for each operation in build folder root:
 
-   ```plaintext
+   ```text
    //tmp/my_pipeline/build/operation_wrapper_my_stage_map.sh
    //tmp/my_pipeline/build/operation_wrapper_my_stage_vanilla.sh
    ```
@@ -81,14 +81,14 @@ pipeline:
 
 After upload, build folder contains:
 
-```plaintext
+```text
 //tmp/my_pipeline/build/
 └── source.tar.gz                                    # Code archive (contains everything)
 ```
 
 The `source.tar.gz` archive contains (when extracted):
 
-```plaintext
+```text
 source.tar.gz (extracted contents)
 ├── ytjobs/                                        # YT jobs package
 ├── stages/
@@ -163,7 +163,7 @@ The `source.tar.gz` archive contains:
 
 ### Archive Structure
 
-```plaintext
+```text
 source.tar.gz
 ├── ytjobs/
 │   └── ...
@@ -229,7 +229,7 @@ Similar structure but executes `vanilla.py` instead of `mapper.py`.
 
 If a stage has `requirements.txt`, dependencies are installed during operation execution:
 
-```txt
+```text
 # stages/my_stage/requirements.txt
 numpy>=1.20.0
 pandas>=1.3.0
@@ -264,7 +264,7 @@ In dev mode, code is still built locally (`.build/` and `source.tar.gz` are crea
 
 **Dev mode execution:**
 
-```plaintext
+```text
 .dev/sandbox_input->output/
 ├── input.jsonl
 ├── source.tar.gz (extracted)
@@ -314,7 +314,7 @@ from ytjobs.logging.logger import get_logger
 
 **Code runs in sandbox:**
 
-```plaintext
+```text
 sandbox/
 ├── source.tar.gz (extracted)
 ├── stages/
@@ -346,7 +346,7 @@ Autodoc and signatures: [API Reference](../reference/api.md) (sections **Upload 
 
 Code upload happens automatically. Check logs for:
 
-```plaintext
+```text
 [Upload] Packaging code...
 [Upload] Uploading code to //tmp/my_pipeline/build...
 [Upload] Code uploaded successfully

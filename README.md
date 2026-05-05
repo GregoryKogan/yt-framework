@@ -14,29 +14,22 @@
 
 ## Overview
 
-A powerful Python framework for building and executing data processing pipelines on [YTsaurus](https://ytsaurus.tech/) (YT) clusters. YT Framework simplifies pipeline development with automatic stage discovery, seamless dev/prod mode switching, and comprehensive support for YT operations.
+Python helpers and conventions for [YTsaurus](https://ytsaurus.tech/) pipelines: YAML config, ordered stages under `stages/`, dev mode that mirrors many prod behaviors on disk, and prod mode that uploads `src/` bundles to the cluster.
 
 ## Architecture
 
-YT Framework follows a pipeline-based architecture where pipelines consist of stages, and stages execute operations.
+- **Pipeline** — loads config, builds the YT client, walks `enabled_stages`.
+- **Stage** — one `BaseStage` subclass plus `config.yaml` (and optional `src/` for jobs).
+- **Operations** — map, vanilla, map-reduce/reduce, YQL via the client, S3 helpers, sorts, etc.
+- **Configuration** — OmegaConf-backed YAML; secrets in `configs/secrets.env`.
 
-**Key Components:**
+## What ships in the box
 
-- **Pipeline**: Orchestrates stages, their execution order, and configuration management
-- **Stages**: Reusable units of work that execute operations
-- **Operations**: Specific tasks (Map, Vanilla, YQL, S3, Table operations)
-- **Configuration**: YAML-based configuration system for flexible pipeline setup
+- Stage discovery (`DefaultPipeline`) from the filesystem layout.
+- `dev` / `prod` switch on the same code paths where possible.
+- Map, vanilla, YQL helpers, S3 listing/download patterns, table helpers, checkpoint upload wiring.
+- Optional custom Docker images, tokenizer tarballs, and multi-operation stages.
 
-## Key Features
-
-- **Pipeline & Stage Architecture**: Organize complex workflows into reusable stages
-- **Automatic Stage Discovery**: No manual registration needed - just create stages and run
-- **Dev/Prod Modes**: Develop locally with file system simulation, deploy to YT cluster seamlessly
-- **Multiple Operation Types**: Support for Map, Vanilla, YQL, and S3 operations
-- **Code Upload**: Automatic code packaging and deployment to YT cluster
-- **Docker Support**: Custom Docker images for special dependencies
-- **Checkpoint Management**: Built-in support for ML model checkpoints
-- **Configuration Management**: Flexible YAML-based configuration with multiple config support
 
 ## Installation
 
@@ -80,20 +73,18 @@ For local Sphinx builds without the full dev extra, use `pip install -e ".[docs]
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development setup and [Installation Guide](https://yt-framework.readthedocs.io/en/latest/#installation) for prerequisites.
 
-## Quick Start
+## Quick start
 
-Create your first pipeline in 3 steps:
+Three files: layout, entrypoint, stage + pipeline config.
 
-**What you'll build:** A simple pipeline that creates a stage, logs a message, and demonstrates the basic framework structure.
-
-1. **Create pipeline structure**:
+1. **Layout**
 
    ```bash
    mkdir my_pipeline && cd my_pipeline
    mkdir -p stages/my_stage configs
    ```
 
-2. **Create `pipeline.py`**:
+2. **`pipeline.py`**
 
    ```python
    from yt_framework.core.pipeline import DefaultPipeline
@@ -102,7 +93,7 @@ Create your first pipeline in 3 steps:
        DefaultPipeline.main()
    ```
 
-3. **Create stage and config**:
+3. **Stage + config**
 
    ```python
    # stages/my_stage/stage.py
@@ -124,29 +115,22 @@ Create your first pipeline in 3 steps:
      mode: "dev"  # Use "dev" for local development
    ```
 
-**Run your pipeline:**
-
 ```bash
 python pipeline.py
 ```
 
-**Next Steps:**
-
-- See the [Quick Start Guide](https://yt-framework.readthedocs.io/en/latest/#quick-start) for a complete example with table operations
-- Explore [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples) to see more complex use cases
-- Read about [Pipelines and Stages](https://yt-framework.readthedocs.io/en/latest/pipelines-and-stages.html) in the documentation
+**Next:** [Docs quick start](https://yt-framework.readthedocs.io/en/latest/#quick-start) (table write), [examples/](https://github.com/GregoryKogan/yt-framework/tree/main/examples), [Pipelines and stages](https://yt-framework.readthedocs.io/en/latest/pipelines-and-stages.html).
 
 ## Examples
 
-The [`examples/`](https://github.com/GregoryKogan/yt-framework/tree/main/examples) directory contains comprehensive examples demonstrating most framework features.
-Each example includes a README explaining what it demonstrates and how to run it.
+[`examples/`](https://github.com/GregoryKogan/yt-framework/tree/main/examples) holds runnable trees; each folder has a README with scope and commands.
 
 ## Requirements
 
-### Prerequisites Checklist
+### Prerequisites
 
-- [ ] **Python 3.11+** installed
-- [ ] **YT cluster access and credentials** (for production mode)
+- Python **3.11+**
+- YT **proxy + token** when you run `pipeline.mode: prod`
 
 ### YT Cluster Requirements
 
@@ -157,25 +141,19 @@ When running pipelines in production mode, code from `ytjobs` executes on YT clu
 - **boto3** == 1.35.99 (for S3 operations)
 - **botocore** == 1.35.99 (auto-installed with boto3)
 
-**Important:** Ensure your cluster's default Docker image satisfies these dependencies, or always use custom Docker images for your pipelines. See [Cluster Requirements](https://yt-framework.readthedocs.io/en/latest/configuration/cluster-requirements.html) and [Custom Docker Images](https://yt-framework.readthedocs.io/en/latest/advanced/docker.html) for details.
+If the cell default image lacks those pins, build a [custom Docker image](https://yt-framework.readthedocs.io/en/latest/advanced/docker.html). Background: [Cluster requirements](https://yt-framework.readthedocs.io/en/latest/configuration/cluster-requirements.html).
 
 ## Documentation
 
-**Full documentation available at: [yt-framework.readthedocs.io](https://yt-framework.readthedocs.io/en/latest/)**
+- Published: [yt-framework.readthedocs.io](https://yt-framework.readthedocs.io/en/latest/)
+- Source: [`docs/`](docs/)
+- [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples)
 
-For local development, source documentation is available in the [`docs/`](docs/) directory.
+## Getting help
 
-**[Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples)** - Complete working examples for most features
-
-## Getting Help
-
-- **Documentation**: Check the [full documentation](https://yt-framework.readthedocs.io/en/latest/) for detailed guides
-- **Troubleshooting**: See the [Troubleshooting Guide](https://yt-framework.readthedocs.io/en/latest/troubleshooting/index.html) for common issues
-- **Examples**: Browse [working examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples) to see how features are used
-- **GitHub Issues**: Report bugs or request features on [GitHub Issues](https://github.com/GregoryKogan/yt-framework/issues)
-- **Questions**: Open a GitHub issue with the `question` label
+- [Troubleshooting](https://yt-framework.readthedocs.io/en/latest/troubleshooting/index.html)
+- [GitHub Issues](https://github.com/GregoryKogan/yt-framework/issues) (bugs, features, questions with the `question` label)
 
 ## Contributing
 
-We welcome contributions! Whether it's bug fixes, new features, documentation improvements, or examples, your help makes YT Framework better.  
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -1,9 +1,4 @@
-"""
-Development YT Client
-=====================
-
-Development implementation of YT client using local file system.
-"""
+"""Local filesystem stand-in for Cypress tables and subprocess-backed jobs."""
 
 import json
 import os

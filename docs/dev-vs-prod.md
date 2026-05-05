@@ -1,40 +1,34 @@
-# Dev vs Prod Modes
+# Dev vs prod modes
 
-YT Framework supports two execution modes: **dev** (development) and **prod** (production). Understanding the differences and when to use each mode is crucial for effective pipeline development.
+The pipeline `mode` field is either `dev` or `prod`. Same Python and YAML shape; execution differs (local files vs YT cluster).
 
 ## Overview
 
 ```{tip}
-**Start with Dev Mode**
+**Start in dev**
 
-Always develop and test your pipelines in dev mode first. It's faster, doesn't require YT credentials, and makes debugging easier.
+No `secrets.env` requirement, fast feedback, artifacts under `.dev/`.
 ```
 
-- **Dev Mode**: Simulates YT operations locally using the file system. Perfect for development, testing, and debugging.
-- **Prod Mode**: Executes operations on the actual YT cluster. Used for production workloads.
-
-Both modes use the same code and configuration, making it easy to develop locally and deploy to production.
+- **Dev**: tables and many operations are simulated on disk; good for development and CI without a cluster.
+- **Prod**: real YT operations and uploads; needs credentials and a compatible cluster image.
 
 ```{warning}
-**Credentials Required for Prod Mode**
+**Prod needs credentials**
 
-Production mode requires YT credentials in `configs/secrets.env`. Make sure to set up credentials before running in prod mode.
+Set `YT_PROXY` and `YT_TOKEN` in `configs/secrets.env` before switching to `prod`.
 ```
 
-## Dev Mode
+## Dev mode
 
-### How It Works (dev)
+### Behavior
 
-Dev mode simulates YT operations using the local file system:
+- **Tables**: JSONL files under `.dev/`, keyed from logical YT-style paths.
+- **Map / vanilla style jobs**: local subprocess plus a sandbox directory under `.dev/`.
+- **Code upload**: skipped; Python runs from your working tree.
+- **YQL**: translated through DuckDB where the dev client supports it (not identical to cluster YQL in every edge case).
 
-- **Tables**: Stored as `.jsonl` files in `.dev/` directory
-- **Operations**: Executed locally using subprocess
-- **Code Upload**: No-op (code runs directly from local filesystem)
-- **YQL Operations**: Executed using DuckDB for local simulation
-
-### Configuration (dev)
-
-Set mode in pipeline config:
+### Config
 
 ```yaml
 # configs/config.yaml
@@ -42,35 +36,32 @@ pipeline:
   mode: "dev"
 ```
 
-### Directory Structure (dev)
+### Layout after a run
 
-When running in dev mode, the framework creates a `.dev/` directory:
-
-```plaintext
+```text
 my_pipeline/
 ├── .dev/
-│   ├── table1.jsonl      # Simulated YT tables
+│   ├── table1.jsonl
 │   ├── table2.jsonl
-│   └── operation.log     # Operation logs
+│   └── operation.log
 ├── configs/
 ├── stages/
 └── pipeline.py
 ```
 
-### Table Operations (dev)
+### Tables
 
-**Writing tables:**
+Write:
 
 ```python
-# In dev mode, writes to .dev/table_name.jsonl
+# Writes .dev/data.jsonl for logical path //tmp/my_pipeline/data
 self.deps.yt_client.write_table(
     table_path="//tmp/my_pipeline/data",
-    rows=[{"id": 1, "name": "Alice"}]
+    rows=[{"id": 1, "name": "Alice"}],
 )
-# Creates: .dev/data.jsonl
 ```
 
-Append without truncating the file (same keyword in prod on a real table that already exists):
+Append without truncating (same keyword as prod when the target already exists):
 
 ```python
 self.deps.yt_client.write_table(
@@ -80,94 +71,71 @@ self.deps.yt_client.write_table(
 )
 ```
 
-**Reading tables:**
+Read:
 
 ```python
-# In dev mode, reads from .dev/table_name.jsonl
 rows = list(self.deps.yt_client.read_table("//tmp/my_pipeline/data"))
-# Reads from: .dev/data.jsonl
 ```
 
-### Map Operations (dev)
+### Map (dev)
 
-Map operations run locally using subprocess:
+Typical flow:
 
-1. Creates sandbox directory: `.dev/sandbox_<input>-><output>/`
-2. Copies input table to sandbox
-3. Executes mapper.py script
-4. Writes mapper stdout to `.dev/<output>.jsonl`, or appends to that file when `append: true` is set on the map operation
+1. Sandbox: `.dev/sandbox_<input>-><output>/` (exact name may vary by config).
+2. Copy or link input JSONL into the sandbox.
+3. Run the mapper entrypoint.
+4. Mapper stdout becomes `.dev/<output>.jsonl`, or appends when the map op sets `append: true`.
 
-See [Map operations — Append output](operations/map.md#append-output) for the config flag.
+See [Map operations — Append output](operations/map.md) (`append: true` section).
 
-**Example:**
+### Vanilla (dev)
 
-```bash
-# Dev mode execution
-.dev/sandbox_input->output/
-├── input.jsonl
-├── source.tar.gz (extracted)
-└── operation_wrapper_*.sh
-```
+1. Sandbox under `.dev/<stage>_sandbox/` (name depends on stage).
+2. Extract the uploaded archive layout locally.
+3. Run `vanilla.py` (or configured entry).
+4. Stdout/stderr captured to `.dev/<stage>.log` (see operations docs for exact file names).
 
-### Vanilla Operations (dev)
+### YQL (dev)
 
-Vanilla operations run locally using subprocess:
+Runs through the dev client’s DuckDB-backed path for supported statements. Treat results as representative, not a full YT SQL conformance suite.
 
-1. Creates sandbox directory: `.dev/<stage_name>_sandbox/`
-2. Extracts source archive
-3. Executes vanilla.py script
-4. Logs output to `.dev/<stage_name>.log`
+### When dev mode is enough
 
-### YQL Operations (dev)
+- Writing stages and unit-style checks.
+- Debugging mapper I/O with small fixtures.
+- CI that should not depend on YT network.
 
-YQL operations are simulated using DuckDB:
+### Tradeoffs (dev)
 
-- Joins, filters, aggregations run locally
-- Results written to `.dev/` directory
-- Full YQL syntax supported
+**Pros**
 
-### When to Use Dev Mode
+- Fast edit-run cycles.
+- No cluster account required for basic flows.
+- Easy to inspect `.jsonl` and logs on disk.
+- Works offline for many pipelines.
 
-- **Development**: Writing and testing new stages
-- **Debugging**: Investigating issues locally
-- **Testing**: Validating pipeline logic
-- **CI/CD**: Running tests without YT cluster access
-- **Learning**: Understanding framework behavior
+**Cons**
 
-### Advantages (dev)
+- Dataset size bounded by your machine.
+- Parallelism and timing differ from prod.
+- Rare YT-only behavior may not appear until prod.
 
-- ✅ Fast iteration (no network latency)
-- ✅ No YT cluster access required
-- ✅ Easy debugging (files are local)
-- ✅ Free (no cluster resources used)
-- ✅ Works offline
+## Prod mode
 
-### Limitations (dev)
+### Behavior
 
-- ❌ Not suitable for large datasets (limited by local disk)
-- ❌ Some YT-specific features may differ
-- ❌ Performance characteristics differ from production
-
-## Prod Mode
-
-### How It Works (prod)
-
-Prod mode executes operations on the actual YT cluster:
-
-- **Tables**: Stored on YT cluster at specified paths
-- **Operations**: Executed on YT cluster nodes
-- **Code Upload**: Code is packaged and uploaded to YT
-- **YQL Operations**: Executed using YT's YQL engine
+- **Tables**: real Cypress paths on YT.
+- **Operations**: cluster jobs with the resources you request.
+- **Upload**: framework packages code to `build_folder` before starting jobs.
+- **YQL**: cluster YQL engine.
 
 ```{warning}
-**Cluster Dependencies Required**
+**Image must match imports**
 
-In prod mode, `ytjobs` code executes on YT cluster nodes. The cluster's Docker image must include required dependencies or you must use custom Docker images. See [Cluster Requirements](configuration/cluster-requirements.md) for details.
+Job code imports `ytjobs` and your own modules. The Docker image for those jobs must ship matching Python deps. See [Cluster requirements](configuration/cluster-requirements.md).
 ```
 
-### Configuration (prod)
-
-Set mode in pipeline config:
+### Config
 
 ```yaml
 # configs/config.yaml
@@ -176,304 +144,160 @@ pipeline:
   build_folder: "//tmp/my_pipeline/build"
 ```
 
-**Required credentials** (`configs/secrets.env`):
+`configs/secrets.env`:
 
 ```bash
 YT_PROXY=your-yt-proxy-url
 YT_TOKEN=your-yt-token
 ```
 
-### Table Operations (prod)
-
-**Writing tables:**
+### Tables (prod)
 
 ```python
-# In prod mode, writes to YT cluster
 self.deps.yt_client.write_table(
     table_path="//tmp/my_pipeline/data",
-    rows=[{"id": 1, "name": "Alice"}]
+    rows=[{"id": 1, "name": "Alice"}],
 )
-# Creates: //tmp/my_pipeline/data on YT cluster
 ```
-
-**Reading tables:**
 
 ```python
-# In prod mode, reads from YT cluster
 rows = list(self.deps.yt_client.read_table("//tmp/my_pipeline/data"))
-# Reads from: //tmp/my_pipeline/data on YT cluster
 ```
 
-### Map Operations (prod)
+### Map (prod)
 
-Map operations run on YT cluster:
+1. Upload bundle to `build_folder`.
+2. YT schedules tasks over input chunks.
+3. Reducers (if any) follow map semantics you configured.
+4. Output lands in the configured output table.
 
-1. Code is uploaded to `build_folder`
-2. YT creates jobs on cluster nodes
-3. Each job processes a portion of input table
-4. Results are written to output table on cluster
+### Vanilla (prod)
 
-### Vanilla Operations (prod)
+Upload, single or few cluster tasks, logs in YT UI.
 
-Vanilla operations run on YT cluster:
+### YQL (prod)
 
-1. Code is uploaded to `build_folder`
-2. YT creates job on cluster node
-3. Job executes vanilla.py script
-4. Logs available in YT web UI
+Distributed engine, cluster-sized inputs.
 
-### YQL Operations (prod)
+### When you need prod
 
-YQL operations execute on YT cluster:
+- Production schedules.
+- Data larger than fits comfortably on a laptop disk.
+- Real concurrency and YT-native features.
 
-- Uses YT's distributed YQL engine
-- Handles large datasets efficiently
-- Full YT YQL syntax supported
+### Tradeoffs (prod)
 
-### When to Use Prod Mode
+**Pros**
 
-- **Production**: Running production workloads
-- **Large Datasets**: Processing data that doesn't fit locally
-- **Performance**: Need cluster performance and parallelism
-- **Integration**: Integrating with other YT-based systems
+- Scales with cluster storage and CPU.
+- Matches how batch jobs actually run in YT.
 
-### Advantages (prod)
+**Cons**
 
-- ✅ Handles large datasets (distributed storage)
-- ✅ High performance (distributed processing)
-- ✅ Scalability (cluster resources)
-- ✅ Production-ready (real YT environment)
+- Needs credentials and network.
+- Slower iteration than dev.
+- Debugging means YT logs and UI, not only local files.
 
-### Limitations (prod)
+## Quick comparison
 
-- ❌ Requires YT cluster access
-- ❌ Slower iteration (network latency)
-- ❌ Costs cluster resources
-- ❌ Harder to debug (remote execution)
+| Topic | Dev | Prod |
+|-------|-----|------|
+| Config snippet | `pipeline.mode: "dev"` | `pipeline.mode: "prod"` plus `build_folder` when uploading |
+| Credentials | No YT `secrets.env` for basic flows | `YT_PROXY` / `YT_TOKEN` required |
+| Throughput | One machine, subprocess-style map/vanilla | Cluster scheduling and distributed tables |
+| Debugging | `.dev/*.jsonl`, local stderr | YT operation UI, remote stderr |
 
-## Quick Comparison
+## Switching modes
 
-```{tab-set}
-```{tab-item} Configuration
-**Dev Mode:**
-```yaml
-pipeline:
-  mode: "dev"
-```
-
-**Prod Mode:**
+Change one field:
 
 ```yaml
 pipeline:
-  mode: "prod"
-  build_folder: "//tmp/my_pipeline/build"
-```
-
-```{tab-item} Credentials
-**Dev Mode:**
-- No credentials required
-- Works offline
-
-**Prod Mode:**
-- Requires `configs/secrets.env`
-- Must have YT cluster access
-```
-
-```{tab-item} Performance
-**Dev Mode:**
-- Fast iteration
-- Limited by local resources
-- Sequential execution
-
-**Prod Mode:**
-- Distributed processing
-- Scales with cluster size
-- Parallel execution
-```
-
-```{tab-item} Debugging
-**Dev Mode:**
-- Files in `.dev/` directory
-- Immediate error feedback
-- Easy to inspect
-
-**Prod Mode:**
-- YT web UI for logs
-- Remote debugging
-- Requires cluster access
-```
-
-## Switching Between Modes
-
-Switching between modes is simple - just change the `mode` setting:
-
-```yaml
-# Development
-pipeline:
-  mode: "dev"
-
-# Production
-pipeline:
-  mode: "prod"
+  mode: "dev"   # or "prod"
 ```
 
 ```{note}
-**Same Code, Different Execution**
+**Same repo, different backend**
 
-The same code and configuration work in both modes. The framework handles the differences automatically.
+The framework picks dev vs prod implementations from `mode`; your stage classes stay the same.
 ```
 
-**Important considerations:**
+Checklist when going to prod:
 
-1. **Table paths**: Same paths work in both modes (dev mode maps them to `.dev/`)
-2. **Credentials**: Prod mode requires `secrets.env` with YT credentials
-3. **Build folder**: Prod mode requires `build_folder` for code execution
-4. **Code changes**: Dev mode uses local code, prod mode uploads code
+1. Logical table paths stay the same string format; dev maps them to files.
+2. `secrets.env` exists and points at the right cluster.
+3. `build_folder` is set and writable for your service user.
+4. Docker image includes everything imported inside uploaded job code.
 
-## Leaky Abstractions
+## Where behavior diverges
 
-While the framework tries to abstract away differences, some leak through:
+### Paths
 
-### File Paths
+- Dev: `//tmp/.../name` maps to `.dev/name.jsonl` (see client implementation for exact mapping rules).
+- Prod: the same string is a Cypress path.
 
-**Dev mode:**
+### Parallelism
 
-- Tables stored as `.jsonl` files
-- Path `//tmp/my_pipeline/data` becomes `.dev/data.jsonl`
+- Dev map runs are closer to “one local subprocess story” than thousands of tiny tasks.
+- Prod uses YT scheduling; race conditions that never show up locally can appear under load.
 
-**Prod mode:**
+### Code freshness
 
-- Tables stored on YT cluster
-- Path `//tmp/my_pipeline/data` is actual YT path
+- Dev reads your tree directly.
+- Prod needs a successful upload each run; if you change only local files, rerun the pipeline to refresh the bundle.
 
-**What to know:**
+### Errors
 
-- Same code works in both modes
-- Path format is the same (`//tmp/...`)
-- Dev mode automatically maps paths to local files
+- Dev: tracebacks in your terminal.
+- Prod: fetch stderr and system logs from YT for the failing operation.
 
-### Operation Execution
+## Debugging
 
-**Dev mode:**
+### Dev
 
-- Map operations run sequentially (one job)
-- Limited parallelism
-- Uses local resources
+1. List `.dev/` after the stage runs.
+2. Open the JSONL you think should have changed.
+3. Read `operation.log` and stage logs next to it.
+4. Print debugging is fine; you see it immediately.
 
-**Prod mode:**
+### Prod
 
-- Map operations run in parallel (multiple jobs)
-- Full cluster parallelism
-- Uses cluster resources
+1. Open the operation in the YT UI and read stderr.
+2. Use `self.logger` consistently; it ends up in the same places operations already aggregate logs.
+3. For stubborn issues, reproduce with a tiny input table, then widen.
 
-**What to know:**
+### Common symptoms
 
-- Performance characteristics differ
-- Dev mode may not catch all concurrency issues
-- Test in prod mode for production workloads
+**Table missing in prod**
 
-### Code Execution
+- Path typo or table never created in that Cypress tree.
+- Credentials or proxy pointing at the wrong cluster.
 
-**Dev mode:**
+**Code changes ignored in prod**
 
-- Code runs directly from local filesystem
-- No code upload needed
-- Changes are immediately available
+- You did not re-run the pipeline after editing sources, or upload failed silently earlier (check logs).
 
-**Prod mode:**
+**Different results dev vs prod**
 
-- Code is packaged and uploaded
-- Must upload before execution
-- Changes require re-upload
+- DuckDB vs cluster SQL differences for YQL-heavy stages.
+- Resource limits killing tasks only on the cluster.
 
-**What to know:**
-
-- Dev mode is faster for iteration
-- Prod mode requires `build_folder` configuration
-- Code structure must be compatible with both modes
-
-### Error Handling
-
-**Dev mode:**
-
-- Errors show in terminal
-- Stack traces are immediate
-- Easy to debug
-
-**Prod mode:**
-
-- Errors in YT web UI
-- Stack traces in operation logs
-- Requires YT access to debug
-
-**What to know:**
-
-- Use dev mode for debugging
-- Check YT web UI for prod errors
-- Logs are crucial for prod debugging
-
-## Debugging Tips
-
-### Dev Mode Debugging
-
-1. **Check `.dev/` directory**: See generated files and tables
-2. **Check logs**: Operation logs in `.dev/` directory
-3. **Inspect tables**: Open `.jsonl` files directly
-4. **Add print statements**: Output appears immediately
-
-### Prod Mode Debugging
-
-1. **Check YT web UI**: View operations and logs
-2. **Use logging**: `self.logger` output appears in YT logs
-3. **Check operation status**: Monitor in YT web UI
-4. **Download results**: Download tables for local inspection
-
-### Common Issues
-
-### Issue: Tables not found in prod mode
-
-- Check table paths exist on YT cluster
-- Verify YT credentials are correct
-- Check YT proxy URL is accessible
-
-### Issue: Code not updating in prod mode
-
-- Code is uploaded once per pipeline run
-- Changes require re-running pipeline
-- Check `build_folder` is correct
-
-### Issue: Different behavior in dev vs prod
-
-- Check for YT-specific features
-- Verify resource limits
-- Test with similar data sizes
-
-## Best Practices
+## Workflow suggestion
 
 ```{tip}
-**Development Workflow**
+**Smoke in prod early**
 
-1. Develop and test in dev mode
-2. Validate in prod mode with small dataset
-3. Deploy to production with full dataset
+After dev passes, run prod once on a small slice of real schema before full-scale backfill jobs.
 ```
 
-1. **Develop in dev mode**: Faster iteration and debugging
-2. **Test in prod mode**: Validate before production deployment
-3. **Use same configs**: Keep dev and prod configs similar
-4. **Monitor resources**: Check resource usage in prod mode
-5. **Version control**: Track config changes between modes
+1. Implement in dev.
+2. Promote to prod with a narrow date range or row limit.
+3. Only then open the floodgates.
 
-```{warning}
-**Test Before Production**
+## Next steps
 
-Always test your pipeline in prod mode with a small dataset before running on production data. This helps catch mode-specific issues early.
-```
-
-## Next Steps
-
-- Understand [Cluster Requirements](configuration/cluster-requirements.md) for production mode dependencies
-- Learn about [Configuration](configuration/index.md) management
-- Explore [Operations](operations/index.md) for different operation types
-- Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for mode-specific examples
-- Review [Troubleshooting](troubleshooting/configuration.md) for mode-specific issues
+- [Cluster requirements](configuration/cluster-requirements.md)
+- [Configuration](configuration/index.md)
+- [Operations](operations/index.md)
+- [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/)
+- [Troubleshooting: configuration](troubleshooting/configuration.md)

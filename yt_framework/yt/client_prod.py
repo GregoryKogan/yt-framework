@@ -1,9 +1,4 @@
-"""
-Production YT Client
-====================
-
-Production implementation of YT client using actual YTsaurus client.
-"""
+"""Thin wrapper around `yt.wrapper.YtClient` for real cluster operations."""
 
 import logging
 from pathlib import Path

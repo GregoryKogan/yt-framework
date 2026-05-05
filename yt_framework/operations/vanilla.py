@@ -1,8 +1,4 @@
-"""
-High-level orchestration for YT vanilla operations.
-
-This module provides functions for running vanilla operations on YTsaurus clusters.
-"""
+"""Driver helpers to package `src/vanilla.py` and submit YT vanilla operations."""
 
 import logging
 from pathlib import Path

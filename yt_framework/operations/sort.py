@@ -1,9 +1,4 @@
-"""
-Sort operation for YT Framework.
-
-Stages use this to run a YT sort operation with pool/resources drawn from config,
-following the same (context, operation_config) pattern as run_map_reduce/run_reduce.
-"""
+"""Submit YT sort jobs using the same `(context, operation_config)` pattern as map."""
 
 import logging
 from typing import TYPE_CHECKING

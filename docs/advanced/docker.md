@@ -5,7 +5,7 @@ YT Framework supports custom Docker images for operations that require special d
 ```{note}
 **When Custom Docker is Required**
 
-Custom Docker images are essential if your YT cluster's default Docker image doesn't include the dependencies required by `ytjobs` (Python 3.11+, ytsaurus-client, boto3, omegaconf). See [Cluster Requirements](../configuration/cluster-requirements.md) for details about cluster dependencies and when to use custom Docker images.
+Use a custom image when the cell default does not ship the Python stack your uploaded jobs import (`ytjobs`, `boto3`, CUDA user-space, etc.). See [Cluster requirements](../configuration/cluster-requirements.md) for package versions this repo tests against.
 ```
 
 ## Overview

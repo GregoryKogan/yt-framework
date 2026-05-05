@@ -1,23 +1,20 @@
-# Map Operations
+# Map operations
 
-Map operations process each row of a table independently, making them perfect for row-by-row transformations, filtering, and data processing tasks.
+A map job reads an input table, runs your `mapper.py` once per row (grouped into YT tasks in prod), and writes JSON lines to an output table. Use it when the transform is row-local in Python and does not fit YQL cleanly.
 
 ## Overview
 
 ```{tip}
-**When to Use Map Operations**
+**When map fits**
 
-Use map operations for row-by-row transformations, filtering, data enrichment, or any task that processes each table row independently.
+Reach for map when each output row (or zero rows) depends only on one input row and you need arbitrary Python. Prefer YQL for set-style SQL operations.
 ```
 
-A **map operation** takes an input table, processes each row through a mapper script, and writes results to an output table. The operation runs in parallel across multiple jobs on the YT cluster (or sequentially in dev mode).
+**Behavior:**
 
-**Key characteristics:**
-
-- Processes each row independently
-- Parallel execution (multiple jobs)
-- Input/output tables required
-- Custom code execution (mapper.py)
+- Stdin/stdout JSON lines (one object per line); flush after each printed row.
+- Prod: many tasks; dev: a single local subprocess and a sandbox under `.dev/`.
+- Requires `input_table`, `output_table`, and `resources` in YAML.
 
 ```{warning}
 **Mapper Script Requirements**
@@ -129,14 +126,12 @@ The mapper script (`src/mapper.py`) is executed for each row of the input table.
 import sys
 import json
 
+def process_row(row: dict) -> dict:
+    return row  # replace with your transform
+
 for line in sys.stdin:
-    # Read input row
     row = json.loads(line)
-    
-    # Process row
     processed = process_row(row)
-    
-    # Write output row
     print(json.dumps(processed), flush=True)
 ```
 
@@ -249,12 +244,11 @@ resources:
   user_slots: null           # Optional: user slots limit
 ```
 
-**Resource guidelines:**
+**Resources (rule of thumb):**
 
-- **Memory**: Allocate based on row size and processing needs
-- **CPU**: More CPUs = faster processing per job
-- **Job count**: More jobs = better parallelism (up to data size)
-- **GPU**: Set to 1+ for GPU workloads (requires custom Docker)
+- Raise `memory_limit_gb` when a single row plus model weights no longer fits.
+- `cpu_limit` helps per-task throughput; `job_count` spreads rows across tasks.
+- `gpu_limit` > 0 only works with an image that actually exposes GPUs to Python.
 
 ### Advanced Configuration
 
@@ -422,14 +416,13 @@ if checkpoint_file:
 
 See [Checkpoints Guide](../advanced/checkpoints.md) for details.
 
-## Best Practices
+## Practices
 
-1. **Idempotent processing**: Mapper should produce same output for same input
-2. **Error handling**: Handle errors gracefully, don't crash on bad rows
-3. **Resource allocation**: Allocate resources based on actual needs
-4. **Job count**: Balance parallelism vs overhead (start with 2-4 jobs)
-5. **Logging**: Log important operations for debugging
-6. **Testing**: Test mapper locally before running on cluster
+1. Keep transforms deterministic for the same input row.
+2. Decide whether a bad row should skip, fail the task, or poison the whole op (`max_failed_job_count`).
+3. Size memory from peak RSS you observe in dev, not from guesses.
+4. Log row ids sparingly; high-volume logs hurt both dev and prod.
+5. Run dev mode on a slice of production schema before widening `job_count` in prod.
 
 ## Common Patterns
 
@@ -468,32 +461,15 @@ for line in sys.stdin:
 
 ## Troubleshooting
 
-### Issue: Operation fails immediately
+| Symptom | Checks |
+|---------|--------|
+| Op fails at start | Mapper entrypoint path, import errors in bundle, missing input table |
+| Sparse row failures | `max_failed_job_count`, stderr in failing task |
+| Slow wall clock | `job_count` too low for data size, CPU-bound Python, remote I/O inside mapper |
+| OOM kills | Raise `memory_limit_gb`, shrink per-row allocations, stream instead of buffering |
 
-- Check mapper script syntax
-- Verify input table exists
-- Check resource limits
+## Next steps
 
-### Issue: Some rows fail
-
-- Check `max_failed_job_count` setting
-- Review error logs in YT web UI
-- Add error handling in mapper
-
-### Issue: Slow performance
-
-- Increase `job_count` for parallelism
-- Increase `cpu_limit` per job
-- Check for bottlenecks in mapper code
-
-### Issue: Out of memory
-
-- Increase `memory_limit_gb`
-- Check row size and processing needs
-- Optimize mapper code
-
-## Next Steps
-
-- Learn about [Vanilla Operations](vanilla.md)
-- Explore [Advanced Topics](../advanced/index.md) (Docker, checkpoints)
-- Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for more patterns
+- [Vanilla](vanilla.md) for non-table jobs
+- [Advanced](../advanced/index.md) for Docker and checkpoints
+- [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/)

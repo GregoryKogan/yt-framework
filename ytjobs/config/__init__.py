@@ -1,9 +1,4 @@
-"""
-Job Configuration Utilities
-============================
-
-Configuration loading for YT jobs - using OmegaConf.
-"""
+"""Resolve `JOB_CONFIG_PATH` to the staged `config.yaml` inside sandboxes."""
 
 import os
 from pathlib import Path

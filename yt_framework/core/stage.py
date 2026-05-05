@@ -1,12 +1,6 @@
-"""
-Base Stage Class
-=================
+"""`BaseStage` — pipeline authors subclass this and implement `run()`.
 
-Abstract base class for pipeline stages.
-All stages should inherit from BaseStage and implement the run method.
-
-Stage name is automatically detected from the directory name.
-Directory structure: stages/<stage_name>/stage.py
+The framework derives the stage name from the `stages/<name>/` directory.
 """
 
 from abc import ABC, abstractmethod

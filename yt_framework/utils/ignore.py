@@ -1,9 +1,4 @@
-"""
-.ytignore Parser and Matcher
-============================
-
-Supports .gitignore-like pattern matching for excluding files from YT uploads.
-"""
+"""`.ytignore` parsing (gitignore-style) for upload tarballs."""
 
 import re
 from pathlib import Path

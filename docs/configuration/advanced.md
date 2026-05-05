@@ -1,34 +1,27 @@
-# Advanced Configuration
+# Advanced configuration
 
-Advanced configuration features including multiple config files, merging, and validation.
+Extra YAML files, OmegaConf features, and how to debug merged config.
 
-## Multiple Configuration Files
+## Multiple files
 
-You can use multiple configuration files for different environments or scenarios:
-
-```bash
+```text
 configs/
-├── config.yaml          # Default config
-├── config_dev.yaml      # Development config
-├── config_prod.yaml     # Production config
-└── config_large.yaml    # Large dataset config
+├── config.yaml
+├── config_dev.yaml
+├── config_prod.yaml
+└── config_large.yaml
 ```
 
-### Using Different Configs
-
-Specify the config file via `--config` flag:
+Pick one at launch:
 
 ```bash
-# Use default config
 python pipeline.py
-
-# Use specific config
 python pipeline.py --config configs/config_prod.yaml
 ```
 
-### Example: Environment-Specific Configs
+Example split:
 
-**Development config** (`configs/config_dev.yaml`):
+`configs/config_dev.yaml`:
 
 ```yaml
 stages:
@@ -41,7 +34,7 @@ pipeline:
   build_folder: "//tmp/my_pipeline/dev/build"
 ```
 
-**Production config** (`configs/config_prod.yaml`):
+`configs/config_prod.yaml`:
 
 ```yaml
 stages:
@@ -56,19 +49,13 @@ pipeline:
   build_folder: "//home/production/my_pipeline/build"
 ```
 
-See [Example: 08_multiple_configs](https://github.com/GregoryKogan/yt-framework/tree/main/examples/08_multiple_configs/) for a complete example.
+Sample repo layout: [08_multiple_configs](https://github.com/GregoryKogan/yt-framework/tree/main/examples/08_multiple_configs/).
 
-## Configuration Merging
+## OmegaConf features
 
-The framework uses OmegaConf for configuration management, which supports:
+The framework uses OmegaConf. You can lean on:
 
-- **Variable interpolation**: Reference other config values
-- **Environment variable substitution**: Use `${ENV_VAR}` syntax
-- **Config composition**: Merge multiple config files
-
-### Variable Interpolation
-
-Reference other config values within the same file:
+- **Interpolation** inside YAML:
 
 ```yaml
 base_path: //tmp/my_pipeline
@@ -78,116 +65,85 @@ client:
   output_table: ${base_path}/output
 ```
 
-### Environment Variables
-
-Use environment variables in configuration:
+- **Environment substitution** (OmegaConf 2.x `oc.env` resolver; enable resolvers where you construct config if needed):
 
 ```yaml
 pipeline:
-  build_folder: ${BUILD_FOLDER:://tmp/default/build}
+  build_folder: ${oc.env:BUILD_FOLDER,//tmp/default/build}
 ```
 
-Uses `BUILD_FOLDER` environment variable if set, otherwise defaults to `//tmp/default/build`.
+If you do not use OmegaConf resolvers in your merge path, set `build_folder` in the YAML file you pass to `--config` or export values and generate YAML in CI.
 
-### Config Composition
-
-Merge multiple config files:
+- **Manual merge** in tooling or tests:
 
 ```python
 from omegaconf import OmegaConf
 
-base_config = OmegaConf.load("configs/config.yaml")
-override_config = OmegaConf.load("configs/config_prod.yaml")
-merged = OmegaConf.merge(base_config, override_config)
+base = OmegaConf.load("configs/config.yaml")
+override = OmegaConf.load("configs/config_prod.yaml")
+merged = OmegaConf.merge(base, override)
 ```
 
-## Configuration Validation
+## Validation the framework performs
 
-The framework validates configuration at runtime:
+Expect hard failures when:
 
-- **Required fields**: Missing required fields raise errors
-- **Type checking**: Incorrect types raise errors
-- **Path validation**: Invalid YT paths raise errors
+- `enabled_stages` missing or empty
+- `build_folder` missing while a stage needs upload
+- Stage name in YAML does not match a `stages/<name>/` directory
+- `config.yaml` missing for an enabled stage
+- Malformed YT paths where the client validates them
 
-### Common Configuration Errors
+### Examples
 
-1. **Missing `enabled_stages`**: Pipeline won't know which stages to run
-2. **Missing `build_folder`**: Required for stages with `src/` directory
-3. **Invalid stage names**: Stage names must match directory names
-4. **Missing stage config**: Each stage must have `config.yaml`
-
-### Validation Examples
-
-**Missing required field:**
+Missing stages list:
 
 ```yaml
-# ❌ Missing enabled_stages
+# bad
 stages: {}
 
-# ✅ Correct
+# good
 stages:
   enabled_stages:
     - my_stage
 ```
 
-**Invalid path:**
+Bad build path (must be absolute YT style with `//` where required):
 
 ```yaml
-# ❌ Invalid YT path (missing //)
+# bad
 pipeline:
   build_folder: "tmp/build"
 
-# ✅ Correct
+# good
 pipeline:
   build_folder: "//tmp/build"
 ```
 
-## Configuration Inheritance
+## “Inheritance” between pipeline and stage YAML
 
-Stage configs inherit from pipeline config where applicable:
+There is no automatic deep merge of arbitrary keys: the pipeline file supplies `pipeline.*` and the list of stages; each stage file supplies that stage’s subtree. Some operation helpers read `pipeline.build_folder` implicitly—see operation docs for the precise merge rules per operation type.
 
-```yaml
-# configs/config.yaml
-pipeline:
-  mode: "prod"
-  build_folder: "//tmp/my_pipeline/build"
+## Debugging config
 
-# stages/my_stage/config.yaml
-client:
-  operations:
-    map:
-      # Inherits build_folder from pipeline config
-      input_table: //tmp/my_pipeline/input
-      output_table: //tmp/my_pipeline/output
-```
-
-## Configuration Debugging
-
-### Print Configuration
+Dump what the stage sees:
 
 ```python
 from omegaconf import OmegaConf
 
-# Print full config
 print(OmegaConf.to_yaml(self.config))
-
-# Print specific section
 print(OmegaConf.to_yaml(self.config.client.operations.map))
 ```
 
-### Validate Configuration
+Guard optional keys:
 
 ```python
-# Check if key exists
-if "build_folder" in self.config.pipeline:
-    build_folder = self.config.pipeline.build_folder
-
-# Get with default
-build_folder = self.config.pipeline.get("build_folder", "//tmp/default")
+if "build_folder" in self.deps.pipeline_config.pipeline:
+    bf = self.deps.pipeline_config.pipeline.build_folder
 ```
 
-## See Also
+## See also
 
-- [Configuration Guide](index.md) - Basic configuration
-- [Secrets Management](secrets.md) - Managing credentials
-- [Troubleshooting](../troubleshooting/configuration.md) - Configuration issues
+- [Configuration index](index.md)
+- [Secrets](secrets.md)
+- [Troubleshooting: configuration](../troubleshooting/configuration.md)

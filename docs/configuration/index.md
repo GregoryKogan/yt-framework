@@ -1,6 +1,6 @@
 # Configuration
 
-YT Framework uses YAML files for configuration and environment files for secrets. Understanding the configuration system is essential for building effective pipelines.
+YAML describes pipeline and stage behavior. Credentials live in `configs/secrets.env` (never commit that file).
 
 ```{toctree}
 :maxdepth: 1
@@ -12,23 +12,21 @@ advanced
 ../pipelines-and-stages
 ```
 
-## Configuration Files
+## Files
 
-Configuration is organized into multiple files:
-
-- **Pipeline config** (`configs/config.yaml`): Pipeline-level settings
-- **Stage configs** (`stages/<stage_name>/config.yaml`): Stage-specific settings
-- **Secrets** (`configs/secrets.env`): Credentials and sensitive data
+| File | Role |
+|------|------|
+| `configs/config.yaml` | Pipeline-wide settings: mode, `build_folder`, enabled stages, optional upload lists |
+| `stages/<name>/config.yaml` | Settings for one stage (tables, operation blocks, resources) |
+| `configs/secrets.env` | `YT_*`, S3 keys, Docker registry auth, etc. |
 
 ```{warning}
-**YT Cluster Requirements**
+**Prod jobs run in cluster images**
 
-In production mode, `ytjobs` code executes on YT cluster nodes. Ensure your cluster's Docker image includes required dependencies or use custom Docker images. See [Cluster Requirements](cluster-requirements.md) for details.
+Uploaded job code imports `ytjobs` and your modules. The image YT uses for those jobs must already contain matching Python packages. See [Cluster requirements](cluster-requirements.md).
 ```
 
-## Pipeline Configuration
-
-The pipeline configuration file (`configs/config.yaml`) controls pipeline-level behavior:
+## Pipeline config (`configs/config.yaml`)
 
 ```yaml
 stages:
@@ -39,76 +37,58 @@ stages:
 
 pipeline:
   mode: "dev"  # or "prod"
-  build_folder: "//tmp/my_pipeline/build"  # Required for operations with code
+  build_folder: "//tmp/my_pipeline/build"  # required when prod uploads code
 ```
 
-### Stages Section
+### `stages.enabled_stages`
 
-**`enabled_stages`** (required): List of stage names to execute, in order.
+Required ordered list of stage directory names. Only listed stages run.
 
-```yaml
-stages:
-  enabled_stages:
-    - create_input
-    - process_data
-    - validate_output
-```
+### `pipeline.mode`
 
-Only stages listed here will be executed. Stages are executed in the order specified.
+- `dev` — local simulation (see [Dev vs prod](../dev-vs-prod.md))
+- `prod` — YT cluster
 
-### Pipeline Section
+Default in examples is often `dev`.
 
-**`mode`** (optional, default: "dev"): Execution mode.
+### `pipeline.build_folder`
 
-- `"dev"`: Local development mode (file system simulation)
-- `"prod"`: Production mode (YT cluster execution)
+YT Cypress path for uploaded bundles when a stage ships `src/` (map, vanilla, etc.). Omit only if every enabled stage is pure driver-side work with no upload.
 
-**`build_folder`** (required for code execution): YT path where code will be uploaded.
+### `pipeline.upload_modules`
 
-```yaml
-pipeline:
-  build_folder: "//tmp/my_pipeline/build"
-```
-
-Required if any enabled stages have `src/` directory (for map or vanilla operations).
-
-**`upload_modules`** (optional): List of Python module names to upload in addition to ytjobs.
+Extra importable top-level modules to pack beside `ytjobs`:
 
 ```yaml
 pipeline:
   upload_modules: [my_package, company_utils]
 ```
 
-Each module must be importable. The `ytjobs` package is always uploaded implicitly.
+`ytjobs` is always included.
 
-**`upload_paths`** (optional): List of local directories to upload by path.
+### `pipeline.upload_paths`
+
+Extra directories copied into the archive:
 
 ```yaml
 pipeline:
   upload_paths:
     - { source: "./lib/shared", target: "shared" }
-    - { source: "./experiments/utils" }  # target defaults to "utils"
+    - { source: "./experiments/utils" }  # target defaults to last path segment
 ```
 
-Paths are relative to the pipeline directory. Use `target` to set the directory name in the archive. See [Code Upload](../advanced/code-upload.md) for details.
+Paths are relative to the pipeline root. Details: [Code upload](../advanced/code-upload.md).
 
-## Stage Configuration
-
-Each stage has its own configuration file at `stages/<stage_name>/config.yaml`:
+## Stage config (`stages/<stage>/config.yaml`)
 
 ```yaml
-# stages/my_stage/config.yaml
 job:
-  # Job-specific settings
   multiplier: 2
   prefix: "processed_"
 
 client:
-  # Client settings
   input_table: //tmp/my_pipeline/input
   output_table: //tmp/my_pipeline/output
-  
-  # Operation configurations
   operations:
     map:
       input_table: //tmp/my_pipeline/input
@@ -120,34 +100,26 @@ client:
         job_count: 2
 ```
 
-### Configuration Structure
+Conventions:
 
-Configuration is organized into sections:
+- `job` — values mapper/vanilla entrypoints read via `get_config_path()`.
+- `client` — values the stage class reads from `self.config`.
+- `client.operations.<name>` — per-operation settings (names depend on how you wire the stage).
 
-- **`job`**: Settings used by mapper.py or vanilla.py scripts
-- **`client`**: Settings used by the stage itself
-  - **`operations`**: Operation-specific settings (map, vanilla, etc.)
+### Reading config in Python
 
-### Accessing Configuration
-
-In stage code:
+Stage class:
 
 ```python
 class MyStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
-        # Access job config
         multiplier = self.config.job.multiplier
-        
-        # Access client config
         input_table = self.config.client.input_table
-        
-        # Access nested config
         memory = self.config.client.operations.map.resources.memory_limit_gb
-        
         return debug
 ```
 
-In mapper.py or vanilla.py:
+Inside uploaded `mapper.py` / `vanilla.py`:
 
 ```python
 from omegaconf import OmegaConf
@@ -157,12 +129,11 @@ config = OmegaConf.load(get_config_path())
 multiplier = config.job.multiplier
 ```
 
-## Configuration Examples
+## Examples
 
-### Simple Pipeline
+### Dev-only pipeline
 
 ```yaml
-# configs/config.yaml
 stages:
   enabled_stages:
     - create_table
@@ -171,10 +142,9 @@ pipeline:
   mode: "dev"
 ```
 
-### Pipeline with Code Execution
+### Prod with upload
 
 ```yaml
-# configs/config.yaml
 stages:
   enabled_stages:
     - process_data
@@ -184,21 +154,11 @@ pipeline:
   build_folder: "//tmp/my_pipeline/build"
 ```
 
-### Pipeline with Multiple Operations
+### Two operations in one stage
+
+`configs/config.yaml` as above; stage YAML:
 
 ```yaml
-# configs/config.yaml
-stages:
-  enabled_stages:
-    - process_and_validate
-
-pipeline:
-  mode: "prod"
-  build_folder: "//tmp/my_pipeline/build"
-```
-
-```yaml
-# stages/process_and_validate/config.yaml
 client:
   operations:
     process:
@@ -213,11 +173,11 @@ client:
         cpu_limit: 2
 ```
 
-## Max Row Weight Configuration
+## `max_row_weight`
 
-By default, the framework uses `max_row_weight: 128M` across operation submission and YQL execution. The maximum allowed value is `128M`; anything larger is rejected when the client builds the operation or query.
+Default is `128M` for operations and YQL helpers that accept it; larger values are rejected at client build time.
 
-Override per operation when needed:
+Per-operation YAML:
 
 ```yaml
 client:
@@ -230,7 +190,7 @@ client:
         pool: default
 ```
 
-Override for YQL helper calls at runtime:
+Runtime YQL helper:
 
 ```python
 self.deps.yt_client.select_columns(
@@ -241,10 +201,10 @@ self.deps.yt_client.select_columns(
 )
 ```
 
-## Next Steps
+## Next steps
 
-- Understand [Cluster Requirements](cluster-requirements.md) for production mode dependencies
-- Learn about [Secrets Management](secrets.md) for credentials
-- Explore [Advanced Configuration](advanced.md) for multiple configs and merging
-- Check [Dev vs Prod](../dev-vs-prod.md) for mode-specific configuration
-- Review [Operations](../operations/index.md) for operation-specific configuration
+- [Cluster requirements](cluster-requirements.md)
+- [Secrets](secrets.md)
+- [Advanced configuration](advanced.md) (multiple files, merging)
+- [Dev vs prod](../dev-vs-prod.md)
+- [Operations](../operations/index.md)
