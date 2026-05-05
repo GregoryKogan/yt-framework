@@ -15,7 +15,7 @@ Update docs in the same change set when behavior could confuse a reader: new/cha
 
 ## Obligation
 
-Update every affected surface (or add a focused new section for new behavior). Do not leave stale commands, options, or explanations that contradict the code.
+Update every affected surface (or add a focused new section for new behavior). Do not leave stale commands, options, or explanations that contradict the code. Thoroughness: very thorough.
 
 ## While working
 

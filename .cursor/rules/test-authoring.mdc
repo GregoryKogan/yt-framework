@@ -13,6 +13,7 @@ Cross-links: proof obligations in [testing.mdc](testing.mdc); Conda commands in 
 
 - Tests are a **safety net**: a test that turns red after a change did its job—it localized a mistake. Fix **production code** or **update the test deliberately** when the contract changed; do not weaken assertions to “make green” without a stated reason.
 - Prefer tests that **pinpoint** the broken unit or scenario so the failure message and test name narrow the search space (layout-of-tests).
+- Thoroughness: very thorough.
 
 ## Naming and file placement
 

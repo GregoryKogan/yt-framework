@@ -13,7 +13,7 @@ alwaysApply: true
 ## Impact & verification
 
 - Touch only required files. Root-cause fixes over rewrites. No destructive git without request. No dead code.
-- Done = proof (test/log/command output). No "done" without evidence. Divergence → re-plan, don’t patch.
+- Done = proof (test/log/command output). No "done" without evidence. Divergence → re-plan, don’t patch. Thoroughness: very thorough.
 
 ## Code
 

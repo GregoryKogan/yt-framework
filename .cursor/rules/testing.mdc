@@ -17,7 +17,7 @@ Add or extend tests in the same change set when you change behavior, fix bugs, a
 
 ## Obligation
 
-Do not claim a change is verified without evidence. Update or add tests so they match the new semantics; remove or rewrite assertions that encode obsolete behavior. If you rely on dev mode or examples instead of pytest, say what you ran and the outcome.
+Do not claim a change is verified without evidence. Update or add tests so they match the new semantics; remove or rewrite assertions that encode obsolete behavior. If you rely on dev mode or examples instead of pytest, say what you ran and the outcome. Thoroughness: very thorough.
 
 ## While working
 
