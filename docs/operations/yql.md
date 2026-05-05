@@ -24,12 +24,46 @@ YQL operations use YT's distributed query engine to perform table operations. Th
 - Efficient distributed execution
 - No custom code required
 - Dry run support for query preview
+- Automatic `PRAGMA yt.MaxRowWeight` management (default `128M`)
 
 ```{note}
 **YQL vs Map**
 
 Use YQL for SQL-like operations (joins, aggregations). Use map for custom Python logic per row. YQL is often faster for standard operations.
 ```
+
+## Row Weight Defaults
+
+All YQL helpers and raw `run_yql(...)` execution include:
+
+```sql
+PRAGMA yt.MaxRowWeight = "128M";
+```
+
+by default.
+
+Override per call when needed (must not exceed `128M`; larger values raise `ValueError`):
+
+```python
+self.deps.yt_client.join_tables(
+    left_table="//tmp/a",
+    right_table="//tmp/b",
+    output_table="//tmp/out",
+    on="id",
+    max_row_weight="64M",
+)
+```
+
+For raw queries:
+
+```python
+self.deps.yt_client.run_yql(
+    "INSERT INTO `//tmp/out` WITH TRUNCATE SELECT * FROM `//tmp/in`;",
+    max_row_weight="64M",
+)
+```
+
+If the SQL already contains `PRAGMA yt.MaxRowWeight`, that value is checked too; overrides and embedded pragmas cannot exceed `128M`.
 
 ## Available Operations
 

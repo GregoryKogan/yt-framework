@@ -15,6 +15,7 @@ Comprehensive example demonstrating all YQL (YTsaurus Query Language) operations
 - Dry run support for query preview
 - Table operations without custom code
 - Efficient distributed execution
+- Default `PRAGMA yt.MaxRowWeight = "128M";` on all YQL queries
 
 ## Running
 
@@ -47,6 +48,7 @@ Executes all YQL operations in sequence, demonstrating each operation type.
 - YQL operations are high-level and don't require custom code
 - Dry run mode allows previewing queries
 - Operations execute efficiently on YT cluster
+- `max_row_weight` defaults to `128M` and can be overridden per call
 
 ## Next Steps
 

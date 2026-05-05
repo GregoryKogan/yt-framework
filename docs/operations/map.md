@@ -253,6 +253,21 @@ client:
         # ...
 ```
 
+**Max row weight:**
+
+`max_row_weight` defaults to `128M` for map operations (that is also the maximum the cluster accepts). Override it per operation with a value at or below `128M`:
+
+```yaml
+client:
+  operations:
+    map:
+      input_table: //tmp/my_pipeline/input
+      output_table: //tmp/my_pipeline/output
+      max_row_weight: 64M
+      resources:
+        # ...
+```
+
 **Custom Docker:**
 
 ```yaml

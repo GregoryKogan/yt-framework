@@ -253,6 +253,19 @@ client:
         # ...
 ```
 
+**Max row weight:**
+
+`max_row_weight` defaults to `128M` for vanilla operations (and cannot exceed `128M`). Override it per operation:
+
+```yaml
+client:
+  operations:
+    vanilla:
+      max_row_weight: 64M
+      resources:
+        # ...
+```
+
 **Custom Docker:**
 
 ```yaml

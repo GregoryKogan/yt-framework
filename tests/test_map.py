@@ -110,6 +110,21 @@ def test_run_map_forwards_dict_operation_description(tmp_path: Path) -> None:
     assert call_kw.get("operation_description") == {"foo": 1}
 
 
+def test_run_map_forwards_max_row_weight_override(tmp_path: Path) -> None:
+    ctx = _map_stage_context(tmp_path)
+    cfg = OmegaConf.create(
+        {
+            "input_table": "//in/t",
+            "output_table": "//out/t",
+            "resources": {"pool": "p"},
+            "max_row_weight": "64M",
+        }
+    )
+    assert run_map(ctx, cfg) is True
+    call_kw = ctx.deps.yt_client.run_map.call_args.kwargs
+    assert call_kw.get("max_row_weight") == "64M"
+
+
 @patch("yt_framework.operations.map.TarArchiveDependencyBuilder.build_dependencies")
 def test_run_map_raises_when_mapper_missing_and_builder_command_missing(
     mock_build: MagicMock, tmp_path: Path

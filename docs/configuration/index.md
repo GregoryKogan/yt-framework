@@ -213,6 +213,34 @@ client:
         cpu_limit: 2
 ```
 
+## Max Row Weight Configuration
+
+By default, the framework uses `max_row_weight: 128M` across operation submission and YQL execution. The maximum allowed value is `128M`; anything larger is rejected when the client builds the operation or query.
+
+Override per operation when needed:
+
+```yaml
+client:
+  operations:
+    map:
+      input_table: //tmp/my_pipeline/input
+      output_table: //tmp/my_pipeline/output
+      max_row_weight: 64M
+      resources:
+        pool: default
+```
+
+Override for YQL helper calls at runtime:
+
+```python
+self.deps.yt_client.select_columns(
+    input_table="//tmp/in",
+    output_table="//tmp/out",
+    columns=["id"],
+    max_row_weight="64M",
+)
+```
+
 ## Next Steps
 
 - Understand [Cluster Requirements](cluster-requirements.md) for production mode dependencies

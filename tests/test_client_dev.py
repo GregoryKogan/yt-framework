@@ -3,6 +3,7 @@
 import logging
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from omegaconf import OmegaConf
@@ -461,6 +462,58 @@ def test_dev_client_run_yql_copies_select_into_output_jsonl(
     ], "dev run_yql should materialize INSERT … SELECT into .dev basename jsonl"
 
 
+def test_dev_client_run_yql_adds_default_max_row_weight_pragma_when_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.yql_default_mrw"), pipeline_dir=tmp_path
+    )
+    captured: dict[str, str] = {}
+
+    def _exec(self, yql: str):  # type: ignore[no-untyped-def]
+        captured["query"] = yql
+        return [], None
+
+    monkeypatch.setattr(
+        "yt_framework.yt.dev_simulator.DuckDBSimulator.execute_yql",
+        _exec,
+    )
+    client.run_yql("SELECT 1;")
+    assert captured["query"].startswith('PRAGMA yt.MaxRowWeight = "128M";')
+
+
+def test_dev_client_run_yql_does_not_duplicate_existing_max_row_weight_pragma(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.yql_no_dup_mrw"), pipeline_dir=tmp_path
+    )
+    captured: dict[str, str] = {}
+
+    def _exec(self, yql: str):  # type: ignore[no-untyped-def]
+        captured["query"] = yql
+        return [], None
+
+    monkeypatch.setattr(
+        "yt_framework.yt.dev_simulator.DuckDBSimulator.execute_yql",
+        _exec,
+    )
+    client.run_yql('PRAGMA yt.MaxRowWeight = "64M";\nSELECT 1;')
+    assert captured["query"].count("PRAGMA yt.MaxRowWeight") == 1
+
+
+def test_dev_client_run_yql_raises_when_embedded_pragma_exceeds_cluster_limit(
+    tmp_path: Path,
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.yql_pragma_too_big"), pipeline_dir=tmp_path
+    )
+    with pytest.raises(ValueError, match="exceeds cluster maximum"):
+        client.run_yql('PRAGMA yt.MaxRowWeight = "512M";\nSELECT 1;')
+
+
 def test_dev_client_run_yql_warns_when_input_table_jsonl_missing(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
@@ -679,3 +732,75 @@ def test_dev_client_group_by_aggregate_materializes_grouped_rows_in_output_jsonl
         "east": {"region": "east", "n": 2, "total": 30},
         "west": {"region": "west", "n": 1, "total": 5},
     }, "dev group_by_aggregate should aggregate via DuckDB into output jsonl"
+
+
+@pytest.mark.parametrize(
+    ("method_name", "kwargs"),
+    [
+        (
+            "join_tables",
+            {
+                "left_table": "//l",
+                "right_table": "//r",
+                "output_table": "//o",
+                "on": "id",
+            },
+        ),
+        (
+            "filter_table",
+            {
+                "input_table": "//i",
+                "output_table": "//o",
+                "condition": "id > 0",
+            },
+        ),
+        (
+            "select_columns",
+            {
+                "input_table": "//i",
+                "output_table": "//o",
+                "columns": ["id"],
+            },
+        ),
+        (
+            "group_by_aggregate",
+            {
+                "input_table": "//i",
+                "output_table": "//o",
+                "group_by": "id",
+                "aggregations": {"n": "count"},
+            },
+        ),
+        (
+            "union_tables",
+            {"tables": ["//a", "//b"], "output_table": "//o"},
+        ),
+        (
+            "distinct",
+            {"input_table": "//i", "output_table": "//o", "columns": ["id"]},
+        ),
+        (
+            "sort_table",
+            {"input_table": "//i", "output_table": "//o", "order_by": "id"},
+        ),
+        (
+            "limit_table",
+            {"input_table": "//i", "output_table": "//o", "limit": 5},
+        ),
+    ],
+)
+def test_dev_yql_helpers_forward_max_row_weight_to_run_yql(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    method_name: str,
+    kwargs: dict[str, object],
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.yql_helpers_mrw"), pipeline_dir=tmp_path
+    )
+    monkeypatch.setattr(client, "_get_table_columns", lambda _path: ["id"])
+    run_yql = MagicMock()
+    monkeypatch.setattr(client, "run_yql", run_yql)
+    method = getattr(client, method_name)
+    method(max_row_weight="64M", **kwargs)
+    assert run_yql.call_args.kwargs.get("max_row_weight") == "64M"
