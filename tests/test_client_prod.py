@@ -93,6 +93,51 @@ class _BuilderWithJobIo:
         return self
 
 
+class _BuilderWithTableWriterAndJobIo:
+    def __init__(self) -> None:
+        self.table_writer_payload: Any = None
+        self.job_io_payload: Any = None
+
+    def table_writer(self, payload: Any) -> "_BuilderWithTableWriterAndJobIo":
+        self.table_writer_payload = payload
+        return self
+
+    def job_io(self, payload: Any) -> "_BuilderWithTableWriterAndJobIo":
+        self.job_io_payload = payload
+        return self
+
+
+def _chain_returns_self(mock_obj: MagicMock, method_names: tuple[str, ...]) -> None:
+    for name in method_names:
+        getattr(mock_obj, name).return_value = mock_obj
+
+
+def _prod_client_with_run_operation_id(
+    monkeypatch: pytest.MonkeyPatch,
+    logger_name: str,
+    op_id: str,
+) -> tuple[YTProdClient, MagicMock]:
+    fake_inner = MagicMock()
+    fake_op = MagicMock()
+    fake_op.id = op_id
+    fake_inner.run_operation.return_value = fake_op
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+    client = YTProdClient(
+        _null_logger(logger_name),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    return client, fake_inner
+
+
+def _stub_split_run_operation_kwargs(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
+        lambda sb, kw: (sb, {}),
+    )
+
+
 def test_apply_command_leg_format_sets_json_format_for_string_command() -> None:
     b = _LegBuilderWithFormat()
     assert _apply_command_leg_format(b, "python3 mapper.py") is b
@@ -114,6 +159,18 @@ def test_apply_max_row_weight_to_spec_builder_uses_job_io_fallback_with_bytes() 
     b = _BuilderWithJobIo()
     out = _apply_max_row_weight_to_spec_builder(b, "64M")
     assert out is b and b.payload == {"table_writer": {"max_row_weight": 67108864}}
+
+
+def test_apply_max_row_weight_to_spec_builder_prefers_table_writer_over_job_io() -> (
+    None
+):
+    b = _BuilderWithTableWriterAndJobIo()
+    out = _apply_max_row_weight_to_spec_builder(b, "64M")
+    assert (
+        out is b
+        and b.table_writer_payload == {"max_row_weight": 67108864}
+        and b.job_io_payload is None
+    )
 
 
 def test_yt_prod_client_run_map_configures_pool_tree_docker_and_secure_vault(
@@ -212,49 +269,43 @@ def test_yt_prod_client_run_map_returns_operation_from_client_run_operation(
 def test_yt_prod_client_run_map_applies_default_max_row_weight_when_not_provided(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_inner = MagicMock()
-    fake_op = MagicMock()
-    fake_op.id = "yt-op-default-row-weight-map"
-    fake_inner.run_operation.return_value = fake_op
-    monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    client, _ = _prod_client_with_run_operation_id(
+        monkeypatch,
+        "tests.client_prod.map_default_mrw",
+        "yt-op-default-row-weight-map",
     )
 
     spec = MagicMock()
     mapper = MagicMock()
-    for name in (
-        "pool",
-        "resource_limits",
-        "max_failed_job_count",
-        "job_count",
-        "input_table_paths",
-        "output_table_paths",
-        "table_writer",
-    ):
-        getattr(spec, name).return_value = spec
+    _chain_returns_self(
+        spec,
+        (
+            "pool",
+            "resource_limits",
+            "max_failed_job_count",
+            "job_count",
+            "input_table_paths",
+            "output_table_paths",
+            "table_writer",
+        ),
+    )
     spec.begin_mapper.return_value = mapper
-    for name in (
-        "command",
-        "file_paths",
-        "environment",
-        "memory_limit",
-        "cpu_limit",
-        "gpu_limit",
-        "format",
-        "end_mapper",
-    ):
-        getattr(mapper, name).return_value = mapper
+    _chain_returns_self(
+        mapper,
+        (
+            "command",
+            "file_paths",
+            "environment",
+            "memory_limit",
+            "cpu_limit",
+            "gpu_limit",
+            "format",
+            "end_mapper",
+        ),
+    )
     mapper.end_mapper.return_value = spec
     monkeypatch.setattr("yt_framework.yt.client_prod.MapSpecBuilder", lambda: spec)
-
-    monkeypatch.setattr(
-        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
-        lambda sb, kw: (sb, {}),
-    )
-    client = YTProdClient(
-        _null_logger("tests.client_prod.map_default_mrw"),
-        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
-    )
+    _stub_split_run_operation_kwargs(monkeypatch)
     client.run_map(
         "python3 mapper.py", "//tmp/in", "//tmp/out", [], OperationResources(), {}
     )
@@ -264,49 +315,43 @@ def test_yt_prod_client_run_map_applies_default_max_row_weight_when_not_provided
 def test_yt_prod_client_run_map_applies_custom_max_row_weight_as_bytes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_inner = MagicMock()
-    fake_op = MagicMock()
-    fake_op.id = "yt-op-custom-row-weight-map"
-    fake_inner.run_operation.return_value = fake_op
-    monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    client, _ = _prod_client_with_run_operation_id(
+        monkeypatch,
+        "tests.client_prod.map_custom_mrw",
+        "yt-op-custom-row-weight-map",
     )
 
     spec = MagicMock()
     mapper = MagicMock()
-    for name in (
-        "pool",
-        "resource_limits",
-        "max_failed_job_count",
-        "job_count",
-        "input_table_paths",
-        "output_table_paths",
-        "table_writer",
-    ):
-        getattr(spec, name).return_value = spec
+    _chain_returns_self(
+        spec,
+        (
+            "pool",
+            "resource_limits",
+            "max_failed_job_count",
+            "job_count",
+            "input_table_paths",
+            "output_table_paths",
+            "table_writer",
+        ),
+    )
     spec.begin_mapper.return_value = mapper
-    for name in (
-        "command",
-        "file_paths",
-        "environment",
-        "memory_limit",
-        "cpu_limit",
-        "gpu_limit",
-        "format",
-        "end_mapper",
-    ):
-        getattr(mapper, name).return_value = mapper
+    _chain_returns_self(
+        mapper,
+        (
+            "command",
+            "file_paths",
+            "environment",
+            "memory_limit",
+            "cpu_limit",
+            "gpu_limit",
+            "format",
+            "end_mapper",
+        ),
+    )
     mapper.end_mapper.return_value = spec
     monkeypatch.setattr("yt_framework.yt.client_prod.MapSpecBuilder", lambda: spec)
-    monkeypatch.setattr(
-        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
-        lambda sb, kw: (sb, {}),
-    )
-
-    client = YTProdClient(
-        _null_logger("tests.client_prod.map_custom_mrw"),
-        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
-    )
+    _stub_split_run_operation_kwargs(monkeypatch)
     client.run_map(
         "python3 mapper.py",
         "//tmp/in",
@@ -418,40 +463,34 @@ def test_yt_prod_client_run_vanilla_returns_operation_from_client_run_operation(
 def test_yt_prod_client_run_vanilla_applies_default_max_row_weight_when_not_provided(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_inner = MagicMock()
-    fake_op = MagicMock()
-    fake_op.id = "yt-op-default-row-weight-vanilla"
-    fake_inner.run_operation.return_value = fake_op
-    monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    client, _ = _prod_client_with_run_operation_id(
+        monkeypatch,
+        "tests.client_prod.vanilla_default_mrw",
+        "yt-op-default-row-weight-vanilla",
     )
 
     spec = MagicMock()
     task = MagicMock()
-    for name in ("pool", "resource_limits", "max_failed_job_count", "table_writer"):
-        getattr(spec, name).return_value = spec
+    _chain_returns_self(
+        spec,
+        ("pool", "resource_limits", "max_failed_job_count", "table_writer"),
+    )
     spec.begin_task.return_value = task
-    for name in (
-        "command",
-        "file_paths",
-        "environment",
-        "memory_limit",
-        "cpu_limit",
-        "gpu_limit",
-        "job_count",
-        "end_task",
-    ):
-        getattr(task, name).return_value = task
+    _chain_returns_self(
+        task,
+        (
+            "command",
+            "file_paths",
+            "environment",
+            "memory_limit",
+            "cpu_limit",
+            "gpu_limit",
+            "job_count",
+            "end_task",
+        ),
+    )
     monkeypatch.setattr("yt_framework.yt.client_prod.VanillaSpecBuilder", lambda: spec)
-
-    monkeypatch.setattr(
-        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
-        lambda sb, kw: (sb, {}),
-    )
-    client = YTProdClient(
-        _null_logger("tests.client_prod.vanilla_default_mrw"),
-        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
-    )
+    _stub_split_run_operation_kwargs(monkeypatch)
     client.run_vanilla("bash -c true", [], {}, "task", OperationResources())
     assert spec.table_writer.call_args == call({"max_row_weight": 134217728})
 
@@ -541,55 +580,62 @@ def test_yt_prod_client_run_map_reduce_returns_operation_from_client_run_operati
 def test_yt_prod_client_run_map_reduce_applies_default_max_row_weight_when_not_provided(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_inner = MagicMock()
-    fake_op = MagicMock()
-    fake_op.id = "yt-op-default-row-weight-mr"
-    fake_inner.run_operation.return_value = fake_op
-    monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    client, _ = _prod_client_with_run_operation_id(
+        monkeypatch,
+        "tests.client_prod.mr_default_mrw",
+        "yt-op-default-row-weight-mr",
     )
 
     spec = MagicMock()
     mapper = MagicMock()
     reducer = MagicMock()
-    for name in (
-        "input_table_paths",
-        "output_table_paths",
-        "pool",
-        "max_failed_job_count",
-        "reduce_by",
-        "table_writer",
-    ):
-        getattr(spec, name).return_value = spec
+    _chain_returns_self(
+        spec,
+        (
+            "input_table_paths",
+            "output_table_paths",
+            "pool",
+            "max_failed_job_count",
+            "reduce_by",
+            "table_writer",
+        ),
+    )
     spec.begin_mapper.return_value = mapper
     spec.begin_reducer.return_value = reducer
-    for name in (
-        "command",
-        "file_paths",
-        "environment",
-        "memory_limit",
-        "cpu_limit",
-        "gpu_limit",
-        "format",
-        "end_mapper",
-        "end_reducer",
-    ):
-        getattr(mapper, name).return_value = mapper
-        getattr(reducer, name).return_value = reducer
+    _chain_returns_self(
+        mapper,
+        (
+            "command",
+            "file_paths",
+            "environment",
+            "memory_limit",
+            "cpu_limit",
+            "gpu_limit",
+            "format",
+            "end_mapper",
+            "end_reducer",
+        ),
+    )
+    _chain_returns_self(
+        reducer,
+        (
+            "command",
+            "file_paths",
+            "environment",
+            "memory_limit",
+            "cpu_limit",
+            "gpu_limit",
+            "format",
+            "end_mapper",
+            "end_reducer",
+        ),
+    )
     mapper.end_mapper.return_value = spec
     reducer.end_reducer.return_value = spec
     monkeypatch.setattr(
         "yt_framework.yt.client_prod.MapReduceSpecBuilder", lambda: spec
     )
-
-    monkeypatch.setattr(
-        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
-        lambda sb, kw: (sb, {}),
-    )
-    client = YTProdClient(
-        _null_logger("tests.client_prod.mr_default_mrw"),
-        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
-    )
+    _stub_split_run_operation_kwargs(monkeypatch)
     client.run_map_reduce(
         "python3 mapper.py",
         "python3 reducer.py",
@@ -623,49 +669,43 @@ def test_yt_prod_client_run_reduce_returns_operation_from_client_run_operation(
 def test_yt_prod_client_run_reduce_applies_default_max_row_weight_when_not_provided(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_inner = MagicMock()
-    fake_op = MagicMock()
-    fake_op.id = "yt-op-default-row-weight-reduce"
-    fake_inner.run_operation.return_value = fake_op
-    monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    client, _ = _prod_client_with_run_operation_id(
+        monkeypatch,
+        "tests.client_prod.reduce_default_mrw",
+        "yt-op-default-row-weight-reduce",
     )
 
     spec = MagicMock()
     reducer = MagicMock()
-    for name in (
-        "input_table_paths",
-        "output_table_paths",
-        "pool",
-        "max_failed_job_count",
-        "reduce_by",
-        "begin_reducer",
-        "table_writer",
-    ):
-        getattr(spec, name).return_value = spec
+    _chain_returns_self(
+        spec,
+        (
+            "input_table_paths",
+            "output_table_paths",
+            "pool",
+            "max_failed_job_count",
+            "reduce_by",
+            "begin_reducer",
+            "table_writer",
+        ),
+    )
     spec.begin_reducer.return_value = reducer
-    for name in (
-        "command",
-        "file_paths",
-        "environment",
-        "memory_limit",
-        "cpu_limit",
-        "gpu_limit",
-        "format",
-        "end_reducer",
-    ):
-        getattr(reducer, name).return_value = reducer
+    _chain_returns_self(
+        reducer,
+        (
+            "command",
+            "file_paths",
+            "environment",
+            "memory_limit",
+            "cpu_limit",
+            "gpu_limit",
+            "format",
+            "end_reducer",
+        ),
+    )
     reducer.end_reducer.return_value = spec
     monkeypatch.setattr("yt_framework.yt.client_prod.ReduceSpecBuilder", lambda: spec)
-
-    monkeypatch.setattr(
-        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
-        lambda sb, kw: (sb, {}),
-    )
-    client = YTProdClient(
-        _null_logger("tests.client_prod.reduce_default_mrw"),
-        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
-    )
+    _stub_split_run_operation_kwargs(monkeypatch)
     client.run_reduce(
         "python3 reducer.py",
         "//tmp/in",
