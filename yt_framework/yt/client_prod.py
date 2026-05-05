@@ -24,6 +24,7 @@ from yt_framework.yt.client_base import BaseYTClient, OperationResources
 from yt_framework.yt.max_row_weight import (
     build_max_row_weight_pragma,
     ensure_max_row_weight_pragma,
+    parse_max_row_weight_to_bytes,
     validate_max_row_weight,
 )
 from yt_framework.utils.ignore import YTIgnoreMatcher
@@ -90,12 +91,13 @@ def _apply_max_row_weight_to_spec_builder(
     """Apply max row weight to spec builder when supported."""
     if max_row_weight is None:
         return spec_builder
+    max_row_weight_bytes = parse_max_row_weight_to_bytes(max_row_weight)
     table_writer = getattr(spec_builder, "table_writer", None)
     if callable(table_writer):
-        return table_writer({"max_row_weight": max_row_weight})
+        return table_writer({"max_row_weight": max_row_weight_bytes})
     job_io = getattr(spec_builder, "job_io", None)
     if callable(job_io):
-        return job_io({"table_writer": {"max_row_weight": max_row_weight}})
+        return job_io({"table_writer": {"max_row_weight": max_row_weight_bytes}})
     return spec_builder
 
 
