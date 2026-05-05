@@ -1,9 +1,4 @@
-"""
-Logging Configuration Module
-=============================
-
-Centralized logging setup for the entire pipeline.
-"""
+"""Colored console formatter and helpers used by pipeline startup."""
 
 import logging
 import sys

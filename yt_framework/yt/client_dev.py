@@ -1,9 +1,4 @@
-"""
-Development YT Client
-=====================
-
-Development implementation of YT client using local file system.
-"""
+"""Local filesystem stand-in for Cypress tables and subprocess-backed jobs."""
 
 import json
 import os
@@ -18,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
 from yt_framework.operations.job_command import is_typed_job, resolve_aliased_job
+from yt_framework.yt.max_row_weight import ensure_max_row_weight_pragma
 
 if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
@@ -236,6 +232,7 @@ class YTDevClient(BaseYTClient):
         self,
         query: str,
         pool: str = "default",
+        max_row_weight: Optional[str] = None,
     ) -> None:
         """
         Execute a YQL query locally using DuckDB simulation.
@@ -243,10 +240,15 @@ class YTDevClient(BaseYTClient):
         Args:
             query: YQL query string to execute
             pool: YT pool name (default: 'default')
+            max_row_weight: Optional max row weight override
         """
         self.logger.info("Executing YQL query (dev mode - DuckDB simulation)")
         self.logger.debug(f"Pool: {pool}")
-        self.logger.debug(f"Query:\n{query}")
+        query_with_max_row_weight = ensure_max_row_weight_pragma(
+            query=query,
+            max_row_weight=max_row_weight,
+        )
+        self.logger.debug(f"Query:\n{query_with_max_row_weight}")
 
         from yt_framework.yt.dev_simulator import (
             DuckDBSimulator,
@@ -259,8 +261,8 @@ class YTDevClient(BaseYTClient):
 
         try:
             # Extract table references
-            input_tables = extract_table_references(query)
-            output_table = extract_output_table(query)
+            input_tables = extract_table_references(query_with_max_row_weight)
+            output_table = extract_output_table(query_with_max_row_weight)
 
             self.logger.debug(f"Input tables: {input_tables}")
             self.logger.debug(f"Output table: {output_table}")
@@ -274,7 +276,7 @@ class YTDevClient(BaseYTClient):
                     self.logger.warning(f"Input table not found: {local_path}")
 
             # Execute query
-            results, _ = simulator.execute_yql(query)
+            results, _ = simulator.execute_yql(query_with_max_row_weight)
 
             # Save results if output table specified
             if output_table and results is not None:
@@ -300,6 +302,7 @@ class YTDevClient(BaseYTClient):
         how: Literal["inner", "left", "right", "full"] = "left",
         select_columns: Optional[List[str]] = None,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """Join two tables using YQL (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_join_query
@@ -311,12 +314,13 @@ class YTDevClient(BaseYTClient):
             on=on,
             how=how,
             select_columns=select_columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def filter_table(
@@ -325,6 +329,7 @@ class YTDevClient(BaseYTClient):
         output_table: str,
         condition: str,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """Filter table rows using WHERE condition (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_filter_query
@@ -337,12 +342,13 @@ class YTDevClient(BaseYTClient):
             output_table=output_table,
             condition=condition,
             columns=columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def select_columns(
@@ -351,6 +357,7 @@ class YTDevClient(BaseYTClient):
         output_table: str,
         columns: List[str],
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """Select specific columns from a table (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_select_query
@@ -359,12 +366,13 @@ class YTDevClient(BaseYTClient):
             input_table=input_table,
             output_table=output_table,
             columns=columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def group_by_aggregate(
@@ -374,6 +382,7 @@ class YTDevClient(BaseYTClient):
         group_by: Union[str, List[str]],
         aggregations: Dict[str, Union[str, Tuple[str, str]]],
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """Group by columns and compute aggregations (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_group_by_query
@@ -383,12 +392,13 @@ class YTDevClient(BaseYTClient):
             output_table=output_table,
             group_by=group_by,
             aggregations=aggregations,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def union_tables(
@@ -396,6 +406,7 @@ class YTDevClient(BaseYTClient):
         tables: List[str],
         output_table: str,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """Union multiple tables (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_union_query
@@ -408,12 +419,13 @@ class YTDevClient(BaseYTClient):
             tables=tables,
             output_table=output_table,
             columns=columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def distinct(
@@ -422,6 +434,7 @@ class YTDevClient(BaseYTClient):
         output_table: str,
         columns: Optional[List[str]] = None,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """Get distinct rows from a table (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_distinct_query
@@ -430,12 +443,13 @@ class YTDevClient(BaseYTClient):
             input_table=input_table,
             output_table=output_table,
             columns=columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def sort_table(
@@ -445,6 +459,7 @@ class YTDevClient(BaseYTClient):
         order_by: Union[str, List[str]],
         ascending: bool = True,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """Sort table by columns (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_sort_query
@@ -458,12 +473,13 @@ class YTDevClient(BaseYTClient):
             order_by=order_by,
             columns=columns,
             ascending=ascending,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def limit_table(
@@ -472,6 +488,7 @@ class YTDevClient(BaseYTClient):
         output_table: str,
         limit: int,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """Limit number of rows from a table (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_limit_query
@@ -484,12 +501,13 @@ class YTDevClient(BaseYTClient):
             output_table=output_table,
             limit=limit,
             columns=columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def upload_file(
@@ -533,6 +551,7 @@ class YTDevClient(BaseYTClient):
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
         job: Any = None,
+        append: bool = False,
         **kwargs: Any,
     ) -> Operation:
         """Run a map operation locally using subprocess.
@@ -551,6 +570,7 @@ class YTDevClient(BaseYTClient):
             output_schema: Optional output table schema (not used in dev mode).
             max_failed_jobs: Maximum failed jobs allowed (not used in dev mode).
             docker_auth: Optional Docker authentication (not used in dev mode).
+            append: If True and output JSONL exists, append mapper stdout lines to it.
             **kwargs: Additional arguments (not used in dev mode).
 
         Returns:
@@ -608,7 +628,11 @@ class YTDevClient(BaseYTClient):
         # Copy output back
         output_path = self._table_local_path(output_table)
         if proc.returncode == 0 and sandbox_output.exists():
-            shutil.copy2(sandbox_output, output_path)
+            if append and output_path.exists():
+                with open(output_path, "ab") as out, open(sandbox_output, "rb") as sand:
+                    out.write(sand.read())
+            else:
+                shutil.copy2(sandbox_output, output_path)
 
         err_hint = f"Stderr written to {logs_path}" if proc.returncode != 0 else ""
         return _DevOperation(proc.returncode, err_hint)  # type: ignore[return-value]

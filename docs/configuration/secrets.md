@@ -1,156 +1,104 @@
-# Secrets Management
+# Secrets
 
-Sensitive data (credentials, tokens, etc.) is stored in `configs/secrets.env`:
+Put credentials in `configs/secrets.env` (key=value, one per line). Non-secret runtime knobs are listed in [Environment variables](../reference/environment-variables.md).
 
 ```bash
 # configs/secrets.env
-YT_PROXY=your-yt-proxy-url
-YT_TOKEN=your-yt-token
+YT_PROXY=https://your-proxy.example
+YT_TOKEN=your-token
 
-# Optional: S3 credentials
-S3_ENDPOINT=https://your-s3-endpoint.com
-S3_DOWNLOAD_ACCESS_KEY=your-download-access-key
-S3_DOWNLOAD_SECRET_KEY=your-download-secret-key
-# For upload operations:
-S3_UPLOAD_ACCESS_KEY=your-upload-access-key
-S3_UPLOAD_SECRET_KEY=your-upload-secret-key
+# Optional: S3
+S3_ENDPOINT=https://your-s3-endpoint.example
+S3_DOWNLOAD_ACCESS_KEY=...
+S3_DOWNLOAD_SECRET_KEY=...
+S3_UPLOAD_ACCESS_KEY=...
+S3_UPLOAD_SECRET_KEY=...
 ```
 
-Non-secret runtime variables (dev paths, job sandbox bootstrap) are listed in [Environment variables](../reference/environment-variables.md).
+## YT
 
-## YT Credentials
-
-Required for production mode:
+Prod mode needs a reachable proxy and token:
 
 ```bash
 YT_PROXY=your-yt-proxy-url
 YT_TOKEN=your-yt-token
 ```
 
-### Getting YT Credentials
+Get values from whoever runs your YT cell.
 
-1. Contact your YTsaurus cluster administrator
-2. Request YT proxy URL and authentication token
-3. Add credentials to `configs/secrets.env`
+## S3
 
-## S3 Credentials
+Reads typically use the download pair; writes use the upload pair unless one credential set has both roles.
 
-Required for S3 integration:
+## How secrets reach your code
 
-```bash
-S3_ENDPOINT=https://your-s3-endpoint.com
-S3_DOWNLOAD_ACCESS_KEY=your-download-access-key
-S3_DOWNLOAD_SECRET_KEY=your-download-secret-key
-# For upload operations:
-S3_UPLOAD_ACCESS_KEY=your-upload-access-key
-S3_UPLOAD_SECRET_KEY=your-upload-secret-key
-```
-
-### S3 Credential Types
-
-- **Download credentials**: For reading/list operations
-- **Upload credentials**: For write operations (optional if download credentials have write access)
-
-## Loading Secrets
-
-Secrets are automatically loaded by the framework. Access them in stages:
+The pipeline loader reads `secrets.env` early. For values you must pass explicitly into helpers (for example constructing `S3Client`), call `load_secrets` on the configs directory:
 
 ```python
 from yt_framework.utils.env import load_secrets
 
-class MyStage(BaseStage):
-    def __init__(self, deps, logger):
-        super().__init__(deps, logger)
-        
-        # Load secrets
-        secrets = load_secrets(self.deps.configs_dir)
-        yt_proxy = secrets.get("YT_PROXY")
-        yt_token = secrets.get("YT_TOKEN")
+def run(self, debug: DebugContext) -> DebugContext:
+    secrets = load_secrets(self.deps.configs_dir)
+    _proxy = secrets.get("YT_PROXY")
+    return debug
 ```
 
-### Environment Variable Reference
+### Common variables
 
-| Variable | Required For | Description |
-|----------|--------------|-------------|
-| `YT_PROXY` | Prod mode | YTsaurus cluster proxy URL |
-| `YT_TOKEN` | Prod mode | YTsaurus authentication token |
-| `S3_ENDPOINT` | S3 operations | S3 service endpoint URL |
-| `S3_DOWNLOAD_ACCESS_KEY` | S3 read | S3 access key for read operations |
-| `S3_DOWNLOAD_SECRET_KEY` | S3 read | S3 secret key for read operations |
-| `S3_UPLOAD_ACCESS_KEY` | S3 write | S3 access key for write operations |
-| `S3_UPLOAD_SECRET_KEY` | S3 write | S3 secret key for write operations |
-| `DOCKER_AUTH_USERNAME` | Private Docker | Docker registry username |
-| `DOCKER_AUTH_PASSWORD` | Private Docker | Docker registry password |
+| Variable | When you need it |
+|----------|------------------|
+| `YT_PROXY`, `YT_TOKEN` | Prod driver talking to YT |
+| `S3_*` | S3-backed operations |
+| `DOCKER_AUTH_USERNAME`, `DOCKER_AUTH_PASSWORD` | Private registry pulls for `docker_image` |
 
-## Security Best Practices
+## Hygiene
 
 ```{warning}
-**Never commit secrets to version control!**
+**Do not commit `secrets.env`**
 ```
 
-1. **Never commit secrets**: Add `configs/secrets.env` to `.gitignore`
-2. **Use example files**: Create `configs/secrets.example.env` with placeholder values
-3. **Rotate credentials**: Regularly update tokens and keys
-4. **Use environment variables**: In CI/CD, use environment variables instead of files
-5. **Limit access**: Restrict file permissions on secrets.env (chmod 600)
+- Add `configs/secrets.env` to `.gitignore`.
+- Commit a `secrets.example.env` with dummy values for onboarding.
+- Rotate tokens on the schedule your security team expects.
+- In CI, inject the same keys via the environment; the loader also reads process env when the file is absent.
 
-### Example .gitignore Entry
+Example ignore rules:
 
-```gitignore
-# Secrets
+```text
 configs/secrets.env
 *.env
 !*example.env
 ```
 
-### Example secrets.example.env
+Example template:
 
 ```bash
 # configs/secrets.example.env
-YT_PROXY=your-yt-proxy-url
-YT_TOKEN=your-yt-token
-
-# S3 credentials (optional)
-S3_ENDPOINT=https://your-s3-endpoint.com
-S3_DOWNLOAD_ACCESS_KEY=your-download-access-key
-S3_DOWNLOAD_SECRET_KEY=your-download-secret-key
-S3_UPLOAD_ACCESS_KEY=your-upload-access-key
-S3_UPLOAD_SECRET_KEY=your-upload-secret-key
+YT_PROXY=https://proxy.example
+YT_TOKEN=replace-me
+# S3 optional...
 ```
 
-## CI/CD Integration
-
-In CI/CD pipelines, use environment variables instead of files:
+## CI
 
 ```bash
-# Set environment variables
-export YT_PROXY="your-proxy"
-export YT_TOKEN="your-token"
-
-# Run pipeline
+export YT_PROXY="https://..."
+export YT_TOKEN="..."
 python pipeline.py
 ```
 
-The framework will automatically load secrets from environment variables if `secrets.env` is not found.
+If `secrets.env` is missing, variables already present in the process environment still work.
 
 ## Troubleshooting
 
-### Secrets not loading
+| Symptom | What to check |
+|---------|----------------|
+| File ignored / not found | Path is `configs/` next to `pipeline.py`, filename `secrets.env` unless you customized loading |
+| Auth errors | Typos, expired token, wrong cluster proxy |
+| HTTP 403 from S3 | Endpoint URL, bucket policy, wrong access/secret pair for the operation |
 
-- Verify `configs/secrets.env` exists
-- Check file permissions
-- Review file format (KEY=VALUE, one per line)
-- Check for syntax errors
+## See also
 
-### Credentials invalid
-
-- Verify credentials are correct
-- Check token expiration
-- Review YT/S3 permissions
-- Test credentials manually
-
-## See Also
-
-- [Configuration Guide](index.md) - Complete configuration reference
-- [Dev vs Prod](../dev-vs-prod.md) - Understanding when secrets are required
-- [Troubleshooting](../troubleshooting/configuration.md) - Common secrets issues
+- [Configuration index](index.md)
+- [Dev vs prod](../dev-vs-prod.md)
+- [Troubleshooting: configuration](../troubleshooting/configuration.md)

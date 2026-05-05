@@ -7,6 +7,8 @@ Utility functions for building YQL queries programmatically.
 
 from typing import List, Dict, Union, Optional, Tuple
 
+from yt_framework.yt.max_row_weight import build_max_row_weight_pragma
+
 
 def _escape_table_name(table: str) -> str:
     """Escape table name with backticks for YQL.
@@ -156,6 +158,12 @@ def _format_order_by_list(
     return ", ".join([f"{col} {direction}" for col in order_by])
 
 
+def _pragma_header(max_row_weight: Optional[str] = None) -> str:
+    return (
+        f"{build_max_row_weight_pragma(max_row_weight)}\nPRAGMA yt.InferSchema = '1';"
+    )
+
+
 def build_join_query(
     left_table: str,
     right_table: str,
@@ -163,6 +171,7 @@ def build_join_query(
     on: Union[str, List[str], Dict[str, str]],
     how: str = "left",
     select_columns: Optional[List[str]] = None,
+    max_row_weight: Optional[str] = None,
 ) -> str:
     """
     Build a YQL JOIN query.
@@ -244,7 +253,7 @@ def build_join_query(
         else:
             using_clause = f"USING ({', '.join(using_columns)})"
 
-        query = f"""PRAGMA yt.InferSchema = '1';
+        query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
@@ -255,7 +264,7 @@ FROM {_escape_table_name(left_table)} AS a
         assert (
             join_conditions is not None
         ), "join_conditions must be set when use_using is False"
-        query = f"""PRAGMA yt.InferSchema = '1';
+        query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
@@ -271,6 +280,7 @@ def build_filter_query(
     output_table: str,
     condition: str,
     columns: List[str],
+    max_row_weight: Optional[str] = None,
 ) -> str:
     """
     Build a YQL filter query with WHERE clause.
@@ -286,7 +296,7 @@ def build_filter_query(
     """
     select_clause = _format_column_list(columns)
 
-    query = f"""PRAGMA yt.InferSchema = '1';
+    query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
@@ -300,6 +310,7 @@ def build_select_query(
     input_table: str,
     output_table: str,
     columns: List[str],
+    max_row_weight: Optional[str] = None,
 ) -> str:
     """
     Build a YQL query to select specific columns.
@@ -314,7 +325,7 @@ def build_select_query(
     """
     select_clause = _format_column_list(columns)
 
-    query = f"""PRAGMA yt.InferSchema = '1';
+    query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
@@ -328,6 +339,7 @@ def build_group_by_query(
     output_table: str,
     group_by: Union[str, List[str]],
     aggregations: Dict[str, Union[str, Tuple[str, str]]],
+    max_row_weight: Optional[str] = None,
 ) -> str:
     """
     Build a YQL GROUP BY query with aggregations.
@@ -348,13 +360,13 @@ def build_group_by_query(
 
     # If group_by is empty, omit GROUP BY clause (aggregate all rows)
     if isinstance(group_by, list) and len(group_by) == 0:
-        query = f"""PRAGMA yt.InferSchema = '1';
+        query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
 FROM {_escape_table_name(input_table)};"""
     else:
-        query = f"""PRAGMA yt.InferSchema = '1';
+        query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
@@ -368,6 +380,7 @@ def build_union_query(
     tables: List[str],
     output_table: str,
     columns: List[str],
+    max_row_weight: Optional[str] = None,
 ) -> str:
     """
     Build a YQL UNION ALL query.
@@ -390,7 +403,7 @@ def build_union_query(
     ]
     union_clause = "\nUNION ALL\n".join(union_parts)
 
-    query = f"""PRAGMA yt.InferSchema = '1';
+    query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 {union_clause};"""
 
@@ -401,6 +414,7 @@ def build_distinct_query(
     input_table: str,
     output_table: str,
     columns: Optional[List[str]] = None,
+    max_row_weight: Optional[str] = None,
 ) -> str:
     """
     Build a YQL DISTINCT query.
@@ -418,7 +432,7 @@ def build_distinct_query(
     else:
         select_clause = "*"
 
-    query = f"""PRAGMA yt.InferSchema = '1';
+    query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT DISTINCT
     {select_clause}
@@ -433,6 +447,7 @@ def build_sort_query(
     order_by: Union[str, List[str]],
     columns: List[str],
     ascending: bool = True,
+    max_row_weight: Optional[str] = None,
 ) -> str:
     """
     Build a YQL ORDER BY query.
@@ -455,7 +470,7 @@ def build_sort_query(
 
     # Use subquery pattern to prevent YQL from adding internal binary columns
     # Inner query does the ORDER BY, outer query selects only desired columns
-    query = f"""PRAGMA yt.InferSchema = '1';
+    query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
@@ -473,6 +488,7 @@ def build_limit_query(
     output_table: str,
     limit: int,
     columns: List[str],
+    max_row_weight: Optional[str] = None,
 ) -> str:
     """
     Build a YQL LIMIT query.
@@ -488,7 +504,7 @@ def build_limit_query(
     """
     select_clause = _format_column_list(columns)
 
-    query = f"""PRAGMA yt.InferSchema = '1';
+    query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}

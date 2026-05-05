@@ -1,9 +1,4 @@
-"""
-Common Operations Utilities
-============================
-
-Shared utility functions used by multiple operation types.
-"""
+"""Shared helpers for map/vanilla/map-reduce (resources, secrets, tokenizer wiring)."""
 
 import logging
 from pathlib import Path

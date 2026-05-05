@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD029 -->
 
-Thank you for your interest in contributing to YT Framework! This document provides guidelines and instructions for contributing to the project.
+This file is the maintainer checklist: environment, tests, docs build, and review expectations.
 
 ## Table of Contents
 

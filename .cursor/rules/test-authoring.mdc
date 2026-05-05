@@ -13,6 +13,8 @@ Cross-links: proof obligations in [testing.mdc](testing.mdc); Conda commands in 
 
 - Tests are a **safety net**: a test that turns red after a change did its job—it localized a mistake. Fix **production code** or **update the test deliberately** when the contract changed; do not weaken assertions to “make green” without a stated reason.
 - Prefer tests that **pinpoint** the broken unit or scenario so the failure message and test name narrow the search space (layout-of-tests).
+- When writing, reviewing, or refactoring test/production code in this workflow, you MUST use `.cursor/skills/karpathy-guidelines/SKILL.md` to keep changes minimal, explicit, and easy to verify.
+- Thoroughness: very thorough.
 
 ## Naming and file placement
 

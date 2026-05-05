@@ -1,6 +1,6 @@
-# Operations Overview
+# Operations
 
-YT Framework supports several types of operations for processing data on YTsaurus clusters.
+Stages call helpers (`run_map`, `run_vanilla`, YT client methods, etc.) declared under `client.operations` in YAML. This section documents each pattern.
 
 ```{toctree}
 :maxdepth: 1
@@ -15,130 +15,68 @@ table
 sort
 ```
 
-## Operation Types
+## Guides
 
-```{card-grid} 2
-:padding: 2
+| Topic | Link |
+|-------|------|
+| Map | [map.md](map.md) |
+| Map-reduce (TypedJob) | [map-reduce-typed-jobs.md](map-reduce-typed-jobs.md) |
+| Map-reduce (command mode) | [command-mode-map-reduce.md](command-mode-map-reduce.md) |
+| Vanilla | [vanilla.md](vanilla.md) |
+| YQL | [yql.md](yql.md) |
+| S3 | [s3.md](s3.md) |
+| Table helpers | [table.md](table.md) |
+| Sort | [sort.md](sort.md) |
 
-**Map Operations**
-^^^
-Process each row of a table independently. Perfect for row-by-row transformations, data enrichment, and parallel processing.
+## Picking a tool
 
-+++
-[Learn More →](map.md)
-
-**Map-Reduce / Reduce Operations**
-^^^
-Group rows by key and aggregate with a reducer. Supports both TypedJob (pickled Python) and command-string (JSON stdin/stdout) legs.
-
-+++
-[TypedJob guide →](map-reduce-typed-jobs.md) · [Command mode →](command-mode-map-reduce.md)
-
-**Vanilla Operations**
-^^^
-Run standalone jobs without input/output tables. Perfect for setup, cleanup, validation, or any task that doesn't require table I/O.
-
-+++
-[Learn More →](vanilla.md)
-
-**YQL Operations**
-^^^
-Perform table operations using YQL (YTsaurus Query Language). Includes joins, filters, aggregations, sorting, and more.
-
-+++
-[Learn More →](yql.md)
-
-**S3 Operations**
-^^^
-Integrate with S3 for file listing, downloading, and processing. Perfect for working with external data sources.
-
-+++
-[Learn More →](s3.md)
-
-**Table helpers**
-^^^
-Count rows, load a table into memory, or export to JSONL using framework helpers—or call `yt_client` directly.
-
-+++
-[Learn More →](table.md)
-
-**Sort operation**
-^^^
-Run a YTsaurus sort on a table in-place with pool/resources from config (`run_sort`).
-
-+++
-[Learn More →](sort.md)
-```
-
-## When to Use Each Operation
-
-| Operation | Best For | Input/Output | Parallelization |
-|-----------|----------|--------------|-----------------|
-| **Map** | Row-by-row processing, transformations | Table → Table | Automatic (per row) |
-| **Map-Reduce** | Grouping + aggregation with custom Python | Table → Table | Automatic (map + reduce phases) |
-| **Reduce** | Reduce-only on a pre-sorted table | Table → Table | Automatic (per key group) |
-| **Vanilla** | Setup, cleanup, standalone tasks | None | Single job |
-| **YQL** | SQL-like queries, joins, aggregations | Table(s) → Table | Automatic (query-level) |
-| **S3** | External data integration | S3 → Table | File-level |
-| **Table helpers** | Row counts, bulk read, JSONL export | Table → Python / disk | Driver-side |
-| **Sort** | Sort table before reduce or YQL | Table → Table (sorted) | Cluster sort job |
-
-## Quick Comparison
+| Pattern | Input / output | Parallelism |
+|---------|----------------|-------------|
+| Map | Table → table | YT splits input across tasks |
+| Map-reduce / reduce | Sorted or grouped table work | Map + reduce phases |
+| Vanilla | None required | Single job |
+| YQL | One or more tables → table | Query planner |
+| S3 | Object store → table (typical) | Driver listing + cluster for follow-up |
+| Table helpers | Driver-side Python | None on cluster |
+| Sort | Table → sorted table | YT sort operation |
 
 ### Map vs YQL
 
-- **Use Map** when you need custom Python logic per row
-- **Use YQL** when you need SQL-like operations (joins, aggregations)
+- Custom Python per row → map.
+- Declarative SQL shape → YQL.
 
-### Vanilla vs Map
+### Vanilla vs map
 
-- **Use Vanilla** when you don't need table input/output
-- **Use Map** when processing table rows
+- No table contract → vanilla.
+- Row stream → map.
 
-### S3 Integration
+### S3 plus tables
 
-- **Use S3** when working with external data sources
-- Often combined with Map or YQL operations
+S3 stages often feed map or YQL; compose them as separate stages or multiple operations in one stage ([Multiple operations](../advanced/multiple-operations.md)).
 
-## Common Patterns
+## Example stage lists
 
-### Pattern 1: Extract → Transform → Load
-
-```yaml
-stages:
-  enabled_stages:
-    - extract_from_s3      # S3 operation
-    - transform_data       # Map operation
-    - load_to_table        # YQL operation
-```
-
-### Pattern 2: Setup → Process → Validate
+Extract / transform / load:
 
 ```yaml
 stages:
   enabled_stages:
-    - setup_environment    # Vanilla operation
-    - process_data         # Map operation
-    - validate_results     # Vanilla operation
+    - extract_from_s3
+    - transform_data
+    - load_to_table
 ```
 
-### Pattern 3: Join → Filter → Aggregate
+Setup / process / validate:
 
 ```yaml
 stages:
   enabled_stages:
-    - join_tables         # YQL operation
-    - filter_data         # YQL operation
-    - aggregate_results   # YQL operation
+    - setup_environment
+    - process_data
+    - validate_results
 ```
 
-## See Also
+## See also
 
-- [Command mode map-reduce / reduce](command-mode-map-reduce.md) — `tar_command_bootstrap`, JSON stdin/stdout legs
-- [Map Operations](map.md) - Detailed map operation guide
-- [Vanilla Operations](vanilla.md) - Detailed vanilla operation guide
-- [YQL Operations](yql.md) - Detailed YQL operation guide
-- [S3 Operations](s3.md) - Detailed S3 operation guide
-- [Table helpers](table.md) - `read_table`, `get_row_count`, `download_table`
-- [Sort operation](sort.md) - `run_sort` and YAML layout
-- [Multiple Operations](../advanced/multiple-operations.md) - Running multiple operations in one stage
+- [Command-mode map-reduce](command-mode-map-reduce.md)
+- [Multiple operations](../advanced/multiple-operations.md)

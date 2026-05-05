@@ -84,6 +84,7 @@ client:
       input_table: //tmp/my_pipeline/input
       output_table: //tmp/my_pipeline/output
       reduce_by: [key]
+      max_row_weight: 128M  # optional override, default is 128M
       resources:
         pool: my_pool
         memory_limit_gb: 4

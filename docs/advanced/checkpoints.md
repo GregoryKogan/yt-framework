@@ -1,28 +1,21 @@
-# Checkpoint Management
+# Checkpoints (model files)
 
-Checkpoint management allows you to use ML model files in your operations. The framework handles checkpoint upload, mounting, and access automatically.
+Model weights (single files such as `.pth` or small HF snapshots treated as one artifact) can be uploaded to Cypress and mounted into map / map-reduce / vanilla sandboxes. This page covers that **model checkpoint** path.
 
-For **tokenizer or processor tarballs** (separate upload path and env vars), see [Tokenizer artifacts](tokenizer-artifact.md)—not the same as a single `checkpoint:` model file.
+Tokenizer directories or tarballs use a different config block: [Tokenizer artifacts](tokenizer-artifact.md).
 
 ```{note}
-Mapper examples may import `ytjobs.config`; runtime state in Cypress via `ytjobs.checkpoint` is a separate concern—see [YT jobs library (`ytjobs`)](../reference/ytjobs.md).
+`ytjobs.checkpoint` stores arbitrary blobs under Cypress from **inside** a running job. That API is unrelated to uploading a model file from the driver—see [YT jobs (`ytjobs`)](../reference/ytjobs.md).
 ```
 
 ## Overview
 
-Checkpoints are model files (e.g., PyTorch `.pth` files, HuggingFace models) that need to be available to operations. The framework:
+The framework can:
 
-- Uploads checkpoints to YT
-- Mounts checkpoints in operation sandboxes
-- Provides access via environment variables
-- Handles both local and YT-stored checkpoints
+- Copy or reuse a checkpoint already on YT
+- Expose the resolved filesystem path to job code (`CHECKPOINT_FILE` in dev; prod details in sections below)
 
-**Key points:**
-
-- Checkpoints are mounted as files in operation sandboxes
-- Access via `CHECKPOINT_FILE` environment variable (dev mode) or `model_name` from config (prod mode)
-- Supports local upload and YT-stored checkpoints
-- Works in both dev and prod modes
+Sandboxes see the file on disk; your mapper loads it like any local path.
 
 ## Quick Start
 
@@ -196,7 +189,7 @@ def main():
 
 Checkpoints are stored in YT at:
 
-```plaintext
+```text
 {checkpoint_base}/{model_name}
 ```
 
@@ -344,7 +337,7 @@ if __name__ == "__main__":
 
 **Organize checkpoints by model:**
 
-```plaintext
+```text
 //tmp/my_pipeline/checkpoints/
 ├── model_v1.pth
 ├── model_v2.pth

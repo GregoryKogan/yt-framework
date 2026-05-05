@@ -1,9 +1,4 @@
-"""
-Production YT Client
-====================
-
-Production implementation of YT client using actual YTsaurus client.
-"""
+"""Thin wrapper around `yt.wrapper.YtClient` for real cluster operations."""
 
 import logging
 from pathlib import Path
@@ -26,6 +21,11 @@ from yt.wrapper.spec_builders import (  # pyright: ignore[reportMissingImports]
 from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
 
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
+from yt_framework.yt.max_row_weight import (
+    build_max_row_weight_pragma,
+    ensure_max_row_weight_pragma,
+    validate_max_row_weight,
+)
 from yt_framework.utils.ignore import YTIgnoreMatcher
 from yt_framework.operations.job_command import (
     resolve_aliased_job as _resolve_aliased_job,
@@ -53,6 +53,9 @@ def _apply_spec_options_and_split_run_operation_kwargs(
         if k in _RUN_OPERATION_KWARGS:
             run_op[k] = kwargs.pop(k)
     for k, v in list(kwargs.items()):
+        if k == "max_row_weight":
+            del kwargs[k]
+            continue
         meth = getattr(spec_builder, k, None)
         if meth is not None and callable(meth):
             spec_builder = meth(v)
@@ -78,6 +81,22 @@ def _apply_command_leg_format(
     if isinstance(leg, TypedJob):
         return leg_builder
     return leg_builder.format(yt_format.JsonFormat(encode_utf8=False))
+
+
+def _apply_max_row_weight_to_spec_builder(
+    spec_builder: Any,
+    max_row_weight: Optional[str],
+) -> Any:
+    """Apply max row weight to spec builder when supported."""
+    if max_row_weight is None:
+        return spec_builder
+    table_writer = getattr(spec_builder, "table_writer", None)
+    if callable(table_writer):
+        return table_writer({"max_row_weight": max_row_weight})
+    job_io = getattr(spec_builder, "job_io", None)
+    if callable(job_io):
+        return job_io({"table_writer": {"max_row_weight": max_row_weight}})
+    return spec_builder
 
 
 class YTProdClient(BaseYTClient):
@@ -367,7 +386,8 @@ class YTProdClient(BaseYTClient):
                     import uuid
 
                     temp_output = f"{table_path}.temp_schema_{uuid.uuid4().hex[:8]}"
-                    query = f"""PRAGMA yt.InferSchema = '1';
+                    query = f"""{build_max_row_weight_pragma()}
+PRAGMA yt.InferSchema = '1';
 INSERT INTO `{temp_output}` WITH TRUNCATE
 SELECT * FROM `{table_path}` LIMIT 0;"""
 
@@ -428,6 +448,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self,
         query: str,
         pool: str = "default",
+        max_row_weight: Optional[str] = None,
     ) -> None:
         """
         Execute a YQL query on YT cluster.
@@ -435,19 +456,24 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         Args:
             query: YQL query string to execute
             pool: YT pool name (default: 'default')
+            max_row_weight: Optional max row weight override
 
         Raises:
             Exception: If query execution fails
         """
         self.logger.info("Executing YQL query on YT cluster")
         self.logger.debug(f"Pool: {pool}")
-        self.logger.debug(f"Query:\n{query}")
+        query_with_max_row_weight = ensure_max_row_weight_pragma(
+            query=query,
+            max_row_weight=max_row_weight,
+        )
+        self.logger.debug(f"Query:\n{query_with_max_row_weight}")
 
         try:
             # Execute YQL query on YT cluster using Python API
             query_obj = self.client.run_query(
                 engine="yql",
-                query=query,
+                query=query_with_max_row_weight,
                 settings={"pool": pool},
             )
 
@@ -477,6 +503,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         how: Literal["inner", "left", "right", "full"] = "left",
         select_columns: Optional[List[str]] = None,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Join two tables using YQL.
@@ -505,12 +532,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             on=on,
             how=how,
             select_columns=select_columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def filter_table(
@@ -519,6 +547,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_table: str,
         condition: str,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Filter table rows using WHERE condition.
@@ -542,12 +571,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             output_table=output_table,
             condition=condition,
             columns=columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def select_columns(
@@ -556,6 +586,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_table: str,
         columns: List[str],
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Select specific columns from a table.
@@ -575,12 +606,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             input_table=input_table,
             output_table=output_table,
             columns=columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def group_by_aggregate(
@@ -590,6 +622,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         group_by: Union[str, List[str]],
         aggregations: Dict[str, Union[str, Tuple[str, str]]],
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Group by columns and compute aggregations.
@@ -612,12 +645,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             output_table=output_table,
             group_by=group_by,
             aggregations=aggregations,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def union_tables(
@@ -625,6 +659,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         tables: List[str],
         output_table: str,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Union multiple tables.
@@ -647,12 +682,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             tables=tables,
             output_table=output_table,
             columns=columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def distinct(
@@ -661,6 +697,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_table: str,
         columns: Optional[List[str]] = None,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Get distinct rows from a table.
@@ -680,12 +717,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             input_table=input_table,
             output_table=output_table,
             columns=columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def sort_table(
@@ -695,6 +733,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         order_by: Union[str, List[str]],
         ascending: bool = True,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Sort table by columns.
@@ -722,12 +761,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             order_by=order_by,
             columns=columns,
             ascending=ascending,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def limit_table(
@@ -736,6 +776,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_table: str,
         limit: int,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Limit number of rows from a table.
@@ -759,12 +800,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             output_table=output_table,
             limit=limit,
             columns=columns,
+            max_row_weight=max_row_weight,
         )
 
         if dry_run:
             return query
 
-        self.run_yql(query)
+        self.run_yql(query, max_row_weight=max_row_weight)
         return None
 
     def upload_file(
@@ -876,6 +918,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
         job: Any = None,
+        append: bool = False,
         **kwargs: Any,
     ) -> Operation:
         """Run a map operation on YT cluster.
@@ -895,6 +938,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             max_failed_jobs: Maximum failed jobs allowed before operation fails.
             docker_auth: Optional Docker authentication for private registries.
             job: Preferred mapper job alias.
+            append: If True, append mapper output to an existing output table.
 
         Returns:
             Operation: YT operation object that can be monitored and waited on.
@@ -905,6 +949,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info("Submitting map operation")
         self.logger.info(f"  Input: {input_table}")
         self.logger.info(f"  Output: {output_table}")
+        self.logger.info(f"  Append: {append}")
         self.logger.info(f"  Output Schema: {output_schema}")
         self.logger.info(f"  Command: {command}")
         self.logger.info(f"  Files: {files}")
@@ -918,11 +963,14 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 preferred_value=job,
             )
             kwargs = dict(kwargs)
+            kwargs["max_row_weight"] = validate_max_row_weight(
+                kwargs.get("max_row_weight")
+            )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
 
-            output_path = TablePath(output_table, append=False, schema=output_schema)
+            output_path = TablePath(output_table, append=append, schema=output_schema)
             spec_builder = (
                 MapSpecBuilder()
                 .pool(resources.pool)
@@ -954,6 +1002,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 spec_builder.secure_vault({"docker_auth": docker_auth})
 
             mapper_builder = mapper_builder.end_mapper()
+            spec_builder = _apply_max_row_weight_to_spec_builder(
+                spec_builder,
+                kwargs.get("max_row_weight"),
+            )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
                 spec_builder, kwargs
@@ -1021,6 +1073,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 preferred_value=job,
             )
             kwargs = dict(kwargs)
+            kwargs["max_row_weight"] = validate_max_row_weight(
+                kwargs.get("max_row_weight")
+            )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
@@ -1058,6 +1113,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 spec_builder.secure_vault({"docker_auth": docker_auth})
 
             task_builder.end_task()
+            spec_builder = _apply_max_row_weight_to_spec_builder(
+                spec_builder,
+                kwargs.get("max_row_weight"),
+            )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
                 spec_builder, kwargs
@@ -1100,6 +1159,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info(f"  Reduce by: {reduce_by}")
 
         try:
+            kwargs = dict(kwargs)
+            kwargs["max_row_weight"] = validate_max_row_weight(
+                kwargs.get("max_row_weight")
+            )
             mapper_leg = _resolve_aliased_job(
                 legacy_name="mapper",
                 legacy_value=mapper,
@@ -1173,6 +1236,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             map_job_count = kwargs.pop("map_job_count", None)
             if map_job_count is not None:
                 spec_builder = spec_builder.map_job_count(map_job_count)
+            spec_builder = _apply_max_row_weight_to_spec_builder(
+                spec_builder,
+                kwargs.get("max_row_weight"),
+            )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
                 spec_builder, kwargs
@@ -1215,6 +1282,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 preferred_value=job,
             )
             kwargs = dict(kwargs)
+            kwargs["max_row_weight"] = validate_max_row_weight(
+                kwargs.get("max_row_weight")
+            )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
@@ -1257,6 +1327,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             reducer_builder.end_reducer()
 
             spec_builder = spec_builder.reduce_by(reduce_by)
+            spec_builder = _apply_max_row_weight_to_spec_builder(
+                spec_builder,
+                kwargs.get("max_row_weight"),
+            )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
                 spec_builder, kwargs

@@ -103,3 +103,11 @@ def test_run_vanilla_forwards_dict_operation_description(
     assert run_vanilla(ctx, cfg) is True
     kw = ctx.deps.yt_client.run_vanilla.call_args.kwargs
     assert kw.get("operation_description") == {"label": "dict-v"}
+
+
+def test_run_vanilla_forwards_max_row_weight_override(tmp_path: Path) -> None:
+    ctx = _vanilla_stage_context(tmp_path)
+    cfg = OmegaConf.create({"resources": {"pool": "p"}, "max_row_weight": "64M"})
+    assert run_vanilla(ctx, cfg) is True
+    kw = ctx.deps.yt_client.run_vanilla.call_args.kwargs
+    assert kw.get("max_row_weight") == "64M"

@@ -1,9 +1,4 @@
-"""
-Checkpoint Management Utilities
-================================
-
-Utilities for managing checkpoint files in YTsaurus.
-"""
+"""Upload or reuse single-file model checkpoints and wire them into operation specs."""
 
 from pathlib import Path
 from typing import TYPE_CHECKING

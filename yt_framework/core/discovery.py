@@ -1,9 +1,4 @@
-"""
-Stage Discovery
-===============
-
-Automatic discovery of stages from stages/ directory.
-"""
+"""Filesystem scan that imports `stages/*/stage.py` and collects `BaseStage` types."""
 
 import importlib
 import sys

@@ -1,6 +1,6 @@
-# Advanced Topics
+# Advanced topics
 
-Advanced features and techniques for complex YT Framework pipelines.
+Pages here cover packaging, images, checkpoints, tokenizer tarballs, and running several operations inside one stage.
 
 ```{toctree}
 :maxdepth: 1
@@ -12,95 +12,33 @@ tokenizer-artifact
 multiple-operations
 ```
 
-## Advanced Features
+## Guides
 
-```{card-grid} 2
-:padding: 2
+| Page | What it covers |
+|------|----------------|
+| [Code upload](code-upload.md) | Tar layout, `upload_modules`, `upload_paths`, wrappers |
+| [Docker](docker.md) | `docker_image`, registry auth, GPU images |
+| [Checkpoints](checkpoints.md) | Single-file model upload + mount |
+| [Tokenizer artifact](tokenizer-artifact.md) | Tarball upload + env vars for processor trees |
+| [Multiple operations](multiple-operations.md) | Several `run_*` calls in one `run()` |
 
-**Code Upload**
-^^^
-Learn how the framework handles code packaging and deployment to YT cluster. Understand the tar archive strategy and dependency management.
+## Before you read
 
-+++
-[Learn More →](code-upload.md)
+- [Pipelines and stages](../pipelines-and-stages.md)
+- [Configuration](../configuration/index.md)
+- [Operations](../operations/index.md)
 
-**Docker Support**
-^^^
-Use custom Docker images for GPU workloads or special dependencies. Configure Docker authentication and multi-stage builds.
+## When these pages matter
 
-+++
-[Learn More →](docker.md)
+| Topic | Typical trigger |
+|-------|-----------------|
+| Code upload | Any stage with `src/` in prod |
+| Docker | Import errors for `torch`, CUDA, or system libs on workers |
+| Checkpoints | ML inference map jobs needing a `.pt` / `.bin` |
+| Tokenizer tarball | NLP models needing `tokenizer.json` plus vocab dirs |
+| Multiple operations | One stage that maps then validates without splitting stages |
 
-**Checkpoint Management**
-^^^
-Handle ML model checkpoints for inference pipelines. Upload, version, and manage checkpoints in YT.
+## See also
 
-+++
-[Learn More →](checkpoints.md)
-
-**Tokenizer artifacts**
-^^^
-Upload tokenizer or processor tarballs to Cypress, wire sandbox extraction (separate from single-file checkpoints).
-
-+++
-[Learn More →](tokenizer-artifact.md)
-
-**Multiple Operations**
-^^^
-Run multiple operations (map, vanilla, YQL) in a single stage. Optimize pipeline execution and reduce overhead.
-
-+++
-[Learn More →](multiple-operations.md)
-```
-
-## Prerequisites
-
-Before diving into advanced topics, make sure you understand:
-
-- [Pipelines and Stages](../pipelines-and-stages.md) - Basic pipeline structure
-- [Configuration](../configuration/index.md) - Configuration system
-- [Operations](../operations/index.md) - Basic operation types
-
-## When to Use Advanced Features
-
-### Code Upload
-
-Use when:
-- Your stages have `src/` directories with Python code
-- You need to deploy custom dependencies
-- Working with complex codebases
-
-### Docker Support
-
-Use when:
-- You need GPU acceleration
-- Requiring specific system dependencies
-- Using custom runtime environments
-
-### Checkpoint Management
-
-Use when:
-- Running ML inference pipelines
-- Need to version model checkpoints
-- Managing large model files
-
-### Tokenizer artifacts
-
-Use when:
-- Workers need a tarball of tokenizer/processor files (not only a single checkpoint file)
-- You want idempotent upload to a Cypress file path and env wiring for TypedJob bootstrap
-
-### Multiple Operations
-
-Use when:
-- Combining multiple operations in one stage
-- Reducing pipeline overhead
-- Optimizing execution flow
-
-## See Also
-
-- [Code Upload Guide](code-upload.md) - Complete code upload documentation
-- [Docker Guide](docker.md) - Docker configuration guide
-- [Checkpoints Guide](checkpoints.md) - Checkpoint management guide
-- [Tokenizer artifacts](tokenizer-artifact.md) - Tarball upload and sandbox extraction
-- [Multiple Operations Guide](multiple-operations.md) - Running multiple operations
+- [Operations index](../operations/index.md)
+- [Troubleshooting](../troubleshooting/index.md)

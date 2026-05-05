@@ -17,12 +17,13 @@ Add or extend tests in the same change set when you change behavior, fix bugs, a
 
 ## Obligation
 
-Do not claim a change is verified without evidence. Update or add tests so they match the new semantics; remove or rewrite assertions that encode obsolete behavior. If you rely on dev mode or examples instead of pytest, say what you ran and the outcome.
+Do not claim a change is verified without evidence. Update or add tests so they match the new semantics; remove or rewrite assertions that encode obsolete behavior. If you rely on dev mode or examples instead of pytest, say what you ran and the outcome. Thoroughness: very thorough.
 
 ## While working
 
 - **Early**: Identify which modules or flows changed and whether `tests/` already covers them; note gaps.
 - **Before done**: Run the relevant pytest scope (full suite or targeted). For integration-only or uncovered paths, run the dev-mode or example steps from `CONTRIBUTING.md` and record the result.
+- **For code edits in this flow**: you MUST use `.cursor/skills/karpathy-guidelines/SKILL.md` when writing/reviewing/refactoring production or test code so fixes stay simple, surgical, and verification-driven.
 
 ## Proof
 

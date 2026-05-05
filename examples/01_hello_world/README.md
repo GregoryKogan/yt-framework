@@ -1,37 +1,29 @@
-# Hello World Example
+# Hello world
 
-The simplest example of a YT Framework pipeline. Demonstrates basic pipeline setup, stage creation, and table operations.
+Minimal `DefaultPipeline` repo: one stage writes rows with the YT client, then reads them back. Runs in **dev** mode by default (`.dev/hello_world_table.jsonl`).
 
-## What It Demonstrates
+## What to notice
 
-- **DefaultPipeline**: Using automatic stage discovery
-- **Basic Stage**: Creating a simple stage that writes and reads a table
-- **YT Client Usage**: Using YT client for table operations
-- **Dev Mode**: Running pipeline in development mode
+- Stage discovery from `stages/create_table/`
+- `write_table` / `read_table` on `self.deps.yt_client`
+- `configs/config.yaml` lists `enabled_stages`
 
-## Features
-
-- Automatic stage discovery (no manual registration)
-- Table creation and reading
-- Basic YT client operations
-- Simple configuration
-
-## Running
+## Run
 
 ```bash
 python pipeline.py
 ```
 
-In dev mode, the table will be created as `.dev/hello_world_table.jsonl`.
+## Layout
 
-## Files
+| Path | Role |
+|------|------|
+| `pipeline.py` | `DefaultPipeline.main()` |
+| `stages/create_table/stage.py` | Sample table write/read |
+| `stages/create_table/config.yaml` | Table path |
+| `configs/config.yaml` | `mode: dev`, enabled stages |
 
-- `pipeline.py`: Pipeline entry point using DefaultPipeline
-- `stages/create_table/stage.py`: Stage that creates a table with sample data
-- `stages/create_table/config.yaml`: Stage configuration
-- `configs/config.yaml`: Pipeline configuration
+## Next
 
-## Next Steps
-
-- See [02_multi_stage_pipeline](../02_multi_stage_pipeline/) for multiple stages
-- See [03_yql_operations](../03_yql_operations/) for YQL operations
+- [02_multi_stage_pipeline](../02_multi_stage_pipeline/)
+- [03_yql_operations](../03_yql_operations/)

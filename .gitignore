@@ -19,6 +19,8 @@ Thumbs.db
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
+!.cursor/skills/
+!.cursor/skills/**
 .idea/
 *.swp
 *.swo

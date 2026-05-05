@@ -1,10 +1,4 @@
-"""
-Dependency Management
-=======================
-
-Build dependency file lists for YT map operations.
-Dependencies are files that need to be mounted in the YT job sandbox.
-"""
+"""Collect extra file dependencies (including implicit `ytjobs`) for YT jobs."""
 
 import logging
 from pathlib import Path

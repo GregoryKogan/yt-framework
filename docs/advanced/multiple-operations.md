@@ -1,22 +1,14 @@
-# Multiple Operations
+# Multiple operations in one stage
 
-You can run multiple operations (map, vanilla, or both) in a single stage. This is useful for complex workflows that need to combine different operation types.
+Call `run_map`, `run_vanilla`, YQL helpers, etc. multiple times inside a single `BaseStage.run()` when they share one stage directory and one merged `config.yaml` subtree.
 
 ## Overview
 
-Running multiple operations in one stage allows you to:
+- Operations execute **in the order you call them**.
+- They reuse the same `self.context` / upload bundle for that stage.
+- Each operation reads its own block under `client.operations.<name>`.
 
-- Chain operations together
-- Combine map and vanilla operations
-- Process data in multiple steps
-- Validate results between operations
-
-**Key points:**
-
-- Operations run sequentially
-- Share the same stage context
-- Use separate operation configs
-- Results flow between operations
+Use separate stages instead when you want different `enabled_stages` ordering, different configs on disk, or clearer failure isolation.
 
 ## Quick Start
 

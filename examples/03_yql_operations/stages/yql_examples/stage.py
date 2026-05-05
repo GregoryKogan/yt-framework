@@ -214,6 +214,7 @@ class YqlExamplesStage(BaseStage):
             output_table=self.config.client.output.limited,
             limit=3,
             dry_run=True,
+            max_row_weight="64M",
         )
         self.logger.info(f"YQL preview (dry run):\n{query}")
 
@@ -221,6 +222,7 @@ class YqlExamplesStage(BaseStage):
             input_table=self.config.client.output.sorted,
             output_table=self.config.client.output.limited,
             limit=3,
+            max_row_weight="64M",
         )
         top3 = list(self.deps.yt_client.read_table(self.config.client.output.limited))
         self.logger.info("Top 3 orders by amount:")

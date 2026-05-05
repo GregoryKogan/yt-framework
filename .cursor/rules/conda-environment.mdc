@@ -13,6 +13,7 @@ Human-readable setup: [CONTRIBUTING.md](CONTRIBUTING.md) (Development Setup). En
   - `conda run -n yt-framework -- <command>`
 - Prefer `conda run` so activation hooks are not required. For compound commands from the repo root:
   - `conda run -n yt-framework -- bash -lc '...'`
+- When a Conda-driven task includes writing/reviewing/refactoring code, you MUST also use `.cursor/skills/karpathy-guidelines/SKILL.md` to keep code changes simple and testable.
 
 ## Do not
 
