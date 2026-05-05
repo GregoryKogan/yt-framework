@@ -15,7 +15,12 @@ Update docs in the same change set when behavior could confuse a reader: new/cha
 
 ## Obligation
 
-Update every affected surface (or add a focused new section for new behavior). Do not leave stale commands, options, or explanations that contradict the code.
+Update every affected surface (or add a focused new section for new behavior). Do not leave stale commands, options, or explanations that contradict the code. Thoroughness: very thorough.
+
+## Skill requirement
+
+When creating or editing documentation text, you MUST use the `humanizer` skill at `.cursor/skills/humanizer/SKILL.md` before drafting or revising prose. Apply its guidance to remove AI-written patterns and keep docs natural, direct, and human-readable.
+When documentation work also includes writing, reviewing, or refactoring code/docstrings, you MUST use `.cursor/skills/karpathy-guidelines/SKILL.md` for those code edits.
 
 ## While working
 

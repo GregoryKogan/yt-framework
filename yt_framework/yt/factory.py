@@ -1,9 +1,4 @@
-"""
-YTsaurus Operations
-===================
-
-Reusable YT client for any YT operations.
-"""
+"""Factory that returns `YTDevClient` or `YTProdClient` based on pipeline mode."""
 
 import logging
 from pathlib import Path

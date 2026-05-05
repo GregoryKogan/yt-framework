@@ -1,6 +1,6 @@
-# Pipeline Issues
+# Pipeline issues
 
-Common issues related to pipeline setup, stage configuration, and execution.
+Driver-side failures: config discovery, stage names, missing files before any YT operation starts.
 
 ## Stage Configuration
 
@@ -8,7 +8,7 @@ Common issues related to pipeline setup, stage configuration, and execution.
 
 **Error:**
 
-```plaintext
+```text
 ValueError: No enabled_stages found in stages config section.
 ```
 
@@ -26,7 +26,7 @@ stages:
 
 **Error:**
 
-```plaintext
+```text
 ValueError: Unknown stage: my_stage. Available stages: [...]
 ```
 
@@ -41,7 +41,7 @@ ValueError: Unknown stage: my_stage. Available stages: [...]
 
 **Error:**
 
-```plaintext
+```text
 FileNotFoundError: Config file not found: configs/config.yaml
 ```
 
@@ -57,7 +57,7 @@ FileNotFoundError: Config file not found: configs/config.yaml
 
 **Error:**
 
-```plaintext
+```text
 AttributeError: Stage setup failed
 ```
 
@@ -72,7 +72,7 @@ AttributeError: Stage setup failed
 
 **Error:**
 
-```plaintext
+```text
 KeyError: Context key not found
 ```
 
@@ -89,7 +89,7 @@ KeyError: Context key not found
 
 **Error:**
 
-```plaintext
+```text
 ValueError: Pipeline initialization failed
 ```
 
@@ -104,7 +104,7 @@ ValueError: Pipeline initialization failed
 
 **Error:**
 
-```plaintext
+```text
 ValueError: build_folder not found
 ```
 

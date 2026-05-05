@@ -212,6 +212,21 @@ def test_build_select_query_lists_explicit_columns() -> None:
     assert "SELECT\n    a,\n    b\n" in q and "FROM `//src`" in q
 
 
+def test_build_select_query_includes_default_max_row_weight_pragma() -> None:
+    q = build_select_query("//src", "//dst", ["a"])
+    assert 'PRAGMA yt.MaxRowWeight = "128M";' in q
+
+
+def test_build_select_query_uses_custom_max_row_weight_pragma_when_overridden() -> None:
+    q = build_select_query("//src", "//dst", ["a"], max_row_weight="64M")
+    assert 'PRAGMA yt.MaxRowWeight = "64M";' in q
+
+
+def test_build_select_query_raises_when_max_row_weight_exceeds_cluster_limit() -> None:
+    with pytest.raises(ValueError, match="exceeds cluster maximum"):
+        build_select_query("//src", "//dst", ["a"], max_row_weight="256M")
+
+
 def test_build_group_by_query_omits_group_by_when_group_by_empty_list() -> None:
     q = build_group_by_query(
         "//in",

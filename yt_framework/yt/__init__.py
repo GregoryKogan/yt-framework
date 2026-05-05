@@ -8,6 +8,7 @@ Example:
     >>> from yt_framework.yt import create_yt_client
     >>> client = create_yt_client(mode="dev", pipeline_dir=Path("."))
     >>> client.write_table("//tmp/test", [{"id": 1, "value": "hello"}])
+    >>> client.write_table("//tmp/test", [{"id": 2}], append=True)
 """
 
 from .factory import create_yt_client

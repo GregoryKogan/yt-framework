@@ -8,7 +8,7 @@ Issues specific to Dev mode and Prod mode configuration.
 
 **Error:**
 
-```plaintext
+```text
 FileNotFoundError: .dev/table.jsonl not found
 ```
 
@@ -23,7 +23,7 @@ FileNotFoundError: .dev/table.jsonl not found
 
 **Error:**
 
-```plaintext
+```text
 RuntimeError: Map operation failed
 ```
 
@@ -38,7 +38,7 @@ RuntimeError: Map operation failed
 
 **Error:**
 
-```plaintext
+```text
 PermissionError: Cannot create sandbox directory
 ```
 
@@ -52,7 +52,7 @@ PermissionError: Cannot create sandbox directory
 
 **Error:**
 
-```plaintext
+```text
 Error: DuckDB query failed
 ```
 
@@ -69,7 +69,7 @@ Error: DuckDB query failed
 
 **Error:**
 
-```plaintext
+```text
 ValueError: secrets are required for prod mode
 ```
 
@@ -84,7 +84,7 @@ ValueError: secrets are required for prod mode
 
 **Error:**
 
-```plaintext
+```text
 ValueError: build_folder not found in [pipeline] config section.
 ```
 
@@ -99,7 +99,7 @@ ValueError: build_folder not found in [pipeline] config section.
 
 **Error:**
 
-```plaintext
+```text
 Error: Failed to upload code to YT
 ```
 
@@ -114,7 +114,7 @@ Error: Failed to upload code to YT
 
 **Error:**
 
-```plaintext
+```text
 RuntimeError: Operation failed on YT cluster
 ```
 
@@ -129,7 +129,7 @@ RuntimeError: Operation failed on YT cluster
 
 **Error:**
 
-```plaintext
+```text
 ConnectionError: Cannot connect to YT cluster
 ```
 

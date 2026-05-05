@@ -1,8 +1,6 @@
 # Troubleshooting
 
-Common issues and solutions for YT Framework pipelines.
-
-This troubleshooting guide is organized by category to help you quickly find solutions to common problems.
+Symptoms grouped by area. Start from the section that matches where the failure shows up (driver config vs job logs).
 
 ```{toctree}
 :maxdepth: 1
@@ -13,52 +11,38 @@ configuration
 debugging
 ```
 
-## Quick Navigation
+## Sections
 
-- [Pipeline Issues](pipeline.md) - Problems with pipeline setup, stages, and configuration
-- [Operation Issues](operations.md) - Issues with Map, Vanilla, YQL, S3, Docker, and Checkpoint operations
-- [Configuration Issues](configuration.md) - Dev mode and Prod mode specific problems
-- [Debugging Guide](debugging.md) - Debugging tips, getting help, and prevention strategies
+- [Pipeline](pipeline.md) — discovery, ordering, `enabled_stages`
+- [Operations](operations.md) — map, vanilla, YQL, S3, checkpoints, Docker
+- [Configuration](configuration.md) — dev vs prod, secrets, paths
+- [Debugging](debugging.md) — logging, reproducing, asking for help
 
-## Common Error Patterns
+## How failures cluster
 
-Most issues fall into these categories:
+1. **YAML / OmegaConf** — missing keys, wrong types, bad table paths
+2. **Filesystem** — missing `stage.py`, wrong working directory
+3. **Operations** — mapper stderr, YQL pragma limits, S3 403
+4. **Environment** — Python version, missing pip package in **cluster** image
+5. **Mode mismatch** — code that only works locally, or vice versa
 
-1. **Configuration Errors**: Missing or incorrect configuration values
-2. **File/Path Errors**: Missing files, incorrect paths, permission issues
-3. **Operation Errors**: Failed map/vanilla/YQL operations
-4. **Environment Errors**: Missing dependencies, wrong Python version, etc.
-5. **Mode-Specific Errors**: Issues that only occur in dev or prod mode
+## Fast checks
 
-## Quick Fixes
+| Symptom | First look |
+|---------|------------|
+| Pipeline exits before stages | `configs/config.yaml`, `python pipeline.py` cwd |
+| Stage raises immediately | Stage `config.yaml`, imports in `stage.py` |
+| Cluster job fails | Task stderr in YT UI, Docker image packages |
+| Works in dev, fails in prod | Credentials, `build_folder`, upload size |
 
-### Pipeline won't start
-- Check `enabled_stages` in config
-- Verify config file exists
-- Check Python version (3.11+)
+## If you are stuck
 
-### Operation fails
-- Test in dev mode first
-- Check operation logs
-- Verify input tables exist
-- Review resource limits
+1. Reproduce in dev with the smallest table or stdin fixture.
+2. Capture **full** stderr from the failing task (prod) or `.dev` logs (dev).
+3. Compare cluster image package list against imports in uploaded code.
 
-### Can't find files/tables
-- Verify paths are correct
-- Check file permissions
-- Ensure previous stages completed successfully
+## See also
 
-## Getting Started
-
-If you're new to troubleshooting:
-
-1. Start with [Pipeline Issues](pipeline.md) if your pipeline won't run
-2. Check [Configuration Issues](configuration.md) for mode-specific problems
-3. Review [Operation Issues](operations.md) for operation-specific errors
-4. Use [Debugging Guide](debugging.md) for advanced troubleshooting
-
-## See Also
-
-- [Configuration Guide](../configuration/index.md) - Complete configuration reference
-- [Dev vs Prod](../dev-vs-prod.md) - Understanding execution modes
-- [Operations Guide](../operations/index.md) - Operation-specific documentation
+- [Configuration](../configuration/index.md)
+- [Dev vs prod](../dev-vs-prod.md)
+- [Operations](../operations/index.md)

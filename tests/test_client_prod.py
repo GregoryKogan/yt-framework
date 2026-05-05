@@ -178,6 +178,131 @@ def test_yt_prod_client_run_map_returns_operation_from_client_run_operation(
     fake_inner.run_operation.assert_called_once()
 
 
+def test_yt_prod_client_run_map_applies_default_max_row_weight_when_not_provided(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_inner = MagicMock()
+    fake_op = MagicMock()
+    fake_op.id = "yt-op-default-row-weight-map"
+    fake_inner.run_operation.return_value = fake_op
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+
+    spec = MagicMock()
+    mapper = MagicMock()
+    for name in (
+        "pool",
+        "resource_limits",
+        "max_failed_job_count",
+        "job_count",
+        "input_table_paths",
+        "output_table_paths",
+    ):
+        getattr(spec, name).return_value = spec
+    spec.begin_mapper.return_value = mapper
+    for name in (
+        "command",
+        "file_paths",
+        "environment",
+        "memory_limit",
+        "cpu_limit",
+        "gpu_limit",
+        "format",
+        "end_mapper",
+    ):
+        getattr(mapper, name).return_value = mapper
+    mapper.end_mapper.return_value = spec
+    monkeypatch.setattr("yt_framework.yt.client_prod.MapSpecBuilder", lambda: spec)
+
+    captured: dict[str, Any] = {}
+
+    def _capture(
+        spec_builder: Any, kwargs: dict[str, Any]
+    ) -> tuple[Any, dict[str, Any]]:
+        captured.update(kwargs)
+        return spec_builder, {}
+
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
+        _capture,
+    )
+    client = YTProdClient(
+        _null_logger("tests.client_prod.map_default_mrw"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    client.run_map(
+        "python3 mapper.py", "//tmp/in", "//tmp/out", [], OperationResources(), {}
+    )
+    assert captured["max_row_weight"] == "128M"
+
+
+def test_yt_prod_client_run_map_sets_output_table_path_append_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_inner = MagicMock()
+    fake_op = MagicMock()
+    fake_op.id = "yt-op-append-map"
+    fake_inner.run_operation.return_value = fake_op
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+
+    spec = MagicMock()
+    mapper = MagicMock()
+    for name in (
+        "pool",
+        "resource_limits",
+        "max_failed_job_count",
+        "job_count",
+        "input_table_paths",
+        "output_table_paths",
+    ):
+        getattr(spec, name).return_value = spec
+    spec.begin_mapper.return_value = mapper
+    for name in (
+        "command",
+        "file_paths",
+        "environment",
+        "memory_limit",
+        "cpu_limit",
+        "gpu_limit",
+        "format",
+        "end_mapper",
+    ):
+        getattr(mapper, name).return_value = mapper
+    mapper.end_mapper.return_value = spec
+
+    captured: List[Any] = []
+
+    def _otp(paths: Any) -> Any:
+        captured[:] = list(paths)
+        return spec
+
+    spec.output_table_paths.side_effect = _otp
+    monkeypatch.setattr("yt_framework.yt.client_prod.MapSpecBuilder", lambda: spec)
+
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
+        lambda sb, kw: (sb, {}),
+    )
+
+    client = YTProdClient(
+        _null_logger("tests.client_prod.map_append"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    client.run_map(
+        "python3 mapper.py",
+        "//tmp/in",
+        "//tmp/out",
+        [],
+        OperationResources(),
+        {},
+        append=True,
+    )
+    assert len(captured) == 1 and captured[0].append is True
+
+
 def _prod_client_with_stub_run_operation(monkeypatch: pytest.MonkeyPatch) -> Any:
     fake_inner = MagicMock()
     fake_op = MagicMock()
@@ -206,6 +331,55 @@ def test_yt_prod_client_run_vanilla_returns_operation_from_client_run_operation(
     )
     assert op.id == "yt-op-stub"
     fake_inner.run_operation.assert_called_once()
+
+
+def test_yt_prod_client_run_vanilla_applies_default_max_row_weight_when_not_provided(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_inner = MagicMock()
+    fake_op = MagicMock()
+    fake_op.id = "yt-op-default-row-weight-vanilla"
+    fake_inner.run_operation.return_value = fake_op
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+
+    spec = MagicMock()
+    task = MagicMock()
+    for name in ("pool", "resource_limits", "max_failed_job_count"):
+        getattr(spec, name).return_value = spec
+    spec.begin_task.return_value = task
+    for name in (
+        "command",
+        "file_paths",
+        "environment",
+        "memory_limit",
+        "cpu_limit",
+        "gpu_limit",
+        "job_count",
+        "end_task",
+    ):
+        getattr(task, name).return_value = task
+    monkeypatch.setattr("yt_framework.yt.client_prod.VanillaSpecBuilder", lambda: spec)
+
+    captured: dict[str, Any] = {}
+
+    def _capture(
+        spec_builder: Any, kwargs: dict[str, Any]
+    ) -> tuple[Any, dict[str, Any]]:
+        captured.update(kwargs)
+        return spec_builder, {}
+
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
+        _capture,
+    )
+    client = YTProdClient(
+        _null_logger("tests.client_prod.vanilla_default_mrw"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    client.run_vanilla("bash -c true", [], {}, "task", OperationResources())
+    assert captured["max_row_weight"] == "128M"
 
 
 def test_yt_prod_client_run_vanilla_configures_pool_tree_docker_description_and_vault(
@@ -290,6 +464,78 @@ def test_yt_prod_client_run_map_reduce_returns_operation_from_client_run_operati
     fake_inner.run_operation.assert_called_once()
 
 
+def test_yt_prod_client_run_map_reduce_applies_default_max_row_weight_when_not_provided(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_inner = MagicMock()
+    fake_op = MagicMock()
+    fake_op.id = "yt-op-default-row-weight-mr"
+    fake_inner.run_operation.return_value = fake_op
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+
+    spec = MagicMock()
+    mapper = MagicMock()
+    reducer = MagicMock()
+    for name in (
+        "input_table_paths",
+        "output_table_paths",
+        "pool",
+        "max_failed_job_count",
+        "reduce_by",
+    ):
+        getattr(spec, name).return_value = spec
+    spec.begin_mapper.return_value = mapper
+    spec.begin_reducer.return_value = reducer
+    for name in (
+        "command",
+        "file_paths",
+        "environment",
+        "memory_limit",
+        "cpu_limit",
+        "gpu_limit",
+        "format",
+        "end_mapper",
+        "end_reducer",
+    ):
+        getattr(mapper, name).return_value = mapper
+        getattr(reducer, name).return_value = reducer
+    mapper.end_mapper.return_value = spec
+    reducer.end_reducer.return_value = spec
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.MapReduceSpecBuilder", lambda: spec
+    )
+
+    captured: dict[str, Any] = {}
+
+    def _capture(
+        spec_builder: Any, kwargs: dict[str, Any]
+    ) -> tuple[Any, dict[str, Any]]:
+        captured.update(kwargs)
+        return spec_builder, {}
+
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
+        _capture,
+    )
+    client = YTProdClient(
+        _null_logger("tests.client_prod.mr_default_mrw"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    client.run_map_reduce(
+        "python3 mapper.py",
+        "python3 reducer.py",
+        "//tmp/in",
+        "//tmp/out",
+        ["k"],
+        [],
+        OperationResources(),
+        {},
+    )
+    assert captured["max_row_weight"] == "128M"
+
+
 def test_yt_prod_client_run_reduce_returns_operation_from_client_run_operation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -305,6 +551,71 @@ def test_yt_prod_client_run_reduce_returns_operation_from_client_run_operation(
     )
     assert op.id == "yt-op-stub"
     fake_inner.run_operation.assert_called_once()
+
+
+def test_yt_prod_client_run_reduce_applies_default_max_row_weight_when_not_provided(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_inner = MagicMock()
+    fake_op = MagicMock()
+    fake_op.id = "yt-op-default-row-weight-reduce"
+    fake_inner.run_operation.return_value = fake_op
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+
+    spec = MagicMock()
+    reducer = MagicMock()
+    for name in (
+        "input_table_paths",
+        "output_table_paths",
+        "pool",
+        "max_failed_job_count",
+        "reduce_by",
+        "begin_reducer",
+    ):
+        getattr(spec, name).return_value = spec
+    spec.begin_reducer.return_value = reducer
+    for name in (
+        "command",
+        "file_paths",
+        "environment",
+        "memory_limit",
+        "cpu_limit",
+        "gpu_limit",
+        "format",
+        "end_reducer",
+    ):
+        getattr(reducer, name).return_value = reducer
+    reducer.end_reducer.return_value = spec
+    monkeypatch.setattr("yt_framework.yt.client_prod.ReduceSpecBuilder", lambda: spec)
+
+    captured: dict[str, Any] = {}
+
+    def _capture(
+        spec_builder: Any, kwargs: dict[str, Any]
+    ) -> tuple[Any, dict[str, Any]]:
+        captured.update(kwargs)
+        return spec_builder, {}
+
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
+        _capture,
+    )
+    client = YTProdClient(
+        _null_logger("tests.client_prod.reduce_default_mrw"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    client.run_reduce(
+        "python3 reducer.py",
+        "//tmp/in",
+        "//tmp/out",
+        ["k"],
+        [],
+        OperationResources(),
+        {},
+    )
+    assert captured["max_row_weight"] == "128M"
 
 
 def test_yt_prod_client_run_map_reduce_wires_pool_tree_slots_description_sort_map_job_count(
@@ -731,12 +1042,51 @@ def test_yt_prod_client_run_yql_logs_success_when_query_state_completed(
     qobj.get_state.return_value = "completed"
     fake_inner.run_query.return_value = qobj
     client.run_yql("SELECT 1", pool="heavy")
+    submitted_query = fake_inner.run_query.call_args.kwargs["query"]
     fake_inner.run_query.assert_called_once_with(
         engine="yql",
-        query="SELECT 1",
+        query=submitted_query,
         settings={"pool": "heavy"},
     )
+    assert submitted_query.startswith('PRAGMA yt.MaxRowWeight = "128M";')
+    assert submitted_query.endswith("SELECT 1")
     qobj.get_state.assert_called_once()
+
+
+def test_yt_prod_client_run_yql_uses_override_for_max_row_weight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    qobj = MagicMock()
+    qobj.id = "yql-q-override"
+    qobj.get_state.return_value = "completed"
+    fake_inner.run_query.return_value = qobj
+    client.run_yql("SELECT 1", max_row_weight="64M")
+    submitted_query = fake_inner.run_query.call_args.kwargs["query"]
+    assert submitted_query.startswith('PRAGMA yt.MaxRowWeight = "64M";')
+
+
+def test_yt_prod_client_run_yql_raises_when_max_row_weight_exceeds_cluster_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    with pytest.raises(ValueError, match="exceeds cluster maximum"):
+        client.run_yql("SELECT 1", max_row_weight="256M")
+    fake_inner.run_query.assert_not_called()
+
+
+def test_yt_prod_client_run_yql_does_not_duplicate_existing_max_row_weight_pragma(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    qobj = MagicMock()
+    qobj.id = "yql-q-no-dup"
+    qobj.get_state.return_value = "completed"
+    fake_inner.run_query.return_value = qobj
+    client.run_yql('PRAGMA yt.MaxRowWeight = "64M";\nSELECT 1;')
+    submitted_query = fake_inner.run_query.call_args.kwargs["query"]
+    assert submitted_query.count("PRAGMA yt.MaxRowWeight") == 1
+    assert '"64M"' in submitted_query
 
 
 def test_yt_prod_client_run_yql_raises_runtime_error_when_query_not_completed(
@@ -1237,6 +1587,75 @@ def test_yt_prod_client_limit_table_dry_run_returns_query_without_run_yql(
     fake_inner.get.return_value = {"schema": [{"name": "id"}]}
     q = client.limit_table("//l_in", "//l_out", limit=3, dry_run=True)
     assert "LIMIT" in q.upper() and not fake_inner.run_query.called
+
+
+@pytest.mark.parametrize(
+    ("method_name", "kwargs"),
+    [
+        (
+            "join_tables",
+            {
+                "left_table": "//l",
+                "right_table": "//r",
+                "output_table": "//o",
+                "on": "id",
+            },
+        ),
+        (
+            "filter_table",
+            {
+                "input_table": "//i",
+                "output_table": "//o",
+                "condition": "id > 0",
+            },
+        ),
+        (
+            "select_columns",
+            {
+                "input_table": "//i",
+                "output_table": "//o",
+                "columns": ["id"],
+            },
+        ),
+        (
+            "group_by_aggregate",
+            {
+                "input_table": "//i",
+                "output_table": "//o",
+                "group_by": "id",
+                "aggregations": {"n": "count"},
+            },
+        ),
+        (
+            "union_tables",
+            {"tables": ["//a", "//b"], "output_table": "//o"},
+        ),
+        (
+            "distinct",
+            {"input_table": "//i", "output_table": "//o", "columns": ["id"]},
+        ),
+        (
+            "sort_table",
+            {"input_table": "//i", "output_table": "//o", "order_by": "id"},
+        ),
+        (
+            "limit_table",
+            {"input_table": "//i", "output_table": "//o", "limit": 5},
+        ),
+    ],
+)
+def test_yt_prod_yql_helpers_forward_max_row_weight_to_run_yql(
+    monkeypatch: pytest.MonkeyPatch,
+    method_name: str,
+    kwargs: dict[str, Any],
+) -> None:
+    client, _ = _prod_client_with_fake_inner(monkeypatch)
+    monkeypatch.setattr(client, "_get_table_columns", lambda _path: ["id"])
+    run_yql = MagicMock()
+    monkeypatch.setattr(client, "run_yql", run_yql)
+    method = getattr(client, method_name)
+    method(max_row_weight="64M", **kwargs)
+    assert run_yql.call_args.kwargs.get("max_row_weight") == "64M"
 
 
 def test_yt_prod_client_upload_directory_skips_ytignored_files_and_logs_count(

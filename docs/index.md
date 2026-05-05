@@ -1,8 +1,8 @@
-# YT Framework Documentation
+# YT Framework documentation
 
-Welcome to the YT Framework documentation! This guide will help you get started with building data processing pipelines on YTsaurus.
+This documentation explains how to build and run data processing pipelines on YTsaurus (YT) with the YT Framework Python package.
 
-## Table of Contents
+## Table of contents
 
 ```{toctree}
 :maxdepth: 3
@@ -19,71 +19,67 @@ troubleshooting/index
 
 ## Introduction
 
-YT Framework is a Python framework designed to simplify the development and execution of data processing pipelines on YTsaurus (YT) clusters. It provides:
+YT Framework is a Python library for defining pipelines as ordered stages, running them against a YT cluster in production, or against the local filesystem in development.
 
-- **Simple Pipeline Architecture**: Organize your workflows into stages
-- **Seamless Development**: Develop locally, deploy to production with minimal changes
-- **Comprehensive Operations**: Support for Map, Vanilla, YQL, and S3 operations
-- **Automatic Code Management**: Handles code upload, dependencies, and execution automatically
+You get:
 
-### Why YT Framework?
+- Pipelines built from stages under `stages/`, with YAML configuration per stage and for the pipeline.
+- A dev mode that mimics table and job behavior locally (no cluster required for basic work).
+- Operations such as map, vanilla, YQL (via the YT client), S3 helpers, and related utilities.
+- Packaging and upload of job code when you run on the cluster.
 
-- **Fast Development**: Automatic stage discovery means less boilerplate
-- **Local Testing**: Dev mode simulates YT operations locally using file system
-- **Production Ready**: Same code runs in dev and prod modes
-- **Flexible**: Supports everything from simple table operations to complex ML inference pipelines
+### When it helps
+
+- Less wiring for stage discovery and config than rolling everything by hand.
+- One codebase: flip `pipeline.mode` between dev and prod instead of maintaining two runners.
+- YQL and table helpers exposed on the same client you use for reads and writes.
 
 ## Installation
 
 ### Prerequisites
 
-- Python 3.11 or higher
-- Access to YTsaurus cluster (for production mode)
-- YT credentials (for production mode)
+- Python 3.11 or newer
+- For **prod** mode: network access to YT, valid credentials, and a cluster whose images match your job dependencies (see [Cluster requirements](configuration/cluster-requirements.md))
 
-#### YT Cluster Requirements
+#### YT cluster requirements
 
 ```{warning}
-**Cluster Docker Image Dependencies**
+**Cluster Docker image**
 
-Code from `ytjobs` executes on YT cluster nodes in production mode. The cluster's Docker image (default or custom) must include required dependencies for your operations to run successfully.
+In prod mode, code from `ytjobs` runs inside jobs on the cluster. The default or custom Docker image for those jobs must include the Python packages your mappers, reducers, and vanilla scripts import.
 ```
 
-See [Cluster Requirements](configuration/cluster-requirements.md) for detailed information about cluster dependencies and how to verify compatibility.
+Details: [Cluster requirements](configuration/cluster-requirements.md).
 
 ### Install from PyPI
-
-For most users, install the package from PyPI:
 
 ```bash
 pip install yt-framework
 ```
 
-### Install from Source
-
-For local development or contributing, install the package in editable mode:
+### Install from source
 
 ```bash
 pip install -e .
 ```
 
-### Verify Installation
+### Verify installation
 
 ```bash
 python -c "import yt_framework; print(yt_framework.__version__)"
 ```
 
-The PyPI package name is `yt-framework`; Python imports are `yt_framework` and `ytjobs`.
+The PyPI distribution is named `yt-framework`. Import paths are `yt_framework` (driver) and `ytjobs` (job-side helpers).
 
-### Configuration Setup
+### Credentials for prod
 
 ```{warning}
-**Secrets Required for Production Mode**
+**Secrets for production**
 
-Production mode requires YT credentials. Make sure to set up `secrets.env` before running in prod mode.
+Prod mode expects YT (and optionally S3) credentials in `configs/secrets.env`. Without them, the client cannot talk to the cluster.
 ```
 
-After installation, you'll need to set up your YT credentials for production mode. Create a `secrets.env` file in your pipeline's `configs/` directory:
+Create `configs/secrets.env` in your pipeline repo:
 
 ```bash
 # configs/secrets.env
@@ -91,7 +87,7 @@ YT_PROXY=your-yt-proxy-url
 YT_TOKEN=your-yt-token
 ```
 
-For S3 integration, also add:
+For S3-backed operations, add the keys your stage uses (names vary by operation; see [Secrets](configuration/secrets.md)):
 
 ```bash
 S3_ENDPOINT=https://your-s3-endpoint.com
@@ -101,13 +97,13 @@ S3_UPLOAD_ACCESS_KEY=your-upload-access-key
 S3_UPLOAD_SECRET_KEY=your-upload-secret-key
 ```
 
-See [Secrets Management](configuration/secrets.md) for more details.
+More detail: [Secrets management](configuration/secrets.md).
 
-## Quick Start
+## Quick start
 
-Let's create a simple pipeline that creates a table with some data.
+Minimal pipeline: one stage that writes a small table.
 
-### Step 1: Create Pipeline Structure
+### Step 1: Layout
 
 ```bash
 mkdir my_first_pipeline
@@ -115,9 +111,9 @@ cd my_first_pipeline
 mkdir -p stages/create_data configs
 ```
 
-### Step 2: Create Pipeline Entry Point
+### Step 2: Entry point
 
-Create `pipeline.py` in the root directory:
+`pipeline.py` at the repo root:
 
 ```python
 from yt_framework.core.pipeline import DefaultPipeline
@@ -126,9 +122,9 @@ if __name__ == "__main__":
     DefaultPipeline.main()
 ```
 
-### Step 3: Create Stage Configuration
+### Step 3: Pipeline config
 
-Create `configs/config.yaml`:
+`configs/config.yaml`:
 
 ```yaml
 stages:
@@ -136,12 +132,12 @@ stages:
     - create_data
 
 pipeline:
-  mode: "dev"  # Use "prod" for production
+  mode: "dev"  # use "prod" on the cluster
 ```
 
-### Step 4: Create Stage
+### Step 4: Stage
 
-Create `stages/create_data/stage.py`:
+`stages/create_data/stage.py`:
 
 ```python
 from yt_framework.core.pipeline import DebugContext
@@ -150,163 +146,126 @@ from yt_framework.core.stage import BaseStage
 class CreateDataStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
         self.logger.info("Creating data table...")
-        
-        # Create some sample data
+
         rows = [
             {"id": 1, "name": "Alice", "value": 100},
             {"id": 2, "name": "Bob", "value": 200},
             {"id": 3, "name": "Charlie", "value": 300},
         ]
-        
-        # Write to YT table
+
         self.deps.yt_client.write_table(
             table_path=self.config.client.output_table,
             rows=rows,
         )
-        
-        self.logger.info(f"Created table with {len(rows)} rows")
+
+        self.logger.info("Created table with %s rows", len(rows))
         return debug
 ```
 
-Create `stages/create_data/config.yaml`:
+`stages/create_data/config.yaml`:
 
 ```yaml
 client:
   output_table: //tmp/my_first_pipeline/data
 ```
 
-### Step 5: Run the Pipeline
+### Step 5: Run
 
 ```bash
 python pipeline.py
 ```
 
-In dev mode, the table will be created as `my_first_pipeline/.dev/data.jsonl`. In prod mode, it will be created on the YT cluster at `//tmp/my_first_pipeline/data`.
+In **dev** mode, rows land under something like `my_first_pipeline/.dev/data.jsonl`. In **prod** mode, the same logical path is a YT table at `//tmp/my_first_pipeline/data`.
 
-### Next Steps
+### Where to go next
 
-- Learn about [Pipelines and Stages](pipelines-and-stages.md)
-- Explore [Configuration](configuration/index.md) options
-- Understand [Dev vs Prod modes](dev-vs-prod.md)
-- Check out [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for more complex scenarios
+- [Pipelines and stages](pipelines-and-stages.md)
+- [Configuration](configuration/index.md)
+- [Dev vs prod](dev-vs-prod.md)
+- [Examples on GitHub](https://github.com/GregoryKogan/yt-framework/tree/main/examples/)
 
-## Core Concepts
+## Core concepts
 
-### Pipelines and Stages
+### Pipelines and stages
 
-A **pipeline** is a collection of **stages** that execute in sequence. Each stage performs a specific task (e.g., create table, process data, upload results).
+A **pipeline** runs **stages** in order. Each stage is a class with a `run` method.
 
-- **DefaultPipeline**: Automatically discovers stages from `stages/` directory
-- **BasePipeline**: Manual stage registration (for advanced use cases)
-- **BaseStage**: Base class for all stages
+- `DefaultPipeline`: discovers `BaseStage` subclasses under `stages/`.
+- `BasePipeline`: you register stages yourself.
+- `BaseStage`: base class for stage implementations.
 
-See [Pipelines and Stages](pipelines-and-stages.md) for details.
+More: [Pipelines and stages](pipelines-and-stages.md).
 
-### Dev vs Prod Modes
+### Dev vs prod
 
 ```{tip}
-**Start with Dev Mode**
+**Start in dev**
 
-Always develop and test your pipelines in dev mode first. It's faster, doesn't require YT credentials, and makes debugging easier.
+Use dev mode first: no cluster credentials, fast feedback, files under `.dev/`.
 ```
 
-- **Dev Mode**: Simulates YT operations locally using file system. Tables are stored as `.jsonl` files in `.dev/` directory. Perfect for development and testing.
-- **Prod Mode**: Executes operations on actual YT cluster. Requires YT credentials and cluster access.
+- **Dev**: tables as `.jsonl` under `.dev/`, local subprocesses for map/vanilla-style work, YQL backed by DuckDB where applicable.
+- **Prod**: real YT operations, code upload to `build_folder`, jobs on the cluster.
 
-See [Dev vs Prod](dev-vs-prod.md) for complete comparison.
+[Dev vs prod](dev-vs-prod.md) has a full comparison.
 
-### Configuration System
+### Configuration
 
-Configuration is managed through YAML files:
+- `configs/config.yaml`: pipeline mode, enabled stages, shared options.
+- `stages/<name>/config.yaml`: settings for that stage.
+- `configs/secrets.env`: credentials (not committed).
 
-- **Pipeline config** (`configs/config.yaml`): Pipeline-level settings (mode, build_folder)
-- **Stage configs** (`stages/<stage_name>/config.yaml`): Stage-specific settings
-- **Secrets** (`configs/secrets.env`): Credentials and sensitive data
-
-See [Configuration Guide](configuration/index.md) for details.
+[Configuration](configuration/index.md).
 
 ## Operations
 
-YT Framework supports several types of operations:
+### Map
 
-### Map Operations
+Row-wise transforms with uploaded mapper code. [Map operations](operations/map.md) — example [04_map_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/04_map_operation/).
 
-Process each row of a table independently. Perfect for row-by-row transformations.
+### Vanilla
 
-- [Map Operations Guide](operations/map.md)
-- Example: [04_map_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/04_map_operation/)
+Jobs without mandatory input/output tables (setup, maintenance, one-off scripts). [Vanilla](operations/vanilla.md) — example [05_vanilla_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/05_vanilla_operation/).
 
-### Vanilla Operations
+### YQL
 
-Run standalone jobs without input/output tables. Perfect for setup, cleanup, or validation tasks.
+Table operations through YQL via the YT client (joins, filters, aggregates, etc.). [YQL](operations/yql.md) — example [03_yql_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/03_yql_operations/).
 
-- [Vanilla Operations Guide](operations/vanilla.md)
-- Example: [05_vanilla_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/05_vanilla_operation/)
+### S3
 
-### YQL Operations
+List, download, and related patterns against S3-compatible storage. [S3 operations](operations/s3.md) — example [06_s3_integration](https://github.com/GregoryKogan/yt-framework/tree/main/examples/06_s3_integration/).
 
-Perform table operations using YQL (YTsaurus Query Language). Includes joins, filters, aggregations, and more.
+## Advanced topics
 
-- [YQL Operations Guide](operations/yql.md)
-- Example: [03_yql_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/03_yql_operations/)
-
-### S3 Operations
-
-Integrate with S3 for file listing, downloading, and processing.
-
-- [S3 Operations Guide](operations/s3.md)
-- Example: [06_s3_integration](https://github.com/GregoryKogan/yt-framework/tree/main/examples/06_s3_integration/)
-
-## Advanced Topics
-
-### Code Upload
-
-Learn how the framework handles code packaging and deployment to YT cluster.
-
-- [Code Upload Guide](advanced/code-upload.md)
-
-### Docker Support
-
-Use custom Docker images for GPU workloads or special dependencies.
-
-- [Docker Guide](advanced/docker.md)
-- Example: [07_custom_docker](https://github.com/GregoryKogan/yt-framework/tree/main/examples/07_custom_docker/)
-
-### Checkpoint Management
-
-Handle ML model checkpoints for inference pipelines.
-
-- [Checkpoints Guide](advanced/checkpoints.md)
-
-### Multiple Operations
-
-Run multiple operations in a single stage.
-
-- [Multiple Operations Guide](advanced/multiple-operations.md)
-- Example: [09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/)
+- [Code upload](advanced/code-upload.md) — how job bundles are built and sent to YT.
+- [Docker](advanced/docker.md) — custom images for GPU or extra system deps — example [07_custom_docker](https://github.com/GregoryKogan/yt-framework/tree/main/examples/07_custom_docker/).
+- [Checkpoints](advanced/checkpoints.md) — model artifacts for inference-style stages.
+- [Multiple operations](advanced/multiple-operations.md) — more than one operation in a stage — example [09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/).
 
 ## Reference
 
-- [API Reference](reference/api.md) — `yt_framework` modules (generated from docstrings)
-- [YT jobs library (`ytjobs`)](reference/ytjobs.md) — job-side helpers (mappers, S3, logging, config, Cypress checkpoints)
-- [Environment variables](reference/environment-variables.md) — dev, driver, and sandbox variables
-- [Troubleshooting](troubleshooting/index.md) — Common issues and solutions
+- [API reference](reference/api.md) — `yt_framework` (autodoc from docstrings)
+- [YT jobs (`ytjobs`)](reference/ytjobs.md) — mapper helpers, S3, logging, job config path, Cypress checkpoints
+- [Environment variables](reference/environment-variables.md)
+- [Troubleshooting](troubleshooting/index.md)
 
 ## Examples
 
-The `examples/` directory contains complete working examples:
+Under [`examples/`](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) on GitHub:
 
-- **[01_hello_world](https://github.com/GregoryKogan/yt-framework/tree/main/examples/01_hello_world/)** - Basic pipeline
-- **[02_multi_stage_pipeline](https://github.com/GregoryKogan/yt-framework/tree/main/examples/02_multi_stage_pipeline/)** - Multiple stages
-- **[03_yql_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/03_yql_operations/)** - YQL operations
-- **[04_map_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/04_map_operation/)** - Map operation
-- **[05_vanilla_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/05_vanilla_operation/)** - Vanilla operation
-- **[06_s3_integration](https://github.com/GregoryKogan/yt-framework/tree/main/examples/06_s3_integration/)** - S3 integration
-- **[07_custom_docker](https://github.com/GregoryKogan/yt-framework/tree/main/examples/07_custom_docker/)** - Custom Docker
-- **[08_multiple_configs](https://github.com/GregoryKogan/yt-framework/tree/main/examples/08_multiple_configs/)** - Multiple configs
-- **[09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/)** - Multiple operations
-- **[10_custom_upload](https://github.com/GregoryKogan/yt-framework/tree/main/examples/10_custom_upload/)** - Custom upload modules and paths
-- **[environment_log](https://github.com/GregoryKogan/yt-framework/tree/main/examples/environment_log/)** - Environment logging
-- **[video_gpu](https://github.com/GregoryKogan/yt-framework/tree/main/examples/video_gpu/)** - GPU processing
+| Example | What it shows |
+|---------|----------------|
+| [01_hello_world](https://github.com/GregoryKogan/yt-framework/tree/main/examples/01_hello_world/) | Minimal pipeline |
+| [02_multi_stage_pipeline](https://github.com/GregoryKogan/yt-framework/tree/main/examples/02_multi_stage_pipeline/) | Several stages and context |
+| [03_yql_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/03_yql_operations/) | YQL |
+| [04_map_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/04_map_operation/) | Map |
+| [05_vanilla_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/05_vanilla_operation/) | Vanilla |
+| [06_s3_integration](https://github.com/GregoryKogan/yt-framework/tree/main/examples/06_s3_integration/) | S3 |
+| [07_custom_docker](https://github.com/GregoryKogan/yt-framework/tree/main/examples/07_custom_docker/) | Custom Docker image |
+| [08_multiple_configs](https://github.com/GregoryKogan/yt-framework/tree/main/examples/08_multiple_configs/) | Multiple config files |
+| [09_multiple_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/09_multiple_operations/) | Multiple operations in one stage |
+| [10_custom_upload](https://github.com/GregoryKogan/yt-framework/tree/main/examples/10_custom_upload/) | Custom upload layout |
+| [environment_log](https://github.com/GregoryKogan/yt-framework/tree/main/examples/environment_log/) | Environment logging |
+| [video_gpu](https://github.com/GregoryKogan/yt-framework/tree/main/examples/video_gpu/) | GPU-oriented sample |
 
-Each example includes a README explaining what it demonstrates.
+Each example directory has its own README.

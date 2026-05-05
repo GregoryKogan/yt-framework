@@ -1,11 +1,4 @@
-"""
-Tokenizer artifact management utilities.
-
-This module provides checkpoint-like behavior for tokenizer/processor assets:
-- optional local artifact upload to YT
-- idempotent existence checks
-- deterministic dependency/env wiring for workers
-"""
+"""Pack tokenizer/processor tarballs, upload to Cypress, and expose sandbox env vars."""
 
 from __future__ import annotations
 

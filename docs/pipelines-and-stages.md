@@ -1,29 +1,27 @@
-# Pipelines and Stages
+# Pipelines and stages
 
-Pipelines and stages are the core building blocks of YT Framework. Understanding how they work is essential for building effective data processing workflows.
+A **pipeline** runs an ordered list of **stages**. The framework loads config, builds a YT client for the current mode, runs upload when needed, then calls each stage’s `run` method in sequence.
 
 ## Pipelines
 
-A **pipeline** is a collection of stages that execute in sequence. The pipeline manages:
+The pipeline is responsible for:
 
-- Stage discovery and registration
-- Configuration loading
-- YT client initialization
-- Code upload (if needed)
-- Stage execution order
-- Error handling
+- Discovering or registering stages
+- Loading YAML and secrets
+- Initializing the YT client (dev or prod)
+- Uploading code in prod
+- Invoking stages in `enabled_stages` order
+- Surfacing failures (a raised exception stops the run)
 
 ### DefaultPipeline
 
 ```{tip}
-**Use DefaultPipeline**
+**Prefer DefaultPipeline**
 
-`DefaultPipeline` is recommended for most use cases. It automatically discovers stages, reducing boilerplate and making your code cleaner.
+It discovers stages under `stages/` so you rarely need custom registration logic.
 ```
 
-`DefaultPipeline` automatically discovers and registers stages from the `stages/` directory. This is the recommended approach for most use cases.
-
-**Usage:**
+Point `__main__` at `DefaultPipeline.main()`:
 
 ```python
 # pipeline.py
@@ -33,16 +31,16 @@ if __name__ == "__main__":
     DefaultPipeline.main()
 ```
 
-**How it works:**
+Discovery does the following:
 
-1. Scans `stages/` directory for subdirectories
-2. Looks for `stage.py` files in each subdirectory
-3. Imports and registers any `BaseStage` subclasses found
-4. Executes stages in the order specified by `enabled_stages` in config
+1. List subdirectories of `stages/`.
+2. Import `stage.py` from each.
+3. Register every `BaseStage` subclass found.
+4. Run stages in the order given by `configs/config.yaml` → `stages.enabled_stages`.
 
-**Example structure:**
+Example layout:
 
-```plaintext
+```text
 my_pipeline/
 ├── pipeline.py
 ├── configs/
@@ -56,13 +54,11 @@ my_pipeline/
         └── config.yaml
 ```
 
-See [Example: 01_hello_world](https://github.com/GregoryKogan/yt-framework/tree/main/examples/01_hello_world/) for a complete example.
+Working tree: [01_hello_world](https://github.com/GregoryKogan/yt-framework/tree/main/examples/01_hello_world/).
 
 ### BasePipeline
 
-`BasePipeline` allows manual stage registration. Use this when you need custom pipeline logic or want explicit control over stage registration.
-
-**Usage:**
+Use `BasePipeline` when you need explicit registration or setup hooks (conditional stages, tests, unusual layout).
 
 ```python
 # pipeline.py
@@ -82,52 +78,41 @@ if __name__ == "__main__":
     MyPipeline.main()
 ```
 
-**When to use BasePipeline:**
+Reasons you might choose this:
 
-- Custom pipeline initialization logic
-- Conditional stage registration
-- Integration with external systems
-- Advanced use cases
+- Custom `setup()` work before stages exist
+- Stages not discoverable from a flat `stages/` tree
+- Tests that inject a small fixed registry
 
-For most users, `DefaultPipeline` is sufficient.
+For normal repos, `DefaultPipeline` is enough.
 
 ## Stages
 
-A **stage** is a single unit of work in a pipeline. Each stage:
-
-- Has its own configuration file
-- Receives dependencies (YT client, configs, etc.)
-- Can pass data to subsequent stages via context
-- Is executed independently
+A **stage** is one unit of work: one `BaseStage` subclass, one `config.yaml`, and optional `src/` or `requirements.txt` for uploaded jobs.
 
 ### BaseStage
 
-All stages inherit from `BaseStage`. The base class provides:
+`BaseStage` gives you:
 
-- Automatic config loading from `stages/<stage_name>/config.yaml`
-- Access to YT client via `self.deps.yt_client`
-- Access to pipeline config via `self.deps.pipeline_config`
-- Logger via `self.logger`
-- Stage context via `self.context`
+- Parsed stage config at `self.config` (from `stages/<name>/config.yaml`)
+- `self.deps.yt_client`, pipeline-wide settings, paths
+- `self.logger`
+- Operation-related context on `self.context` where applicable
 
-### Stage Structure
+### Directory layout
 
-Each stage must follow this directory structure:
-
-```plaintext
+```text
 stages/
 └── stage_name/
-    ├── stage.py          # Stage implementation (required)
-    ├── config.yaml       # Stage configuration (required)
-    ├── src/              # Optional: source code for operations
-    │   ├── mapper.py     # For map operations
-    │   └── vanilla.py     # For vanilla operations
-    └── requirements.txt  # Optional: Python dependencies
+    ├── stage.py          # required
+    ├── config.yaml       # required
+    ├── src/              # optional (mapper, vanilla, etc.)
+    │   ├── mapper.py
+    │   └── vanilla.py
+    └── requirements.txt  # optional extra pip deps for the job bundle
 ```
 
-### Creating a Stage
-
-**Minimal stage:**
+### Minimal stage
 
 ```python
 # stages/my_stage/stage.py
@@ -137,11 +122,10 @@ from yt_framework.core.stage import BaseStage
 class MyStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
         self.logger.info("Running my stage")
-        # Stage logic here
         return debug
 ```
 
-**Stage with configuration:**
+### Stage with tables
 
 ```yaml
 # stages/my_stage/config.yaml
@@ -156,75 +140,61 @@ class MyStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
         input_table = self.config.client.input_table
         output_table = self.config.client.output_table
-        
-        # Read from input
+
         rows = list(self.deps.yt_client.read_table(input_table))
-        
-        # Process data
         processed = [process_row(row) for row in rows]
-        
-        # Write to output
+
+        # Default overwrites the output. Pass append=True to append if the table already exists.
         self.deps.yt_client.write_table(output_table, processed)
-        
         return debug
 ```
 
-### Stage Dependencies
+### `self.deps`
 
-Stages receive dependencies through `self.deps`:
+Typical fields:
 
-- **`self.deps.yt_client`**: YT client for table operations
-- **`self.deps.pipeline_config`**: Pipeline-level configuration
-- **`self.deps.configs_dir`**: Path to configs directory (for secrets)
-
-**Example:**
+- `self.deps.yt_client` — read/write tables, YQL helpers, etc.
+- `self.deps.pipeline_config` — merged pipeline section from `configs/config.yaml`
+- `self.deps.configs_dir` — directory that holds `secrets.env`
 
 ```python
 class MyStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
-        # Access YT client
         yt = self.deps.yt_client
-        
-        # Access pipeline config
         mode = self.deps.pipeline_config.pipeline.mode
-        
-        # Access stage config
         table_path = self.config.client.output_table
-        
+        self.logger.info("mode=%s table=%s", mode, table_path)
         return debug
 ```
 
-### Stage Context
+### Passing data between stages (`debug`)
 
-Stages can pass data to subsequent stages via the `debug` context dictionary:
+`debug` is a mutable mapping carried from stage to stage. Put small flags or summaries here; put large data in YT tables.
 
 ```python
 class Stage1(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
-        # Add data to context
         debug["result"] = "some value"
         debug["count"] = 42
         return debug
 
 class Stage2(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
-        # Access data from previous stage
         result = debug.get("result")
         count = debug.get("count", 0)
+        self.logger.info("from stage1: result=%s count=%s", result, count)
         return debug
 ```
 
 ```{warning}
-**Context Size Limits**
+**Keep `debug` small**
 
-The context is a simple dictionary. Use it for small amounts of data (metadata, counts, flags). For large datasets, use YT tables instead.
+It is an in-memory dict passed through the driver process. Metadata only: for big payloads, write a table and pass the path in `debug` if needed.
 ```
 
-**Important:** The context is a simple dictionary. Use it for small amounts of data. For large datasets, use YT tables instead.
+### Stage configuration
 
-### Stage Configuration
-
-Each stage has its own `config.yaml` file. Configuration is accessed via `self.config`:
+Access nested YAML through `self.config`:
 
 ```yaml
 # stages/my_stage/config.yaml
@@ -243,35 +213,34 @@ client:
 ```
 
 ```python
-# stages/my_stage/stage.py
 class MyStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
-        # Access job config
         multiplier = self.config.job.multiplier
         prefix = self.config.job.prefix
-        
-        # Access client config
         input_table = self.config.client.input_table
         output_table = self.config.client.output_table
-        
-        # Access nested config
         memory = self.config.client.operations.map.resources.memory_limit_gb
-        
+        self.logger.info(
+            "job %s %s tables %s -> %s map_mem_gb=%s",
+            prefix,
+            multiplier,
+            input_table,
+            output_table,
+            memory,
+        )
         return debug
 ```
 
-### Stage Lifecycle
+### Lifecycle (conceptual)
 
-1. **Discovery** (DefaultPipeline only): Framework scans `stages/` directory
-2. **Registration**: Stage class is registered in stage registry
-3. **Initialization**: Stage instance is created with dependencies
-4. **Config Loading**: Stage config is loaded from `config.yaml`
-5. **Execution**: `run()` method is called with context
-6. **Completion**: Context is returned and passed to next stage
+1. **Discovery** (`DefaultPipeline`): scan `stages/`.
+2. **Registration**: stage classes recorded in a registry.
+3. **Construction**: one instance per stage with dependencies injected.
+4. **Config load**: OmegaConf-style object from `config.yaml`.
+5. **Run**: `run(debug)` executes; return value becomes the next stage’s `debug`.
+6. **Next stage**: repeat until the list ends or an error is raised.
 
-### Stage Execution Order
-
-Stages execute in the order specified by `enabled_stages` in the pipeline config:
+### Order
 
 ```yaml
 # configs/config.yaml
@@ -283,33 +252,31 @@ stages:
 ```
 
 ```{note}
-**Sequential Execution**
+**Sequential**
 
-Stages are executed sequentially. If a stage fails, the pipeline stops. Make sure each stage handles errors appropriately.
+Stages run one after another. An uncaught exception aborts the pipeline.
 ```
 
-Stages are executed sequentially. If a stage fails, the pipeline stops.
+### Injection details
 
-### Stage dependencies (`self.deps`)
+`self.deps` follows `PipelineStageDependencies`. See **Core injection (`self.deps`)** under [API reference](reference/api.md) (`yt_framework.core.dependencies`).
 
-Each stage receives injected dependencies (YT client, configs directory, merged config) via `self.deps` and operation context via `self.context`. The protocol is implemented by `PipelineStageDependencies`; see **Core injection (`self.deps`)** in [API Reference](reference/api.md) (`yt_framework.core.dependencies`).
+### Multi-stage sample
 
-### Multiple Stages Example
+[02_multi_stage_pipeline](https://github.com/GregoryKogan/yt-framework/tree/main/examples/02_multi_stage_pipeline/).
 
-See [Example: 02_multi_stage_pipeline](https://github.com/GregoryKogan/yt-framework/tree/main/examples/02_multi_stage_pipeline/) for a complete example with multiple stages and context passing.
+## Practices that tend to help
 
-## Best Practices
+1. One main responsibility per stage.
+2. Names that match what the stage does in YT terms.
+3. Large payloads in tables, not in `debug`.
+4. Fail fast: raise on invalid input instead of returning partial success silently.
+5. Log decisions you will need when reading `.dev` logs or YT operation logs.
+6. Exercise new stages in dev mode before pointing prod traffic at them.
 
-1. **Keep stages focused**: Each stage should do one thing well
-2. **Use descriptive names**: Stage names should clearly indicate their purpose
-3. **Pass data via tables**: Use YT tables for large datasets, not context
-4. **Handle errors**: Stages should raise exceptions on failure
-5. **Log progress**: Use `self.logger` to log important operations
-6. **Test locally**: Use dev mode for development and testing
+## Next steps
 
-## Next Steps
-
-- Learn about [Configuration](configuration/index.md) management
-- Understand [Dev vs Prod](dev-vs-prod.md) modes
-- Explore [Operations](operations/index.md) for different operation types
-- Review [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/) for complete pipeline examples
+- [Configuration](configuration/index.md)
+- [Dev vs prod](dev-vs-prod.md)
+- [Operations overview](operations/index.md)
+- [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples/)

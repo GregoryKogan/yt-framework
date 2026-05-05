@@ -1,9 +1,4 @@
-"""
-Mapper Utilities
-================
-
-Common utilities for YT mapper scripts.
-"""
+"""JSON stdin/stdout mapper helpers (`StreamMapper`, `BatchMapper`, row readers)."""
 
 from .utils import read_input_rows
 from .mappers import StreamMapper, BatchMapper

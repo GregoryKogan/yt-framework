@@ -202,6 +202,7 @@ class BaseYTClient(ABC):
         self,
         query: str,
         pool: str = "default",
+        max_row_weight: Optional[str] = None,
     ) -> None:
         """
         Execute a YQL query on YT cluster.
@@ -209,6 +210,7 @@ class BaseYTClient(ABC):
         Args:
             query: YQL query string to execute
             pool: YT pool name (default: 'default')
+            max_row_weight: Optional max row weight override (default uses project default)
 
         Raises:
             Exception: If query execution fails
@@ -227,6 +229,7 @@ class BaseYTClient(ABC):
         how: Literal["inner", "left", "right", "full"] = "left",
         select_columns: Optional[List[str]] = None,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Join two tables using YQL.
@@ -242,6 +245,7 @@ class BaseYTClient(ABC):
             how: Join type - "inner", "left", "right", or "full"
             select_columns: Optional list of columns to select (with table aliases)
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight override
 
         Returns:
             YQL query string if dry_run=True, None otherwise
@@ -255,6 +259,7 @@ class BaseYTClient(ABC):
         output_table: str,
         condition: str,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Filter table rows using WHERE condition.
@@ -264,6 +269,7 @@ class BaseYTClient(ABC):
             output_table: Path to output table
             condition: WHERE condition (e.g., "status = 'active' AND total > 100")
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight override
 
         Returns:
             YQL query string if dry_run=True, None otherwise
@@ -277,6 +283,7 @@ class BaseYTClient(ABC):
         output_table: str,
         columns: List[str],
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Select specific columns from a table.
@@ -286,6 +293,7 @@ class BaseYTClient(ABC):
             output_table: Path to output table
             columns: List of column names to select
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight override
 
         Returns:
             YQL query string if dry_run=True, None otherwise
@@ -300,6 +308,7 @@ class BaseYTClient(ABC):
         group_by: Union[str, List[str]],
         aggregations: Dict[str, Union[str, Tuple[str, str]]],
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Group by columns and compute aggregations.
@@ -311,6 +320,7 @@ class BaseYTClient(ABC):
             aggregations: Dict mapping output column names to aggregation functions
                          e.g., {"order_count": "count", "total_amount": "sum"}
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight override
 
         Returns:
             YQL query string if dry_run=True, None otherwise
@@ -323,6 +333,7 @@ class BaseYTClient(ABC):
         tables: List[str],
         output_table: str,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Union multiple tables.
@@ -331,6 +342,7 @@ class BaseYTClient(ABC):
             tables: List of table paths to union
             output_table: Path to output table
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight override
 
         Returns:
             YQL query string if dry_run=True, None otherwise
@@ -344,6 +356,7 @@ class BaseYTClient(ABC):
         output_table: str,
         columns: Optional[List[str]] = None,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Get distinct rows from a table.
@@ -353,6 +366,7 @@ class BaseYTClient(ABC):
             output_table: Path to output table
             columns: Optional list of columns to select (if None, selects all)
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight override
 
         Returns:
             YQL query string if dry_run=True, None otherwise
@@ -367,6 +381,7 @@ class BaseYTClient(ABC):
         order_by: Union[str, List[str]],
         ascending: bool = True,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Sort table by columns.
@@ -379,6 +394,7 @@ class BaseYTClient(ABC):
             order_by: Column(s) to sort by
             ascending: Sort direction (True for ASC, False for DESC)
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight override
 
         Returns:
             YQL query string if dry_run=True, None otherwise
@@ -392,6 +408,7 @@ class BaseYTClient(ABC):
         output_table: str,
         limit: int,
         dry_run: bool = False,
+        max_row_weight: Optional[str] = None,
     ) -> Optional[str]:
         """
         Limit number of rows from a table.
@@ -401,6 +418,7 @@ class BaseYTClient(ABC):
             output_table: Path to output table
             limit: Maximum number of rows to return
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight override
 
         Returns:
             YQL query string if dry_run=True, None otherwise
@@ -454,6 +472,7 @@ class BaseYTClient(ABC):
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
         job: Any = None,
+        append: bool = False,
         **kwargs: Any,
     ) -> Operation:
         """
@@ -470,6 +489,7 @@ class BaseYTClient(ABC):
             max_failed_jobs: Maximum number of failed jobs before operation fails
             docker_auth: Optional Docker authentication dictionary
             job: Preferred mapper job argument (TypedJob instance or command string).
+            append: If True, append mapper output to an existing output table.
             **kwargs: Extra options forwarded to the underlying YT client.
         """
         pass

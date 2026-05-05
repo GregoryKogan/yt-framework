@@ -8,7 +8,7 @@ Common issues with Map, Vanilla, YQL, S3, Docker, and Checkpoint operations.
 
 **Error:**
 
-```plaintext
+```text
 FileNotFoundError: stages/my_stage/src/mapper.py not found
 ```
 
@@ -22,7 +22,7 @@ FileNotFoundError: stages/my_stage/src/mapper.py not found
 
 **Error:**
 
-```plaintext
+```text
 SyntaxError in mapper.py
 ```
 
@@ -37,7 +37,7 @@ SyntaxError in mapper.py
 
 **Error:**
 
-```plaintext
+```text
 FileNotFoundError: Input table not found
 ```
 
@@ -52,7 +52,7 @@ FileNotFoundError: Input table not found
 
 **Error:**
 
-```plaintext
+```text
 Error: Cannot create output table
 ```
 
@@ -69,7 +69,7 @@ Error: Cannot create output table
 
 **Error:**
 
-```plaintext
+```text
 FileNotFoundError: stages/my_stage/src/vanilla.py not found
 ```
 
@@ -83,7 +83,7 @@ FileNotFoundError: stages/my_stage/src/vanilla.py not found
 
 **Error:**
 
-```plaintext
+```text
 RuntimeError: Vanilla operation failed
 ```
 
@@ -100,7 +100,7 @@ RuntimeError: Vanilla operation failed
 
 **Error:**
 
-```plaintext
+```text
 Error: Join operation failed
 ```
 
@@ -115,7 +115,7 @@ Error: Join operation failed
 
 **Error:**
 
-```plaintext
+```text
 SyntaxError: Invalid filter condition
 ```
 
@@ -130,7 +130,7 @@ SyntaxError: Invalid filter condition
 
 **Error:**
 
-```plaintext
+```text
 Error: Aggregation operation failed
 ```
 
@@ -147,7 +147,7 @@ Error: Aggregation operation failed
 
 **Error:**
 
-```plaintext
+```text
 Error: Failed to create S3 client
 ```
 
@@ -162,7 +162,7 @@ Error: Failed to create S3 client
 
 **Error:**
 
-```plaintext
+```text
 Warning: No files found in S3
 ```
 
@@ -177,7 +177,7 @@ Warning: No files found in S3
 
 **Error:**
 
-```plaintext
+```text
 PermissionError: Access denied to S3 bucket
 ```
 
@@ -194,7 +194,7 @@ PermissionError: Access denied to S3 bucket
 
 **Error:**
 
-```plaintext
+```text
 Error: Docker image not found
 ```
 
@@ -209,7 +209,7 @@ Error: Docker image not found
 
 **Error:**
 
-```plaintext
+```text
 Error: Platform mismatch
 ```
 
@@ -223,7 +223,7 @@ Error: Platform mismatch
 
 **Error:**
 
-```plaintext
+```text
 Error: GPU not available
 ```
 
@@ -240,7 +240,7 @@ Error: GPU not available
 
 **Error:**
 
-```plaintext
+```text
 FileNotFoundError: Required checkpoint not found in YT
 ```
 
@@ -255,7 +255,7 @@ FileNotFoundError: Required checkpoint not found in YT
 
 **Error:**
 
-```plaintext
+```text
 Error: Failed to upload checkpoint
 ```
 
@@ -270,7 +270,7 @@ Error: Failed to upload checkpoint
 
 **Error:**
 
-```plaintext
+```text
 Error: Invalid checkpoint format
 ```
 

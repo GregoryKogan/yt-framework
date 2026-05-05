@@ -1,27 +1,27 @@
-# API Reference
+# API reference
 
-This page documents major **yt_framework** modules. Signatures and descriptions are generated from Python docstrings. Job-side helpers live under [YT jobs library (`ytjobs`)](ytjobs.md).
+`yt_framework` symbols below are generated from Python docstrings. Job-side entrypoints (`ytjobs`) have a [separate page](ytjobs.md).
 
 ```{tip}
-**Exploring the API**
+**Navigation**
 
-Use the navigation sidebar to jump to modules. For symbols not listed here, use the source tree or `help()` in Python.
+Use the sidebar headings for modules. Anything not listed is still in the source tree; use `help(module)` locally.
 ```
 
-## Module Overview
+## Layout
 
-- **Core**: Pipeline, stage, registry, discovery, injection (`self.deps`)
-- **Operations**: Map, vanilla, map-reduce/reduce, YQL (on YT client), S3, table helpers, checkpoint, sort, tokenizer artifact
-- **Typed jobs**: `StageBootstrapTypedJob` for worker bootstrap
-- **YT**: Client factory, dev and prod clients
-- **Utils**: Environment, logging, ignore patterns
-- **Packaging (advanced)**: Upload, dependency lists, shared operation helpers
-- **YT jobs (`ytjobs`)**: [Dedicated reference](ytjobs.md)
+- **Core** — pipeline, stage, registry, discovery, `self.deps` injection
+- **Operations** — map, vanilla, map-reduce/reduce, S3 helpers, table helpers, checkpoint upload, sort, tokenizer artifact wiring
+- **Typed jobs** — `StageBootstrapTypedJob`
+- **YT** — client factory, dev and prod clients (YQL helpers live on the clients)
+- **Utils** — env files, logging setup, ignore patterns
+- **Packaging** — upload helpers shared by operations
+- **`ytjobs`** — [Job-side reference](ytjobs.md)
 
 ```{note}
-**Auto-generated sections**
+**Narrative docs**
 
-Narrative guides (operations, configuration, advanced) explain how to use these APIs in context.
+How-to guides under `docs/operations`, `docs/configuration`, and `docs/advanced` spell out YAML and stage patterns; this page is the raw API surface.
 ```
 
 ## Core Modules

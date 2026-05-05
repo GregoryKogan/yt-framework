@@ -80,8 +80,13 @@ class _StubBaseClient(BaseYTClient):
         del table_path
         return len(self._rows)
 
-    def run_yql(self, query: str, pool: str = "default") -> None:
-        del query, pool
+    def run_yql(
+        self,
+        query: str,
+        pool: str = "default",
+        max_row_weight: Optional[str] = None,
+    ) -> None:
+        del query, pool, max_row_weight
 
     def join_tables(
         self,
@@ -196,6 +201,7 @@ class _StubBaseClient(BaseYTClient):
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
         job: Any = None,
+        append: bool = False,
         **kwargs: Any,
     ) -> Any:
         del (
@@ -209,6 +215,7 @@ class _StubBaseClient(BaseYTClient):
             max_failed_jobs,
             docker_auth,
             job,
+            append,
             kwargs,
         )
         return MagicMock()
@@ -351,3 +358,8 @@ def test_base_yt_client_wait_for_operation_returns_false_when_wait_raises() -> N
     op.wait.side_effect = RuntimeError("cluster hiccup")
     c = _StubBaseClient(_null_logger("tests.client_base.wait_exc"))
     assert c.wait_for_operation(op) is False
+
+
+def test_stub_base_client_run_yql_accepts_max_row_weight_override() -> None:
+    c = _StubBaseClient(_null_logger("tests.client_base.yql_mrw"))
+    assert c.run_yql("SELECT 1", max_row_weight="64M") is None

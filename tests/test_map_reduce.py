@@ -192,6 +192,22 @@ def test_run_map_reduce_forwards_dict_operation_description(
     assert kw.get("operation_description") == {"kind": "mr"}
 
 
+def test_run_map_reduce_forwards_max_row_weight_override(tmp_path: Path) -> None:
+    ctx = _mr_stage_context(tmp_path)
+    cfg = OmegaConf.create(
+        {
+            "input_table": "//i",
+            "output_table": "//o",
+            "reduce_by": ["k"],
+            "resources": {"pool": "p"},
+            "max_row_weight": "64M",
+        }
+    )
+    assert run_map_reduce(ctx, cfg, map_job="m", reduce_job="r") is True
+    kw = ctx.deps.yt_client.run_map_reduce.call_args.kwargs
+    assert kw.get("max_row_weight") == "64M"
+
+
 def test_run_reduce_raises_when_reduce_by_empty(tmp_path: Path) -> None:
     ctx = _mr_stage_context(tmp_path, name="red_empty")
     cfg = OmegaConf.create(
@@ -284,6 +300,22 @@ def test_run_reduce_forwards_string_operation_description_as_title(
     assert run_reduce(ctx, cfg, job="r") is True
     kw = ctx.deps.yt_client.run_reduce.call_args.kwargs
     assert kw.get("title") == "reduce-title"
+
+
+def test_run_reduce_forwards_max_row_weight_override(tmp_path: Path) -> None:
+    ctx = _mr_stage_context(tmp_path, name="red_mrw")
+    cfg = OmegaConf.create(
+        {
+            "input_table": "//i",
+            "output_table": "//o",
+            "reduce_by": ["k"],
+            "resources": {"pool": "p"},
+            "max_row_weight": "64M",
+        }
+    )
+    assert run_reduce(ctx, cfg, job="r") is True
+    kw = ctx.deps.yt_client.run_reduce.call_args.kwargs
+    assert kw.get("max_row_weight") == "64M"
 
 
 @patch(

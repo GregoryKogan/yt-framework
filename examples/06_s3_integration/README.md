@@ -1,68 +1,33 @@
-# S3 Integration Example
+# S3 listing example
 
-Demonstrates S3 integration for listing files and saving paths to YT tables. Shows how to set up S3 client and use S3 operations.
+Driver stage builds `S3Client` from `configs/secrets.env`, lists a bucket/prefix, and writes keys into a Cypress table for follow-up work.
 
-## What It Demonstrates
+## Prereqs
 
-- **S3 Client**: Creating and configuring S3 client
-- **File Listing**: Listing files from S3 buckets
-- **Path Storage**: Saving S3 paths to YT tables
-- **Secrets Management**: Using AWS credentials from secrets.env
+Create `configs/secrets.env`:
 
-## Features
-
-- S3 client creation in stage
-- File listing with optional filters (prefix, extension, max files)
-- Saving S3 paths to YT table
-- AWS credentials management
-
-## Running
-
-**Prerequisites:**
-
-1. Create `configs/secrets.env`:
 ```bash
-S3_ENDPOINT=https://your-s3-endpoint.com
-S3_DOWNLOAD_ACCESS_KEY=your-download-access-key
-S3_DOWNLOAD_SECRET_KEY=your-download-secret-key
-S3_UPLOAD_ACCESS_KEY=your-upload-access-key
-S3_UPLOAD_SECRET_KEY=your-upload-secret-key
+S3_ENDPOINT=https://your-s3-endpoint.example
+S3_DOWNLOAD_ACCESS_KEY=...
+S3_DOWNLOAD_SECRET_KEY=...
+S3_UPLOAD_ACCESS_KEY=...
+S3_UPLOAD_SECRET_KEY=...
 ```
 
-2. Update bucket and prefix in `stages/list_s3/config.yaml`
+Edit `stages/list_s3/config.yaml` with your bucket and optional prefix/extension limits.
 
-3. Run pipeline:
+## Run
+
 ```bash
 python pipeline.py
 ```
 
 ## Files
 
-- `pipeline.py`: Pipeline entry point
-- `stages/list_s3/stage.py`: Stage that lists S3 files and saves to table
-- `stages/list_s3/config.yaml`: S3 configuration (bucket, prefix, filters)
-- `configs/config.yaml`: Pipeline configuration
-- `configs/secrets.example.env`: Example secrets file
+- `stages/list_s3/stage.py` — list + `save_s3_paths_to_table`
+- `configs/secrets.example.env` — template only (copy to `secrets.env`, do not commit real keys)
 
-## Key Concepts
+## Next
 
-- S3 client is created in stage `__init__` method
-- Files are listed with optional filters
-- Paths are saved to YT table for processing
-- Credentials are loaded from `secrets.env`
-
-## Configuration
-
-```yaml
-client:
-  input_bucket: my-bucket
-  input_prefix: data/2024/
-  file_extension: .json      # Optional: filter by extension
-  max_files: 1000           # Optional: limit results
-  output_table: //tmp/my_pipeline/s3_paths
-```
-
-## Next Steps
-
-- See [04_map_operation](../04_map_operation/) for processing S3 files
-- See [Configuration Guide](../../docs/configuration/index.md) for secrets management
+- [04_map_operation](../04_map_operation/) to consume rows downstream
+- [Secrets](../../docs/configuration/secrets.md)

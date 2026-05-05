@@ -27,6 +27,8 @@ In `client.operations.map_reduce` or `client.operations.reduce`, set:
 tar_command_bootstrap: true
 ```
 
+`max_row_weight` is optional in both sections and defaults to `128M` when omitted.
+
 Behavior:
 
 | Leg kind | Effect |

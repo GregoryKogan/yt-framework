@@ -1,9 +1,4 @@
-"""
-Stage Registry
-==============
-
-Builder for registering pipeline stages with automatic name detection.
-"""
+"""Mutable registry of `BaseStage` subclasses keyed by stage name."""
 
 from typing import Dict, Type
 from pathlib import Path

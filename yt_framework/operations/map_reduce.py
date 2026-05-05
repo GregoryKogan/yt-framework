@@ -1,9 +1,7 @@
-"""
-Map-reduce and reduce-only operations for YT Framework.
+"""Submit map-reduce and reduce-only YT operations (TypedJob or command strings).
 
-Stages use these to run YT map-reduce or reduce operations with TypedJob
-mapper/reducer instances. Dependencies (archive + optional file_paths) are
-built by the framework; credentials come from configs/secrets.env.
+Builds archives plus optional file dependencies; cluster credentials still come
+from `configs/secrets.env` like other operations.
 """
 
 import warnings

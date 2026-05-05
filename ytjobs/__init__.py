@@ -1,9 +1,8 @@
-"""
-YTsaurus Job Utilities
-======================
+"""Job-side helpers shipped with uploaded bundles (`ytjobs`).
 
-Lightweight utility library for YT job execution.
-This package is uploaded to YT and imported by mappers.
+Designed for mappers, reducers, vanilla scripts, and other code executed on YT
+workers; the driver may import it for typing/tests, but production job logic
+should treat it as the sandbox stdlib extension.
 """
 
 # Re-export commonly used classes
