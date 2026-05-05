@@ -18,6 +18,7 @@ alwaysApply: true
 ## Code
 
 - SOLID, DRY, KISS, YAGNI. Explicit intent; no dead code. Clarify ambiguity before implementing.
+- Before writing, reviewing, or refactoring code, you MUST use `.cursor/skills/karpathy-guidelines/SKILL.md` and follow it for assumptions, simplicity, surgical edits, and verifiable outcomes (use judgment for trivial tasks).
 - Types: prefer dataclasses over `tuple[str,str,int]`, `Union[...]`, or big `dict[str, Any]`; use `Optional`, `List`, etc.; `TYPE_CHECKING` for type-only imports.
 - Public API: type hints + docstrings (Args/Returns); Literal for constrained params. Small, single-purpose functions; early returns; compact style (single-line calls, chained transforms, 88-char line). Prefer `assert` with message; comments only as `TODO:` for team decisions.
 - Quality: run `black --check --diff` on changed files; after changes, align diff with style and update .cursor/rules if needed.
