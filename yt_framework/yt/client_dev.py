@@ -556,6 +556,7 @@ class YTDevClient(BaseYTClient):
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
         job: Any = None,
+        append: bool = False,
         **kwargs: Any,
     ) -> Operation:
         """Run a map operation locally using subprocess.
@@ -574,6 +575,7 @@ class YTDevClient(BaseYTClient):
             output_schema: Optional output table schema (not used in dev mode).
             max_failed_jobs: Maximum failed jobs allowed (not used in dev mode).
             docker_auth: Optional Docker authentication (not used in dev mode).
+            append: If True and output JSONL exists, append mapper stdout lines to it.
             **kwargs: Additional arguments (not used in dev mode).
 
         Returns:
@@ -631,7 +633,11 @@ class YTDevClient(BaseYTClient):
         # Copy output back
         output_path = self._table_local_path(output_table)
         if proc.returncode == 0 and sandbox_output.exists():
-            shutil.copy2(sandbox_output, output_path)
+            if append and output_path.exists():
+                with open(output_path, "ab") as out, open(sandbox_output, "rb") as sand:
+                    out.write(sand.read())
+            else:
+                shutil.copy2(sandbox_output, output_path)
 
         err_hint = f"Stderr written to {logs_path}" if proc.returncode != 0 else ""
         return _DevOperation(proc.returncode, err_hint)  # type: ignore[return-value]

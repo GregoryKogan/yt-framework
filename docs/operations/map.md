@@ -96,6 +96,24 @@ if __name__ == "__main__":
 
 See [Example: 04_map_operation](https://github.com/GregoryKogan/yt-framework/tree/main/examples/04_map_operation/) for a complete example.
 
+(append-output)=
+## Append output
+
+Use `append: true` under `client.operations.map` when mapper rows should be appended to an existing output table rather than replacing it.
+
+On the cluster, the output table must already exist and incoming rows must match its schema (including typed columns). In dev mode, if the output `.jsonl` already exists, mapper stdout is appended after the current lines.
+
+```yaml
+client:
+  operations:
+    map:
+      input_table: //tmp/my_pipeline/input
+      output_table: //tmp/my_pipeline/output
+      append: true
+      resources:
+        pool: default
+```
+
 ## Mapper Script
 
 The mapper script (`src/mapper.py`) is executed for each row of the input table.

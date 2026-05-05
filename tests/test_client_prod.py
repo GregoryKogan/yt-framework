@@ -237,6 +237,72 @@ def test_yt_prod_client_run_map_applies_default_max_row_weight_when_not_provided
     assert captured["max_row_weight"] == "128M"
 
 
+def test_yt_prod_client_run_map_sets_output_table_path_append_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_inner = MagicMock()
+    fake_op = MagicMock()
+    fake_op.id = "yt-op-append-map"
+    fake_inner.run_operation.return_value = fake_op
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+
+    spec = MagicMock()
+    mapper = MagicMock()
+    for name in (
+        "pool",
+        "resource_limits",
+        "max_failed_job_count",
+        "job_count",
+        "input_table_paths",
+        "output_table_paths",
+    ):
+        getattr(spec, name).return_value = spec
+    spec.begin_mapper.return_value = mapper
+    for name in (
+        "command",
+        "file_paths",
+        "environment",
+        "memory_limit",
+        "cpu_limit",
+        "gpu_limit",
+        "format",
+        "end_mapper",
+    ):
+        getattr(mapper, name).return_value = mapper
+    mapper.end_mapper.return_value = spec
+
+    captured: List[Any] = []
+
+    def _otp(paths: Any) -> Any:
+        captured[:] = list(paths)
+        return spec
+
+    spec.output_table_paths.side_effect = _otp
+    monkeypatch.setattr("yt_framework.yt.client_prod.MapSpecBuilder", lambda: spec)
+
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
+        lambda sb, kw: (sb, {}),
+    )
+
+    client = YTProdClient(
+        _null_logger("tests.client_prod.map_append"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    client.run_map(
+        "python3 mapper.py",
+        "//tmp/in",
+        "//tmp/out",
+        [],
+        OperationResources(),
+        {},
+        append=True,
+    )
+    assert len(captured) == 1 and captured[0].append is True
+
+
 def _prod_client_with_stub_run_operation(monkeypatch: pytest.MonkeyPatch) -> Any:
     fake_inner = MagicMock()
     fake_op = MagicMock()

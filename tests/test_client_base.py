@@ -201,6 +201,7 @@ class _StubBaseClient(BaseYTClient):
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
         job: Any = None,
+        append: bool = False,
         **kwargs: Any,
     ) -> Any:
         del (
@@ -214,6 +215,7 @@ class _StubBaseClient(BaseYTClient):
             max_failed_jobs,
             docker_auth,
             job,
+            append,
             kwargs,
         )
         return MagicMock()

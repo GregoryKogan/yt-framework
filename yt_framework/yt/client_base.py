@@ -472,6 +472,7 @@ class BaseYTClient(ABC):
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
         job: Any = None,
+        append: bool = False,
         **kwargs: Any,
     ) -> Operation:
         """
@@ -488,6 +489,7 @@ class BaseYTClient(ABC):
             max_failed_jobs: Maximum number of failed jobs before operation fails
             docker_auth: Optional Docker authentication dictionary
             job: Preferred mapper job argument (TypedJob instance or command string).
+            append: If True, append mapper output to an existing output table.
             **kwargs: Extra options forwarded to the underlying YT client.
         """
         pass

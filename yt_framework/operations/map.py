@@ -106,7 +106,8 @@ def run_map(
 
     Args:
         context: Stage context (provides deps, logger, stage_dir)
-        operation_config: Operation-specific config (from client.operations.map)
+        operation_config: Operation-specific config (from client.operations.map).
+            Optional key ``append`` (bool): append mapper output to an existing output table.
         output_schema: Optional YT TableSchema for typed output table
         mapper: Optional mapper leg (legacy name). When omitted, framework uses command wrapper.
             Can be a TypedJob instance or command string.
@@ -170,6 +171,7 @@ def run_map(
         operation_config, logger
     )
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
+    append_output = bool(operation_config.get("append", False))
 
     map_kwargs: dict = {}
     od = operation_config.get("operation_description")
@@ -195,6 +197,7 @@ def run_map(
         "tokenizer_artifact",
         "tar_command_bootstrap",
         "operation_description",
+        "append",
     }
     map_kwargs.update(collect_passthrough_kwargs(operation_config, reserved_keys))
 
@@ -208,6 +211,7 @@ def run_map(
         output_schema=output_schema,
         max_failed_jobs=max_failed_jobs,
         docker_auth=map_operation_data.docker_auth,
+        append=append_output,
         **map_kwargs,
     )
 

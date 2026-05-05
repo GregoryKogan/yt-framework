@@ -70,6 +70,16 @@ self.deps.yt_client.write_table(
 # Creates: .dev/data.jsonl
 ```
 
+Append without truncating the file (same keyword in prod on a real table that already exists):
+
+```python
+self.deps.yt_client.write_table(
+    table_path="//tmp/my_pipeline/data",
+    rows=[{"id": 2, "name": "Bob"}],
+    append=True,
+)
+```
+
 **Reading tables:**
 
 ```python
@@ -85,7 +95,9 @@ Map operations run locally using subprocess:
 1. Creates sandbox directory: `.dev/sandbox_<input>-><output>/`
 2. Copies input table to sandbox
 3. Executes mapper.py script
-4. Collects output to `.dev/<output>.jsonl`
+4. Writes mapper stdout to `.dev/<output>.jsonl`, or appends to that file when `append: true` is set on the map operation
+
+See [Map operations — Append output](operations/map.md#append-output) for the config flag.
 
 **Example:**
 

@@ -198,6 +198,29 @@ def test_dev_client_run_map_copies_jsonl_output_when_subprocess_succeeds(
     ], "dev run_map should copy mapper stdout into output table jsonl"
 
 
+def test_dev_client_run_map_append_preserves_prior_rows_then_adds_mapper_stdout(
+    tmp_path: Path,
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.rm_append"), pipeline_dir=tmp_path
+    )
+    client.write_table("//tmp/out", [{"prior": 1}], append=False)
+    client.write_table("//tmp/in", [{"next": 2}], append=False)
+    op = client.run_map(
+        "cat",
+        "//tmp/in",
+        "//tmp/out",
+        [],
+        OperationResources(),
+        {},
+        append=True,
+    )
+    assert op.get_state() == "completed" and client.read_table("//tmp/out") == [
+        {"prior": 1},
+        {"next": 2},
+    ], "append=True should keep existing JSONL rows and append mapper stdout"
+
+
 def test_dev_client_run_vanilla_rewrites_double_slash_build_prefix_to_local_stages(
     tmp_path: Path,
 ) -> None:

@@ -923,6 +923,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         max_failed_jobs: int = 1,
         docker_auth: Optional[Dict[str, str]] = None,
         job: Any = None,
+        append: bool = False,
         **kwargs: Any,
     ) -> Operation:
         """Run a map operation on YT cluster.
@@ -942,6 +943,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             max_failed_jobs: Maximum failed jobs allowed before operation fails.
             docker_auth: Optional Docker authentication for private registries.
             job: Preferred mapper job alias.
+            append: If True, append mapper output to an existing output table.
 
         Returns:
             Operation: YT operation object that can be monitored and waited on.
@@ -952,6 +954,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info("Submitting map operation")
         self.logger.info(f"  Input: {input_table}")
         self.logger.info(f"  Output: {output_table}")
+        self.logger.info(f"  Append: {append}")
         self.logger.info(f"  Output Schema: {output_schema}")
         self.logger.info(f"  Command: {command}")
         self.logger.info(f"  Files: {files}")
@@ -972,7 +975,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
 
-            output_path = TablePath(output_table, append=False, schema=output_schema)
+            output_path = TablePath(output_table, append=append, schema=output_schema)
             spec_builder = (
                 MapSpecBuilder()
                 .pool(resources.pool)

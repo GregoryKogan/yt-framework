@@ -163,7 +163,7 @@ class MyStage(BaseStage):
         # Process data
         processed = [process_row(row) for row in rows]
         
-        # Write to output
+        # Write to output (default overwrite). Use append=True to add rows if the table exists.
         self.deps.yt_client.write_table(output_table, processed)
         
         return debug
