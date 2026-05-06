@@ -69,6 +69,7 @@ testpaths = ["tests"]
 markers = [
     "unit: fast deterministic tests (default scope)",
     "integration: tests that need dev mode, fakes, or external boundaries",
+    "yt_cluster: real YTsaurus cluster integration (requires credentials; see docs/testing/yt-cluster-integration.md)",
 ]
 
 [tool.black]

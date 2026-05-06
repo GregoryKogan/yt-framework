@@ -237,11 +237,12 @@ from yt_framework.operations.table import TableOperation
 
 ### Testing Approach
 
-YT Framework uses **pytest** for testing (available as a dev dependency). While a comprehensive test suite is being developed, testing is currently done through:
+YT Framework uses **pytest** for testing (available as a dev dependency). Alongside the main suite, you can use:
 
 1. **Dev Mode Testing**: Use dev mode to test changes locally
 2. **Example Pipelines**: Run existing examples to verify compatibility
 3. **Manual Testing**: Create test pipelines to exercise new features
+4. **Real cluster integration tests** (optional): pytest package under `tests/integration/yt_cluster/`; see [docs/testing/yt-cluster-integration.md](docs/testing/yt-cluster-integration.md)
 
 ### Running Tests
 
@@ -249,18 +250,32 @@ When tests are available, run them with:
 
 ```bash
 # Run all tests
-pytest
+conda run -n yt-framework -- pytest
 
-# Run with coverage (matches CI)
-pytest --cov=yt_framework --cov=ytjobs
+# Run with coverage (matches CI; excludes real-cluster marker `yt_cluster`)
+conda run -n yt-framework -- pytest -m "not yt_cluster" --cov=yt_framework --cov=ytjobs
 
 # Run specific test file
-pytest tests/test_stage.py
+conda run -n yt-framework -- pytest tests/test_stage.py
 ```
+
+### Real cluster integration tests (optional)
+
+If `YT_PROXY` and `YT_TOKEN` are available from a repo-root `yt-cluster-test.env` file (see `yt-cluster-test.example.env`), from `YT_FRAMEWORK_CLUSTER_TEST_ENV`, or from the environment, pytest **collects** `tests/integration/yt_cluster/` on your machine. That directory is also ignored when `CI=true` (typical on CI hosts), and **GitHub Actions** runs `pytest -m "not yt_cluster"` so real-cluster tests never execute there even if secrets were misconfigured. Without credentials and outside CI, the same package is skipped at collection time.
+
+Run only those tests:
+
+```bash
+conda run -n yt-framework -- pytest -m yt_cluster -xvs
+```
+
+Do **not** commit real tokens; `*.env` is gitignored except `*example.env`. Jobs in these tests rely on the cell **default** Docker image (no `YT_TEST_DOCKER_IMAGE`).
+
+If you keep `yt-cluster-test.env` in your clone, **pre-push** still runs the full pytest command; cluster tests will run too. To push without a reachable cell, rename or move that file temporarily (or use `git push --no-verify` only when you accept skipping hooks).
 
 ### CI (GitHub Actions)
 
-The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `pytest` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). To require a green check before merging, configure branch protection on GitHub and add the `test` job as a required status check.
+The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `pytest -m "not yt_cluster"` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). Real YT cluster tests are excluded because the runner has no cell access. To require a green check before merging, configure branch protection on GitHub and add the `test` job as a required status check.
 
 ### Coverage badge (maintainers)
 

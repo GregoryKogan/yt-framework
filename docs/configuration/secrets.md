@@ -62,6 +62,8 @@ def run(self, debug: DebugContext) -> DebugContext:
 - Rotate tokens on the schedule your security team expects.
 - In CI, inject the same keys via the environment; the loader also reads process env when the file is absent.
 
+For optional **pytest** runs against a real cell (separate from pipeline `secrets.env`), see [Real cluster integration tests](../testing/yt-cluster-integration.md).
+
 Example ignore rules:
 
 ```text

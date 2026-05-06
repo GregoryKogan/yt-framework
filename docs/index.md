@@ -9,6 +9,7 @@ This documentation explains how to build and run data processing pipelines on YT
 :titlesonly:
 
 configuration/index
+testing/yt-cluster-integration
 operations/index
 advanced/index
 reference/api
