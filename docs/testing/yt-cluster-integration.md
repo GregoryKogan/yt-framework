@@ -43,7 +43,7 @@ conda run -n yt-framework -- pytest tests/integration/yt_cluster/test_yql.py -xv
 - **Docker**: map, map-reduce, reduce, and vanilla jobs do **not** pass `docker_image` in `OperationResources`, so the cell’s **default** job image is used. The scripts call `python3` and trivial shell (`true`). If a job fails with “command not found”, your default image may differ; adjust the command in the test to match the image, not the framework.
 - **YQL helpers** on the client call `run_yql` with pool name `default` inside the library. Map/sort operations use `YT_TEST_POOL` (default `default`) when the test passes `op_resources.pool`.
 - **Optional knobs** in the env file: `YT_TEST_POOL`, `YT_TEST_POOL_TREE`, `YT_TEST_MEMORY_GB`, `YT_TEST_CPU_LIMIT`, `YT_TEST_JOB_COUNT`.
-- **Map extras** (`test_map_operations.py`): mapper `env` propagation, a second `run_map` with `append=True`, the `job=` alias (no `command`), two Cypress file dependencies, and forwarded options such as `title`, `max_row_weight`, and `max_failed_jobs`.
+- **Map extras** (`test_map_operations.py`): mapper `env` propagation, a second `run_map` with `append=True`, the `job=` alias (no `command`), two Cypress file dependencies, forwarded options such as `title`, `max_row_weight`, and `max_failed_jobs`, and a check that sensitive env keys are **not** present in the operation’s plain `mapper.environment` while jobs still read them at runtime (via `secure_vault` + promotion).
 
 ## See also
 

@@ -17,6 +17,7 @@ from .common import (
     extract_docker_auth_from_operation_config,
     extract_max_failed_jobs,
     collect_passthrough_kwargs,
+    extract_secure_env_client_kwargs,
 )
 
 if TYPE_CHECKING:
@@ -194,6 +195,8 @@ def run_map(
         "tar_command_bootstrap",
         "operation_description",
         "append",
+        "environment_public_keys",
+        "use_plain_environment_for_secrets",
     }
     map_kwargs.update(collect_passthrough_kwargs(operation_config, reserved_keys))
 
@@ -208,6 +211,7 @@ def run_map(
         max_failed_jobs=max_failed_jobs,
         docker_auth=map_operation_data.docker_auth,
         append=append_output,
+        **extract_secure_env_client_kwargs(operation_config),
         **map_kwargs,
     )
 

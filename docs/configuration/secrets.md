@@ -43,6 +43,16 @@ def run(self, debug: DebugContext) -> DebugContext:
     return debug
 ```
 
+### Map, vanilla, map-reduce, and reduce jobs (production)
+
+`build_operation_environment` still merges `secrets.env`, `client.operations.<name>.env`, and framework helpers into one dict. On a **real cluster**, `YTProdClient` does **not** send most of those keys to the job’s plain `environment` field (the one the YT web UI shows). They go to the operation-level [`secure_vault`](https://ytsaurus.tech/docs/en/user-guide/data-processing/operations/operations-options) instead. The cluster exposes values to the job as `YT_SECURE_VAULT_<KEY>`; for **string commands**, the framework prepends a small stdlib-only Python snippet that copies those into the usual names (`YT_TOKEN`, `S3_DOWNLOAD_ACCESS_KEY`, etc.) before your script runs.
+
+A short **allowlist** keeps clearly non-secret keys in plain `environment` (for example `YT_STAGE_NAME` and tokenizer artifact path variables). To expose additional non-secret keys in the UI, set `environment_public_keys` on that operation’s config. The insecure rollback is `use_plain_environment_for_secrets: true` (not recommended).
+
+**TypedJob** legs do not get that automatic shim: call `promote_secure_vault_environment()` from `yt_framework.yt.operation_secure_env` at the start of your job, or use a string command.
+
+Do not put secrets in command lines; upstream discussions ([ytsaurus#780](https://github.com/ytsaurus/ytsaurus/issues/780), [ytsaurus#990](https://github.com/ytsaurus/ytsaurus/issues/990)) note that commands are another surface that may leak values in the UI.
+
 ### Common variables
 
 | Variable | When you need it |

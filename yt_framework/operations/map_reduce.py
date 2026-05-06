@@ -18,6 +18,7 @@ from .common import (
     extract_docker_auth_from_operation_config,
     extract_max_failed_jobs,
     collect_passthrough_kwargs,
+    extract_secure_env_client_kwargs,
 )
 
 if TYPE_CHECKING:
@@ -170,6 +171,8 @@ def run_map_reduce(
             "typed_reduce_row_iterator_io",
             "reduce_job_io",
             "map_job_io",
+            "environment_public_keys",
+            "use_plain_environment_for_secrets",
         },
     )
     spec_kwargs.update(passthrough)
@@ -187,6 +190,7 @@ def run_map_reduce(
         output_schema=output_schema,
         max_failed_jobs=max_failed_jobs,
         docker_auth=docker_auth,
+        **extract_secure_env_client_kwargs(operation_config),
         **spec_kwargs,
     )
 
@@ -300,6 +304,8 @@ def run_reduce(
             "operation_description",
             # Legacy custom IO option is intentionally no longer consumed here.
             "job_io",
+            "environment_public_keys",
+            "use_plain_environment_for_secrets",
         },
     )
     reduce_kw.update(passthrough)
@@ -315,6 +321,7 @@ def run_reduce(
         output_schema=output_schema,
         max_failed_jobs=max_failed_jobs,
         docker_auth=docker_auth,
+        **extract_secure_env_client_kwargs(operation_config),
         **reduce_kw,
     )
 

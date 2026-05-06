@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import pytest
+from yt.wrapper.operation_commands import (
+    get_operation,
+)  # pyright: ignore[reportMissingImports]
 
 from integration.yt_cluster._job_uploads import upload_job_dep
 
@@ -207,3 +210,64 @@ def test_run_map_accepts_max_failed_jobs_above_one(
     )
     assert yt_client.wait_for_operation(op)
     assert yt_client.read_table(tout) == [{"k": "m", "v": 5}]
+
+
+_SECRET_IT = "cluster-it-secret-marker"
+_PUBLIC_STAGE = "YT_STAGE_NAME"
+_PUBLIC_STAGE_VAL = "it_secure_env_stage"
+
+MAPPER_ENV_PUBLIC_AND_SECRET = """#!/usr/bin/env python3
+import json
+import os
+import sys
+
+for line in sys.stdin:
+    row = json.loads(line)
+    out = {
+        "k": row["k"],
+        "v": int(row["v"]),
+        "secret_echo": os.environ.get("MY_CLUSTER_SECRET", ""),
+        "stage_echo": os.environ.get("YT_STAGE_NAME", ""),
+    }
+    print(json.dumps(out), flush=True)
+"""
+
+
+@pytest.mark.yt_cluster
+def test_run_map_keeps_secrets_out_of_plain_environment_in_spec(
+    yt_case_prefix: str, yt_client, op_resources, local_case_dir
+) -> None:
+    (local_case_dir / "mapper.py").write_text(
+        MAPPER_ENV_PUBLIC_AND_SECRET, encoding="utf-8"
+    )
+    tin = f"{yt_case_prefix}/map_vault_in"
+    tout = f"{yt_case_prefix}/map_vault_out"
+    yt_client.write_table(tin, [{"k": "vault", "v": 1}])
+    deps = [
+        upload_job_dep(
+            yt_client, yt_case_prefix, local_case_dir / "mapper.py", "mapper.py"
+        )
+    ]
+    op = yt_client.run_map(
+        "python3 mapper.py",
+        tin,
+        tout,
+        deps,
+        op_resources,
+        {
+            "MY_CLUSTER_SECRET": _SECRET_IT,
+            _PUBLIC_STAGE: _PUBLIC_STAGE_VAL,
+        },
+    )
+    assert yt_client.wait_for_operation(op)
+    rows = yt_client.read_table(tout)
+    assert len(rows) == 1
+    assert rows[0]["secret_echo"] == _SECRET_IT
+    assert rows[0]["stage_echo"] == _PUBLIC_STAGE_VAL
+
+    info = get_operation(op.id, attributes=["full_spec"], client=yt_client.client)
+    mapper_env = (info.get("full_spec") or {}).get("mapper", {}).get(
+        "environment"
+    ) or {}
+    assert "MY_CLUSTER_SECRET" not in mapper_env
+    assert mapper_env.get(_PUBLIC_STAGE) == _PUBLIC_STAGE_VAL

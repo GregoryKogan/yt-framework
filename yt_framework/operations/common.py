@@ -139,6 +139,17 @@ def extract_operation_resources(
     )
 
 
+def extract_secure_env_client_kwargs(operation_config: DictConfig) -> Dict[str, Any]:
+    """Options for ``YTProdClient`` secure vault / public env partitioning."""
+    out: Dict[str, Any] = {}
+    epk = operation_config.get("environment_public_keys")
+    if epk is not None:
+        out["environment_public_keys"] = [str(x) for x in list(epk)]
+    if operation_config.get("use_plain_environment_for_secrets"):
+        out["use_plain_environment_for_secrets"] = True
+    return out
+
+
 def collect_passthrough_kwargs(
     operation_config: DictConfig,
     reserved_keys: Set[str],

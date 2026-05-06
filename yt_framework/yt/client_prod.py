@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union, Tuple, Literal
+from typing import List, Dict, Any, Optional, Union, Tuple, Literal, Mapping
 
 from yt.wrapper import (  # pyright: ignore[reportMissingImports]
     YtClient,
@@ -31,6 +31,42 @@ from yt_framework.utils.ignore import YTIgnoreMatcher
 from yt_framework.operations.job_command import (
     resolve_aliased_job as _resolve_aliased_job,
 )
+from yt_framework.yt.operation_secure_env import (
+    merge_secure_vault,
+    partition_env_for_yt_spec,
+    pop_secure_env_client_kwargs,
+    wrap_shell_command_with_secure_vault_promotion,
+)
+
+
+def _maybe_wrap_string_command_for_vault(leg: Any, secure_flat: Dict[str, str]) -> Any:
+    if secure_flat and isinstance(leg, str):
+        return wrap_shell_command_with_secure_vault_promotion(leg)
+    return leg
+
+
+def _partition_and_maybe_wrap_leg(
+    leg: Any,
+    env: Dict[str, str],
+    *,
+    environment_public_keys: Any,
+    use_plain_environment_for_secrets: bool,
+) -> tuple[Dict[str, str], Dict[str, str], Any]:
+    if use_plain_environment_for_secrets:
+        public_env, secure_flat = dict(env), {}
+    else:
+        public_env, secure_flat = partition_env_for_yt_spec(
+            env, environment_public_keys
+        )
+    leg = _maybe_wrap_string_command_for_vault(leg, secure_flat)
+    return public_env, secure_flat, leg
+
+
+def _spec_builder_secure_vault(spec_builder: Any, vault: Mapping[str, Any]) -> Any:
+    if not vault:
+        return spec_builder
+    return spec_builder.secure_vault(dict(vault))
+
 
 # YtClient.run_operation() only accepts these keyword args; everything else must be
 # applied via SpecBuilder chain methods (weight, title, description, …).
@@ -965,12 +1001,28 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 preferred_value=job,
             )
             kwargs = dict(kwargs)
+            environment_public_keys, use_plain, user_secure_vault = (
+                pop_secure_env_client_kwargs(kwargs)
+            )
             kwargs["max_row_weight"] = validate_max_row_weight(
                 kwargs.get("max_row_weight")
             )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
+
+            public_env, secure_flat, mapper_job = _partition_and_maybe_wrap_leg(
+                mapper_job,
+                env,
+                environment_public_keys=environment_public_keys,
+                use_plain_environment_for_secrets=use_plain,
+            )
+            merged_vault = merge_secure_vault(
+                secure_flat,
+                docker_image=resources.docker_image,
+                docker_auth=docker_auth,
+                user_secure_vault=user_secure_vault,
+            )
 
             output_path = TablePath(output_table, append=append, schema=output_schema)
             spec_builder = (
@@ -992,7 +1044,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 spec_builder.begin_mapper()
                 .command(mapper_job)
                 .file_paths(file_paths)
-                .environment(env)
+                .environment(public_env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
                 .gpu_limit(resources.gpu_limit)
@@ -1001,9 +1053,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             if resources.docker_image:
                 mapper_builder = mapper_builder.docker_image(resources.docker_image)
-                spec_builder.secure_vault({"docker_auth": docker_auth})
 
             mapper_builder = mapper_builder.end_mapper()
+            spec_builder = _spec_builder_secure_vault(spec_builder, merged_vault)
             spec_builder = _apply_max_row_weight_to_spec_builder(
                 spec_builder,
                 kwargs.get("max_row_weight"),
@@ -1075,6 +1127,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 preferred_value=job,
             )
             kwargs = dict(kwargs)
+            environment_public_keys, use_plain, user_secure_vault = (
+                pop_secure_env_client_kwargs(kwargs)
+            )
             kwargs["max_row_weight"] = validate_max_row_weight(
                 kwargs.get("max_row_weight")
             )
@@ -1083,6 +1138,19 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             ]
 
             od = kwargs.pop("operation_description", None)
+
+            public_env, secure_flat, vanilla_job = _partition_and_maybe_wrap_leg(
+                vanilla_job,
+                env,
+                environment_public_keys=environment_public_keys,
+                use_plain_environment_for_secrets=use_plain,
+            )
+            merged_vault = merge_secure_vault(
+                secure_flat,
+                docker_image=resources.docker_image,
+                docker_auth=docker_auth,
+                user_secure_vault=user_secure_vault,
+            )
 
             spec_builder = (
                 VanillaSpecBuilder()
@@ -1103,7 +1171,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 spec_builder.begin_task(task_name)
                 .command(vanilla_job)
                 .file_paths(file_paths)
-                .environment(env)
+                .environment(public_env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
                 .gpu_limit(resources.gpu_limit)
@@ -1112,9 +1180,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
             if resources.docker_image:
                 task_builder = task_builder.docker_image(resources.docker_image)
-                spec_builder.secure_vault({"docker_auth": docker_auth})
 
             task_builder.end_task()
+            spec_builder = _spec_builder_secure_vault(spec_builder, merged_vault)
             spec_builder = _apply_max_row_weight_to_spec_builder(
                 spec_builder,
                 kwargs.get("max_row_weight"),
@@ -1162,6 +1230,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         try:
             kwargs = dict(kwargs)
+            environment_public_keys, use_plain, user_secure_vault = (
+                pop_secure_env_client_kwargs(kwargs)
+            )
             kwargs["max_row_weight"] = validate_max_row_weight(
                 kwargs.get("max_row_weight")
             )
@@ -1176,6 +1247,20 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 legacy_value=reducer,
                 preferred_name="reduce_job",
                 preferred_value=reduce_job,
+            )
+            if use_plain:
+                public_env, secure_flat = dict(env), {}
+            else:
+                public_env, secure_flat = partition_env_for_yt_spec(
+                    env, environment_public_keys
+                )
+            mapper_leg = _maybe_wrap_string_command_for_vault(mapper_leg, secure_flat)
+            reducer_leg = _maybe_wrap_string_command_for_vault(reducer_leg, secure_flat)
+            merged_vault = merge_secure_vault(
+                secure_flat,
+                docker_image=resources.docker_image,
+                docker_auth=docker_auth,
+                user_secure_vault=user_secure_vault,
             )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
@@ -1205,7 +1290,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 spec_builder.begin_mapper()
                 .command(mapper_leg)
                 .file_paths(file_paths)
-                .environment(env)
+                .environment(public_env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
                 .gpu_limit(resources.gpu_limit)
@@ -1213,16 +1298,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             mapper_builder = _apply_command_leg_format(mapper_builder, mapper_leg)
             if resources.docker_image:
                 mapper_builder = mapper_builder.docker_image(resources.docker_image)
-                spec_builder = spec_builder.secure_vault(
-                    {"docker_auth": docker_auth or {}}
-                )
             mapper_builder.end_mapper()
 
             reducer_builder = (
                 spec_builder.begin_reducer()
                 .command(reducer_leg)
                 .file_paths(file_paths)
-                .environment(env)
+                .environment(public_env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
                 .gpu_limit(resources.gpu_limit)
@@ -1232,6 +1314,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 reducer_builder = reducer_builder.docker_image(resources.docker_image)
             reducer_builder.end_reducer()
 
+            spec_builder = _spec_builder_secure_vault(spec_builder, merged_vault)
             spec_builder = spec_builder.reduce_by(reduce_by)
             if sort_by:
                 spec_builder = spec_builder.sort_by(sort_by)
@@ -1284,8 +1367,23 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 preferred_value=job,
             )
             kwargs = dict(kwargs)
+            environment_public_keys, use_plain, user_secure_vault = (
+                pop_secure_env_client_kwargs(kwargs)
+            )
             kwargs["max_row_weight"] = validate_max_row_weight(
                 kwargs.get("max_row_weight")
+            )
+            public_env, secure_flat, reducer_leg = _partition_and_maybe_wrap_leg(
+                reducer_leg,
+                env,
+                environment_public_keys=environment_public_keys,
+                use_plain_environment_for_secrets=use_plain,
+            )
+            merged_vault = merge_secure_vault(
+                secure_flat,
+                docker_image=resources.docker_image,
+                docker_auth=docker_auth,
+                user_secure_vault=user_secure_vault,
             )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
@@ -1315,7 +1413,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 spec_builder.begin_reducer()
                 .command(reducer_leg)
                 .file_paths(file_paths)
-                .environment(env)
+                .environment(public_env)
                 .memory_limit(resources.memory_gb * 1024**3)
                 .cpu_limit(resources.cpu_limit)
                 .gpu_limit(resources.gpu_limit)
@@ -1323,11 +1421,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             reducer_builder = _apply_command_leg_format(reducer_builder, reducer_leg)
             if resources.docker_image:
                 reducer_builder = reducer_builder.docker_image(resources.docker_image)
-                spec_builder = spec_builder.secure_vault(
-                    {"docker_auth": docker_auth or {}}
-                )
             reducer_builder.end_reducer()
 
+            spec_builder = _spec_builder_secure_vault(spec_builder, merged_vault)
             spec_builder = spec_builder.reduce_by(reduce_by)
             spec_builder = _apply_max_row_weight_to_spec_builder(
                 spec_builder,
