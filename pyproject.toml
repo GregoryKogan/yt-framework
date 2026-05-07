@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yt_framework"
-version = "1.3.4"
+version = "1.3.5"
 description = "YTsaurus pipeline framework with utilities and common modules"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -69,6 +69,7 @@ testpaths = ["tests"]
 markers = [
     "unit: fast deterministic tests (default scope)",
     "integration: tests that need dev mode, fakes, or external boundaries",
+    "yt_cluster: real YTsaurus cluster integration (requires credentials; see docs/testing/yt-cluster-integration.md)",
 ]
 
 [tool.black]

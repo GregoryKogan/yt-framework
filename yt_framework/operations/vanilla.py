@@ -9,6 +9,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from yt_framework.utils.logging import log_header, log_success
 from .common import (
+    extract_secure_env_client_kwargs,
     extract_operation_resources,
     build_operation_environment,
     extract_docker_auth_from_operation_config,
@@ -169,6 +170,8 @@ def run_vanilla(
                 "tokenizer_artifact",
                 "tar_command_bootstrap",
                 "operation_description",
+                "environment_public_keys",
+                "use_plain_environment_for_secrets",
             },
         )
     )
@@ -181,6 +184,7 @@ def run_vanilla(
         resources=resources,
         docker_auth=vanilla_operation_data.docker_auth,
         max_failed_jobs=max_failed_jobs,
+        **extract_secure_env_client_kwargs(operation_config),
         **vanilla_kwargs,
     )
 

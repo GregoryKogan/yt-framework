@@ -12,6 +12,7 @@ from yt.wrapper import Operation  # pyright: ignore[reportMissingImports]
 from typing import TYPE_CHECKING
 
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
+from yt_framework.yt.operation_secure_env import pop_secure_env_client_kwargs
 from yt_framework.operations.job_command import is_typed_job, resolve_aliased_job
 from yt_framework.yt.max_row_weight import ensure_max_row_weight_pragma
 
@@ -587,6 +588,8 @@ class YTDevClient(BaseYTClient):
             ... )
         """
         assert self.pipeline_dir is not None
+        _kw = dict(kwargs)
+        pop_secure_env_client_kwargs(_kw)
 
         self.logger.info("Submitting map operation")
         self.logger.info(f"  Input: {input_table}")
@@ -662,6 +665,8 @@ class YTDevClient(BaseYTClient):
             Operation: Mock operation object that simulates YT operation.
         """
         self.logger.info("Submitting vanilla operation")
+        _kw = dict(kwargs)
+        pop_secure_env_client_kwargs(_kw)
         vanilla_job = job if job is not None else command
         self.logger.info(f"  Command: {vanilla_job}")
         self.logger.info(f"  Task: {task_name}")
@@ -765,6 +770,8 @@ class YTDevClient(BaseYTClient):
         **kwargs: Any,
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
+        _kw = dict(kwargs)
+        pop_secure_env_client_kwargs(_kw)
         mapper_leg = resolve_aliased_job(
             legacy_name="mapper",
             legacy_value=mapper,
@@ -818,6 +825,8 @@ class YTDevClient(BaseYTClient):
         **kwargs: Any,
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
+        _kw = dict(kwargs)
+        pop_secure_env_client_kwargs(_kw)
         reducer_leg = resolve_aliased_job(
             legacy_name="reducer",
             legacy_value=reducer,

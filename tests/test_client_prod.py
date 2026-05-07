@@ -240,6 +240,68 @@ def test_yt_prod_client_run_map_configures_pool_tree_docker_and_secure_vault(
     ), "pool_tree, docker_image, and secure_vault must be applied for docker map jobs"
 
 
+def test_yt_prod_client_run_map_partitions_env_into_vault_and_wraps_string_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Secrets go to secure_vault; allowlisted keys stay in mapper.environment."""
+    fake_inner = MagicMock()
+    fake_op = MagicMock()
+    fake_op.id = "yt-op-env-vault"
+    fake_inner.run_operation.return_value = fake_op
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+
+    spec = MagicMock()
+    mapper = MagicMock()
+    for name in (
+        "pool",
+        "resource_limits",
+        "max_failed_job_count",
+        "job_count",
+        "input_table_paths",
+        "output_table_paths",
+        "secure_vault",
+    ):
+        getattr(spec, name).return_value = spec
+    spec.begin_mapper.return_value = mapper
+    for name in (
+        "command",
+        "file_paths",
+        "environment",
+        "memory_limit",
+        "cpu_limit",
+        "gpu_limit",
+        "format",
+        "end_mapper",
+    ):
+        getattr(mapper, name).return_value = mapper
+    mapper.end_mapper.return_value = spec
+    monkeypatch.setattr("yt_framework.yt.client_prod.MapSpecBuilder", lambda: spec)
+    monkeypatch.setattr(
+        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
+        lambda sb, kw: (sb, {}),
+    )
+
+    client = YTProdClient(
+        _null_logger("tests.client_prod.map_env_vault"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+    )
+    client.run_map(
+        "python3 mapper.py",
+        "//tmp/in",
+        "//tmp/out",
+        [],
+        OperationResources(),
+        {"YT_TOKEN": "secret", "YT_STAGE_NAME": "st"},
+    )
+    mapper.environment.assert_called_once_with({"YT_STAGE_NAME": "st"})
+    cmd_arg = mapper.command.call_args[0][0]
+    assert isinstance(cmd_arg, str)
+    assert cmd_arg.startswith("python3 -c ")
+    assert spec.secure_vault.call_args == call({"YT_TOKEN": "secret"})
+
+
 def test_yt_prod_client_run_map_returns_operation_from_client_run_operation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
