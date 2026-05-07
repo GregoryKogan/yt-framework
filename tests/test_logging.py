@@ -19,9 +19,9 @@ def test_colored_formatter_prefixes_warning_level_with_icon() -> None:
     fmt = ColoredFormatter("%(levelname)s | %(message)s")
     record = logging.LogRecord("n", logging.WARNING, __file__, 0, "msg", (), None)
     text = fmt.format(record)
-    assert (
-        "⚠️" in text and "WARNING" in text
-    ), "expected warning icon and level in output"
+    assert "⚠️" in text and "WARNING" in text, (
+        "expected warning icon and level in output"
+    )
 
 
 def test_colored_formatter_prefixes_error_level_with_icon() -> None:
@@ -84,9 +84,9 @@ def test_log_config_masks_key_like_column_in_name(
     caplog.set_level(logging.INFO, logger="tests.logging.cfgkey")
     with caplog.at_level(logging.INFO, logger="tests.logging.cfgkey"):
         log_config(log, {"api_key": "secret12345"}, title="Cfg")
-    assert (
-        "***2345" in caplog.text
-    ), "sensitive key values should mask to last four chars"
+    assert "***2345" in caplog.text, (
+        "sensitive key values should mask to last four chars"
+    )
 
 
 def test_log_config_shows_not_set_for_empty_secret_value(
@@ -108,6 +108,6 @@ def test_setup_logging_writes_plain_formatter_when_stdout_not_tty(
     log = setup_logging(name="tests.logging.notty")
     log.info("hello")
     captured = capsys.readouterr()
-    assert (
-        "hello" in captured.out and "\033[" not in captured.out
-    ), "no ANSI when not a TTY"
+    assert "hello" in captured.out and "\033[" not in captured.out, (
+        "no ANSI when not a TTY"
+    )

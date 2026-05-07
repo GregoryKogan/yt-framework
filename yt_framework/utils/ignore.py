@@ -1,14 +1,12 @@
 """`.ytignore` parsing (gitignore-style) for upload tarballs."""
 
+import fnmatch
 import re
 from pathlib import Path
-from typing import List
-import fnmatch
 
 
 class YTIgnorePattern:
-    """
-    Represents a single .ytignore pattern.
+    """Represents a single .ytignore pattern.
 
     This class compiles a pattern string into a regex for efficient matching
     against file paths. It supports the same syntax as .gitignore files.
@@ -54,16 +52,17 @@ class YTIgnorePattern:
         True
         >>> pattern.matches(Path("/project/src/build"))
         False  # Only matches at root
+
     """
 
-    def __init__(self, pattern: str, base_dir: Path, is_negation: bool = False):
-        """
-        Initialize a pattern.
+    def __init__(self, pattern: str, base_dir: Path, is_negation: bool = False) -> None:
+        """Initialize a pattern.
 
         Args:
             pattern: The pattern string (without leading !)
             base_dir: Directory where the .ytignore file is located
             is_negation: Whether this is a negation pattern (!)
+
         """
         self.pattern = pattern
         self.base_dir = base_dir
@@ -80,7 +79,7 @@ class YTIgnorePattern:
         # Convert to regex-like pattern for matching
         self._compile_pattern()
 
-    def _compile_pattern(self):
+    def _compile_pattern(self) -> None:
         """Compile pattern into a matching function."""
         # Pattern is already stripped of leading slash and trailing slash
         pattern = self.pattern
@@ -106,31 +105,30 @@ class YTIgnorePattern:
                 pattern = fnmatch.translate(pattern)
                 # Replace our placeholder with regex for any path
                 pattern = pattern.replace("__RECURSIVE_WILDCARD__", ".*")
+        # Check if pattern contains path separator
+        elif "/" in pattern:
+            # Pattern with explicit path - use fnmatch but ensure * doesn't match /
+            # Split pattern by / and translate each part separately
+            parts = pattern.split("/")
+            regex_parts = []
+            for part in parts:
+                if part == "*":
+                    # * should not match path separators
+                    regex_parts.append("[^/]*")
+                else:
+                    # Use fnmatch for this part, but replace * with [^/]*
+                    # to prevent matching across directories
+                    part_regex = fnmatch.translate(part)
+                    # Remove the anchors that fnmatch adds
+                    part_regex = part_regex.lstrip("^").rstrip(r"\Z")
+                    # Replace .* (from fnmatch's * translation) with [^/]*
+                    # to prevent matching across path separators
+                    part_regex = part_regex.replace(".*", "[^/]*")
+                    regex_parts.append(part_regex)
+            pattern = "^" + "/".join(regex_parts) + r"\Z"
         else:
-            # Check if pattern contains path separator
-            if "/" in pattern:
-                # Pattern with explicit path - use fnmatch but ensure * doesn't match /
-                # Split pattern by / and translate each part separately
-                parts = pattern.split("/")
-                regex_parts = []
-                for part in parts:
-                    if part == "*":
-                        # * should not match path separators
-                        regex_parts.append("[^/]*")
-                    else:
-                        # Use fnmatch for this part, but replace * with [^/]*
-                        # to prevent matching across directories
-                        part_regex = fnmatch.translate(part)
-                        # Remove the anchors that fnmatch adds
-                        part_regex = part_regex.lstrip("^").rstrip(r"\Z")
-                        # Replace .* (from fnmatch's * translation) with [^/]*
-                        # to prevent matching across path separators
-                        part_regex = part_regex.replace(".*", "[^/]*")
-                        regex_parts.append(part_regex)
-                pattern = "^" + "/".join(regex_parts) + r"\Z"
-            else:
-                # Use fnmatch for standard wildcards
-                pattern = fnmatch.translate(pattern)
+            # Use fnmatch for standard wildcards
+            pattern = fnmatch.translate(pattern)
 
         # If pattern was rooted (started with /), only match at root level
         # This means the path should NOT have any leading directory components
@@ -144,14 +142,14 @@ class YTIgnorePattern:
         self._regex = re.compile(pattern)
 
     def matches(self, file_path: Path) -> bool:
-        """
-        Check if a file path matches this pattern.
+        """Check if a file path matches this pattern.
 
         Args:
             file_path: Absolute or relative file path to check
 
         Returns:
             True if the path matches
+
         """
         # Patterns should always be matched relative to their own base_dir
         # (where the .ytignore file is located), not the upload base_dir
@@ -201,8 +199,7 @@ class YTIgnorePattern:
 
 
 class YTIgnoreMatcher:
-    """
-    Matches file paths against .ytignore patterns.
+    r"""Matches file paths against .ytignore patterns.
 
     This class loads .ytignore files from the specified directory and all parent
     directories up to the filesystem root, then provides methods to check if files
@@ -247,20 +244,21 @@ class YTIgnoreMatcher:
         True
         >>> matcher.should_ignore(project_dir / "important.log")
         False
+
     """
 
-    def __init__(self, base_dir: Path):
-        """
-        Initialize matcher.
+    def __init__(self, base_dir: Path) -> None:
+        """Initialize matcher.
 
         Args:
             base_dir: Base directory for file matching
+
         """
         self.base_dir = base_dir.resolve()
-        self.patterns: List[YTIgnorePattern] = []
+        self.patterns: list[YTIgnorePattern] = []
         self._load_patterns()
 
-    def _load_patterns(self):
+    def _load_patterns(self) -> None:
         """Load patterns from .ytignore files in base_dir and parent directories."""
         # Walk up from base_dir to find all .ytignore files
         current_dir = self.base_dir
@@ -278,17 +276,17 @@ class YTIgnoreMatcher:
         for ytignore_file, pattern_base_dir in reversed(found_ytignore_files):
             self._parse_ytignore_file(ytignore_file, pattern_base_dir)
 
-    def _parse_ytignore_file(self, ytignore_file: Path, base_dir: Path):
-        """
-        Parse a .ytignore file and add patterns.
+    def _parse_ytignore_file(self, ytignore_file: Path, base_dir: Path) -> None:
+        """Parse a .ytignore file and add patterns.
 
         Args:
             ytignore_file: Path to .ytignore file
             base_dir: Base directory for patterns in this file
+
         """
         try:
-            with open(ytignore_file, "r", encoding="utf-8") as f:
-                for line in f.readlines():
+            with open(ytignore_file, encoding="utf-8") as f:
+                for line in f:
                     # Remove leading and trailing whitespace
                     line = line.strip()
 
@@ -298,10 +296,7 @@ class YTIgnoreMatcher:
 
                     # Check for negation
                     is_negation = line.startswith("!")
-                    if is_negation:
-                        pattern = line[1:].strip()
-                    else:
-                        pattern = line
+                    pattern = line[1:].strip() if is_negation else line
 
                     # Skip if pattern is empty after processing
                     if not pattern:
@@ -315,17 +310,17 @@ class YTIgnoreMatcher:
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.warning(f"Failed to parse .ytignore file {ytignore_file}: {e}")
+            logger.warning("Failed to parse .ytignore file %s: %s", ytignore_file, e)
 
     def should_ignore(self, file_path: Path) -> bool:
-        """
-        Check if a file should be ignored.
+        """Check if a file should be ignored.
 
         Args:
             file_path: Path to the file (can be absolute or relative)
 
         Returns:
             True if the file should be ignored
+
         """
         # Always ignore .ytignore files themselves - they're only needed locally
         if file_path.name == ".ytignore":
@@ -340,19 +335,14 @@ class YTIgnoreMatcher:
         ignored = False
         for pattern in self.patterns:
             if pattern.matches(file_path):
-                if pattern.is_negation:
-                    # Negation pattern un-ignores
-                    ignored = False
-                else:
-                    # Regular pattern ignores
-                    ignored = True
+                # Negation un-ignores; regular patterns ignore.
+                ignored = not pattern.is_negation
 
         return ignored
 
 
 def should_ignore_file(file_path: Path, base_dir: Path) -> bool:
-    """
-    Convenience function to check if a file should be ignored.
+    """Convenience function to check if a file should be ignored.
 
     This is a shorthand for creating a YTIgnoreMatcher and checking a single file.
     For checking multiple files, create a YTIgnoreMatcher instance directly to
@@ -372,6 +362,7 @@ def should_ignore_file(file_path: Path, base_dir: Path) -> bool:
         True
         >>> should_ignore_file(Path("/project/test.py"), Path("/project"))
         False
+
     """
     matcher = YTIgnoreMatcher(base_dir)
     return matcher.should_ignore(file_path)

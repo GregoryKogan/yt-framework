@@ -8,7 +8,7 @@ class CreateOrdersStage(BaseStage):
 
         # Access data from previous stage
         if "users_count" in debug:
-            self.logger.info(f"Previous stage created {debug['users_count']} users")
+            self.logger.info("Previous stage created %s users", debug["users_count"])
 
         orders = [
             {"order_id": 101, "user_id": 1, "product": "Laptop", "amount": 999.99},
@@ -22,7 +22,7 @@ class CreateOrdersStage(BaseStage):
             rows=orders,
         )
 
-        self.logger.info(f"Created orders table: {self.config.client.output_table}")
+        self.logger.info("Created orders table: %s", self.config.client.output_table)
 
         # Pass table path to next stage
         debug["orders_table"] = self.config.client.output_table

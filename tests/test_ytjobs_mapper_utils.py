@@ -24,7 +24,8 @@ def test_parse_json_line_returns_none_on_invalid_json_and_writes_stderr(
     assert parse_json_line("not json") is None
     err = capsys.readouterr().err
     payload = json.loads(err.strip())
-    assert "error" in payload and payload.get("row") == "not json"
+    assert "error" in payload
+    assert payload.get("row") == "not json"
 
 
 def test_log_error_writes_json_line_to_stderr(
@@ -52,7 +53,8 @@ def test_read_input_rows_writes_json_error_to_stderr_for_invalid_json(
     monkeypatch.setattr(sys, "stdin", io.StringIO("not-json\n"))
     assert list(read_input_rows()) == []
     payload = json.loads(capsys.readouterr().err.strip())
-    assert "error" in payload and payload.get("row") == "not-json"
+    assert "error" in payload
+    assert payload.get("row") == "not-json"
 
 
 def test_process_and_write_results_writes_each_yield_as_json_line_to_stdout(

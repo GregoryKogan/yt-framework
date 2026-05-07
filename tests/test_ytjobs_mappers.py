@@ -3,7 +3,8 @@
 import io
 import json
 import sys
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 
@@ -38,14 +39,16 @@ def test_stream_mapper_map_raises_and_logs_json_error_when_processing_fails(
     monkeypatch.setattr(sys, "stdin", io.StringIO('{"k": 1}\n'))
 
     def _boom(_row: Any, **_kw: Any) -> Iterator[dict[str, str]]:
-        raise RuntimeError("mapper boom")
+        msg = "mapper boom"
+        raise RuntimeError(msg)
         yield  # pragma: no cover
 
     with pytest.raises(RuntimeError, match="mapper boom"):
         StreamMapper().map(_boom, redirect_processing_output=False)
     err_line = capsys.readouterr().err.strip().splitlines()[-1]
     payload = json.loads(err_line)
-    assert "Processing failed" in payload["error"] and payload.get("row") == '{"k": 1}'
+    assert "Processing failed" in payload["error"]
+    assert payload.get("row") == '{"k": 1}'
 
 
 def test_batch_mapper_map_with_none_batch_size_passes_all_rows_to_processor(
@@ -166,7 +169,8 @@ def test_batch_mapper_map_logs_batch_processing_failed_for_all_rows_mode(
     monkeypatch.setattr(sys, "stdin", io.StringIO('{"x": 1}\n'))
 
     def _boom(rows: list[dict[str, int]], **_kw: Any) -> Iterator[dict[str, str]]:
-        raise RuntimeError("all-rows boom")
+        msg = "all-rows boom"
+        raise RuntimeError(msg)
         yield  # pragma: no cover
 
     with pytest.raises(RuntimeError, match="all-rows boom"):
@@ -182,13 +186,13 @@ def test_batch_mapper_map_logs_per_batch_failure_when_batch_size_set(
     monkeypatch.setattr(sys, "stdin", io.StringIO('{"i": 0}\n'))
 
     def _boom(rows: list[dict[str, int]], **_kw: Any) -> Iterator[dict[str, str]]:
-        raise RuntimeError("per-batch boom")
+        msg = "per-batch boom"
+        raise RuntimeError(msg)
         yield  # pragma: no cover
 
     with pytest.raises(RuntimeError, match="per-batch boom"):
         BatchMapper(1).map(_boom, redirect_processing_output=False)
     err_line = capsys.readouterr().err.strip().splitlines()[-1]
     payload = json.loads(err_line)
-    assert (
-        "Batch 0 processing failed" in payload["error"] and payload["batch_size"] == 1
-    )
+    assert "Batch 0 processing failed" in payload["error"]
+    assert payload["batch_size"] == 1

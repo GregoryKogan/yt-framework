@@ -1,5 +1,4 @@
-"""
-sys.path helpers for stage driver-side imports.
+"""sys.path helpers for stage driver-side imports.
 
 Stages that import from their own ``src/`` directory should use
 :func:`stage_src_path` instead of manually manipulating ``sys.path``.
@@ -20,9 +19,9 @@ Example::
 """
 
 import sys
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
 
 
 @contextmanager
@@ -36,6 +35,7 @@ def stage_src_path(stage_dir: Path) -> Generator[None, None, None]:
     Args:
         stage_dir: Path to the stage directory (``self.stage_dir`` from
             :class:`~yt_framework.core.stage.BaseStage`).
+
     """
     src = str(stage_dir / "src")
     if src in sys.path:

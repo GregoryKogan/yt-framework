@@ -26,15 +26,13 @@ def test_dev_client_write_and_read_table_roundtrip_uses_basename_jsonl(
     client = YTDevClient(_null_logger("tests.client_dev"), pipeline_dir=tmp_path)
     client.write_table("//cluster/foo/bar", [{"x": 1}], append=False)
     jsonl = tmp_path / ".dev" / "bar.jsonl"
-    assert jsonl.is_file() and client.read_table("//cluster/foo/bar") == [
-        {"x": 1}
-    ], "tables map to .dev/{basename}.jsonl"
+    assert jsonl.is_file() and client.read_table("//cluster/foo/bar") == [{"x": 1}], (
+        "tables map to .dev/{basename}.jsonl"
+    )
 
 
 def test_dev_client_exists_always_reports_true() -> None:
-    client = YTDevClient(
-        _null_logger("tests.client_dev.exists"), pipeline_dir=Path(".")
-    )
+    client = YTDevClient(_null_logger("tests.client_dev.exists"), pipeline_dir=Path())
     assert client.exists("//any/path")
 
 
@@ -99,9 +97,9 @@ def test_dev_client_get_table_columns_falls_back_to_internal_column_names(
         _null_logger("tests.client_dev.cols_int"), pipeline_dir=tmp_path
     )
     client.write_table("//tmp/internal_cols", [{"_yql_meta": 1}], append=False)
-    assert client._get_table_columns("//tmp/internal_cols") == [
-        "_yql_meta"
-    ], "when every key is filtered, use full key list"
+    assert client._get_table_columns("//tmp/internal_cols") == ["_yql_meta"], (
+        "when every key is filtered, use full key list"
+    )
 
 
 def test_dev_client_get_local_checkpoint_path_returns_existing_file_from_config(
@@ -239,9 +237,9 @@ def test_dev_client_run_vanilla_rewrites_double_slash_build_prefix_to_local_stag
         {},
         task,
     )
-    assert (
-        op.get_state() == "completed"
-    ), "dev should map //…/build/stages/… to sandbox stages/…"
+    assert op.get_state() == "completed", (
+        "dev should map //…/build/stages/… to sandbox stages/…"
+    )
 
 
 def test_dev_client_run_vanilla_falls_back_to_plain_replace_when_no_double_slash_prefix(
@@ -325,7 +323,8 @@ def test_dev_client_upload_files_copies_ytjobs_package_file_into_sandbox(
         sandbox,
     )
     dest = sandbox / "ytjobs" / "config" / "__init__.py"
-    assert dest.is_file() and b"get_config_path" in dest.read_bytes()
+    assert dest.is_file()
+    assert b"get_config_path" in dest.read_bytes()
 
 
 def test_dev_client_upload_files_logs_skip_when_dependency_not_found_locally(
@@ -340,7 +339,8 @@ def test_dev_client_upload_files_logs_skip_when_dependency_not_found_locally(
         [("//yt/missing.bin", "stages/nope/missing.bin")],
         sandbox,
     )
-    assert "skipping file" in caplog.text and "not found locally" in caplog.text
+    assert "skipping file" in caplog.text
+    assert "not found locally" in caplog.text
 
 
 def test_dev_client_upload_files_copies_checkpoint_when_names_match_config(
@@ -363,9 +363,9 @@ def test_dev_client_upload_files_copies_checkpoint_when_names_match_config(
     sandbox.mkdir(parents=True)
     client._upload_files([("//yt/artifacts/model.ckpt", "model.ckpt")], sandbox)
     dest = sandbox / "model.ckpt"
-    assert (
-        dest.is_file() and dest.read_bytes() == b"ck"
-    ), "checkpoint copied into sandbox"
+    assert dest.is_file() and dest.read_bytes() == b"ck", (
+        "checkpoint copied into sandbox"
+    )
 
 
 def test_dev_client_upload_files_copies_tarball_from_dot_build_when_present(
@@ -397,9 +397,9 @@ def test_dev_client_upload_files_swallows_import_error_when_ytjobs_placeholder_i
         [("//yt/pkg/x", "ytjobs/config/__init__.py")],
         sandbox,
     )
-    assert (
-        "skipping file" in caplog.text and "not found locally" in caplog.text
-    ), "ytjobs branch should fall through when import ytjobs fails"
+    assert "skipping file" in caplog.text and "not found locally" in caplog.text, (
+        "ytjobs branch should fall through when import ytjobs fails"
+    )
 
 
 def test_dev_client_setup_checkpoint_config_sets_job_path_and_checkpoint_file(
@@ -478,11 +478,11 @@ def test_dev_client_run_yql_copies_select_into_output_jsonl(
 ) -> None:
     client = YTDevClient(_null_logger("tests.client_dev.yql"), pipeline_dir=tmp_path)
     client.write_table("//cluster/src", [{"n": 1}], append=False)
-    yql = "INSERT INTO `//cluster/dst` WITH TRUNCATE " "SELECT * FROM `//cluster/src`;"
+    yql = "INSERT INTO `//cluster/dst` WITH TRUNCATE SELECT * FROM `//cluster/src`;"
     client.run_yql(yql)
-    assert client.read_table("//cluster/dst") == [
-        {"n": 1}
-    ], "dev run_yql should materialize INSERT … SELECT into .dev basename jsonl"
+    assert client.read_table("//cluster/dst") == [{"n": 1}], (
+        "dev run_yql should materialize INSERT … SELECT into .dev basename jsonl"
+    )
 
 
 def test_dev_client_run_yql_adds_default_max_row_weight_pragma_when_missing(
@@ -546,14 +546,13 @@ def test_dev_client_run_yql_warns_when_input_table_jsonl_missing(
         _null_logger("tests.client_dev.yql_miss"), pipeline_dir=tmp_path
     )
     yql = (
-        "INSERT INTO `//cluster/out` WITH TRUNCATE "
-        "SELECT * FROM `//cluster/not_there`;"
+        "INSERT INTO `//cluster/out` WITH TRUNCATE SELECT * FROM `//cluster/not_there`;"
     )
     with pytest.raises(Exception):
         client.run_yql(yql)
-    assert (
-        "Input table not found" in caplog.text
-    ), "missing .dev jsonl should warn before SQL fails"
+    assert "Input table not found" in caplog.text, (
+        "missing .dev jsonl should warn before SQL fails"
+    )
 
 
 def test_dev_client_run_map_reduce_copies_input_jsonl_to_output(
@@ -592,9 +591,8 @@ def test_dev_client_run_map_reduce_writes_empty_output_when_input_missing(
         OperationResources(),
         {},
     )
-    assert (
-        op.get_state() == "completed" and client.read_table("//tmp/mr_empty_out") == []
-    )
+    assert op.get_state() == "completed"
+    assert client.read_table("//tmp/mr_empty_out") == []
 
 
 def test_dev_client_run_reduce_copies_input_jsonl_to_output(
@@ -629,9 +627,9 @@ def test_dev_client_join_tables_materializes_joined_rows_in_output_jsonl(
         "id",
         dry_run=False,
     )
-    assert client.read_table("//tmp/j_out") == [
-        {"id": 1, "v": "a", "w": "b"}
-    ], "dev join_tables should run YQL via DuckDB and write output jsonl"
+    assert client.read_table("//tmp/j_out") == [{"id": 1, "v": "a", "w": "b"}], (
+        "dev join_tables should run YQL via DuckDB and write output jsonl"
+    )
 
 
 def test_dev_client_filter_table_materializes_where_result_in_output_jsonl(

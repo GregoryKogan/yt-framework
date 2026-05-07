@@ -1,35 +1,39 @@
 """Thin wrapper around `yt.wrapper.YtClient` for real cluster operations."""
 
+import contextlib
 import logging
+from collections.abc import Mapping
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union, Tuple, Literal, Mapping
+from typing import Any, Literal
 
 from yt.wrapper import (  # pyright: ignore[reportMissingImports]
-    YtClient,
     FilePath,
-    TablePath,
-    Operation,
     MapSpecBuilder,
-    VanillaSpecBuilder,
+    Operation,
+    TablePath,
     TypedJob,
+    VanillaSpecBuilder,
+    YtClient,
+)
+from yt.wrapper import (
     format as yt_format,
 )
+from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
 from yt.wrapper.spec_builders import (  # pyright: ignore[reportMissingImports]
     MapReduceSpecBuilder,
     ReduceSpecBuilder,
 )
-from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
 
+from yt_framework.operations.job_command import (
+    resolve_aliased_job as _resolve_aliased_job,
+)
+from yt_framework.utils.ignore import YTIgnoreMatcher
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
 from yt_framework.yt.max_row_weight import (
     build_max_row_weight_pragma,
     ensure_max_row_weight_pragma,
     parse_max_row_weight_to_bytes,
     validate_max_row_weight,
-)
-from yt_framework.utils.ignore import YTIgnoreMatcher
-from yt_framework.operations.job_command import (
-    resolve_aliased_job as _resolve_aliased_job,
 )
 from yt_framework.yt.operation_secure_env import (
     merge_secure_vault,
@@ -39,7 +43,7 @@ from yt_framework.yt.operation_secure_env import (
 )
 
 
-def _maybe_wrap_string_command_for_vault(leg: Any, secure_flat: Dict[str, str]) -> Any:
+def _maybe_wrap_string_command_for_vault(leg: Any, secure_flat: dict[str, str]) -> Any:
     if secure_flat and isinstance(leg, str):
         return wrap_shell_command_with_secure_vault_promotion(leg)
     return leg
@@ -47,11 +51,11 @@ def _maybe_wrap_string_command_for_vault(leg: Any, secure_flat: Dict[str, str]) 
 
 def _partition_and_maybe_wrap_leg(
     leg: Any,
-    env: Dict[str, str],
+    env: dict[str, str],
     *,
     environment_public_keys: Any,
     use_plain_environment_for_secrets: bool,
-) -> tuple[Dict[str, str], Dict[str, str], Any]:
+) -> tuple[dict[str, str], dict[str, str], Any]:
     if use_plain_environment_for_secrets:
         public_env, secure_flat = dict(env), {}
     else:
@@ -77,15 +81,14 @@ _RUN_OPERATION_KWARGS = frozenset(
 
 def _apply_spec_options_and_split_run_operation_kwargs(
     spec_builder: Any,
-    kwargs: Dict[str, Any],
-) -> tuple[Any, Dict[str, Any]]:
-    """
-    Apply kwargs that correspond to SpecBuilder chain methods (e.g. ``weight``,
+    kwargs: dict[str, Any],
+) -> tuple[Any, dict[str, Any]]:
+    """Apply kwargs that correspond to SpecBuilder chain methods (e.g. ``weight``,
     ``title``, ``alias``). Remaining keys must be only those accepted by
     ``YtClient.run_operation`` (see ``_RUN_OPERATION_KWARGS``).
     """
     kwargs = dict(kwargs)
-    run_op: Dict[str, Any] = {}
+    run_op: dict[str, Any] = {}
     for k in list(kwargs.keys()):
         if k in _RUN_OPERATION_KWARGS:
             run_op[k] = kwargs.pop(k)
@@ -98,11 +101,12 @@ def _apply_spec_options_and_split_run_operation_kwargs(
             spec_builder = meth(v)
             del kwargs[k]
         else:
-            raise ValueError(
+            msg = (
                 f"Unknown YT operation option {k!r}: not a SpecBuilder method on "
                 f"{type(spec_builder).__name__} and not one of "
                 f"{sorted(_RUN_OPERATION_KWARGS)}."
             )
+            raise ValueError(msg)
     return spec_builder, run_op
 
 
@@ -110,8 +114,7 @@ def _apply_command_leg_format(
     leg_builder: Any,
     leg: Any,
 ) -> Any:
-    """
-    Configure wire format for command legs only.
+    """Configure wire format for command legs only.
 
     TypedJob legs keep their native typed protocol; command string legs use JSON.
     """
@@ -122,7 +125,7 @@ def _apply_command_leg_format(
 
 def _apply_max_row_weight_to_spec_builder(
     spec_builder: Any,
-    max_row_weight: Optional[str],
+    max_row_weight: str | None,
 ) -> Any:
     """Apply max row weight to spec builder when supported."""
     if max_row_weight is None:
@@ -138,8 +141,7 @@ def _apply_max_row_weight_to_spec_builder(
 
 
 class YTProdClient(BaseYTClient):
-    """
-    Production YT client implementation.
+    """Production YT client implementation.
 
     Uses actual YTsaurus client for all operations.
     """
@@ -147,31 +149,29 @@ class YTProdClient(BaseYTClient):
     def __init__(
         self,
         logger: logging.Logger,
-        secrets: Dict[str, str],
-        pickling: Optional[Dict[str, Any]] = None,
+        secrets: dict[str, str],
+        pickling: dict[str, Any] | None = None,
     ) -> None:
-        """
-        Initialize production YT client.
+        """Initialize production YT client.
 
         Args:
             logger: Logger instance
             secrets: Dictionary containing YT credentials. Expected keys:
                     - YT_PROXY
                     - YT_TOKEN
+
         """
         super().__init__(logger)
 
         yt_proxy = secrets.get("YT_PROXY")
         if not yt_proxy:
-            raise ValueError(
-                "YT_PROXY is not set (check secrets.env or environment variables)"
-            )
+            msg = "YT_PROXY is not set (check secrets.env or environment variables)"
+            raise ValueError(msg)
 
         yt_token = secrets.get("YT_TOKEN")
         if not yt_token:
-            raise ValueError(
-                "YT_TOKEN is not set (check secrets.env or environment variables)"
-            )
+            msg = "YT_TOKEN is not set (check secrets.env or environment variables)"
+            raise ValueError(msg)
 
         self.client = YtClient(proxy=yt_proxy, token=yt_token)
         self._apply_pickling_config(pickling or {})
@@ -179,17 +179,19 @@ class YTProdClient(BaseYTClient):
             if "proxy" in self.client.config:
                 self.client.config["proxy"]["enable_proxy_discovery"] = False  # type: ignore[index]
                 self.logger.debug(
-                    f"YT Client initialized with proxy: {yt_proxy} (proxy discovery disabled)"
+                    "YT Client initialized with proxy: %s (proxy discovery disabled)",
+                    yt_proxy,
                 )
             else:
-                self.logger.debug(f"YT Client initialized with proxy: {yt_proxy}")
+                self.logger.debug("YT Client initialized with proxy: %s", yt_proxy)
         except Exception as e:
             self.logger.warning(
-                f"Could not disable proxy discovery: {e}. Continuing with default settings."
+                "Could not disable proxy discovery: %s. Continuing with default settings.",
+                e,
             )
-            self.logger.debug(f"YT Client initialized with proxy: {yt_proxy}")
+            self.logger.debug("YT Client initialized with proxy: %s", yt_proxy)
 
-    def _apply_pickling_config(self, pickling: Dict[str, Any]) -> None:
+    def _apply_pickling_config(self, pickling: dict[str, Any]) -> None:
         """Apply pickling flags from pipeline config to the YT client.
 
         Supported flags:
@@ -234,11 +236,12 @@ class YTProdClient(BaseYTClient):
 
         Raises:
             Exception: If path creation fails.
+
         """
         try:
             self.client.create(node_type, path, recursive=True, ignore_existing=True)
-        except Exception as e:
-            self.logger.error(f"Failed to create path: {e}")
+        except Exception:
+            self.logger.exception("Failed to create path")
             raise
 
     def exists(self, path: str) -> bool:
@@ -252,17 +255,18 @@ class YTProdClient(BaseYTClient):
 
         Raises:
             Exception: If check fails.
+
         """
         try:
             return self.client.exists(path)
-        except Exception as e:
-            self.logger.error(f"Failed to check if path exists: {e}")
+        except Exception:
+            self.logger.exception("Failed to check if path exists")
             raise
 
     def write_table(
         self,
         table_path: str,
-        rows: List[Dict[str, Any]],
+        rows: list[dict[str, Any]],
         append: bool = False,
         replication_factor: int = 1,
         make_parents: bool = True,
@@ -275,16 +279,19 @@ class YTProdClient(BaseYTClient):
             append: If True, append to existing table (default: False)
             replication_factor: Replication factor for the table (default: 1)
             make_parents: If True, create parent directories if they don't exist (default: True)
+
         """
         mode_str = "append" if append else "overwrite"
-        self.logger.info(f"Writing {len(rows)} rows → {table_path} ({mode_str})")
+        self.logger.info("Writing %s rows → %s (%s)", len(rows), table_path, mode_str)
 
         try:
             # Create parent directories if they don't exist
             if make_parents and "/" in table_path:
                 parent_dir = "/".join(table_path.rstrip("/").split("/")[:-1])
                 if parent_dir:
-                    self.logger.debug(f"Ensuring parent directory exists: {parent_dir}")
+                    self.logger.debug(
+                        "Ensuring parent directory exists: %s", parent_dir
+                    )
                     self.create_path(parent_dir, node_type="map_node")
 
             # Create table with replication factor if it doesn't exist
@@ -303,11 +310,11 @@ class YTProdClient(BaseYTClient):
                 rows,
                 format=yt_format.JsonFormat(),
             )
-        except Exception as e:
-            self.logger.error(f"Failed to write table: {e}")
+        except Exception:
+            self.logger.exception("Failed to write table")
             raise
 
-    def read_table(self, table_path: str) -> List[Dict[str, Any]]:
+    def read_table(self, table_path: str) -> list[dict[str, Any]]:
         """Read rows from a YT table.
 
         Args:
@@ -318,8 +325,9 @@ class YTProdClient(BaseYTClient):
 
         Raises:
             Exception: If table read fails.
+
         """
-        self.logger.info(f"Reading table: {table_path}")
+        self.logger.info("Reading table: %s", table_path)
 
         try:
             # Type ignore needed because YT client's read_table has complex return types
@@ -327,11 +335,11 @@ class YTProdClient(BaseYTClient):
             table_iterator = self.client.read_table(
                 TablePath(table_path), format=yt_format.JsonFormat()
             )
-            results: List[Dict[str, Any]] = list(table_iterator)  # type: ignore[arg-type]
-            self.logger.info(f"✓ Read {len(results)} rows")
+            results: list[dict[str, Any]] = list(table_iterator)  # type: ignore[arg-type]
+            self.logger.info("✓ Read %s rows", len(results))
             return results
-        except Exception as e:
-            self.logger.error(f"Failed to read table: {e}")
+        except Exception:
+            self.logger.exception("Failed to read table")
             raise
 
     def row_count(self, table_path: str) -> int:
@@ -345,18 +353,18 @@ class YTProdClient(BaseYTClient):
 
         Raises:
             Exception: If row count query fails.
+
         """
         try:
             count = self.client.row_count(table_path)
-            self.logger.debug(f"Row count: {count}")
+            self.logger.debug("Row count: %s", count)
             return count
-        except Exception as e:
-            self.logger.error(f"Failed to get row count: {e}")
+        except Exception:
+            self.logger.exception("Failed to get row count")
             raise
 
-    def _get_table_columns(self, table_path: str) -> List[str]:
-        """
-        Get column names from a table.
+    def _get_table_columns(self, table_path: str) -> list[str]:
+        """Get column names from a table.
 
         Tries multiple methods:
         1. Get schema from table attributes (handles binary columns)
@@ -371,6 +379,7 @@ class YTProdClient(BaseYTClient):
 
         Raises:
             ValueError: If table is empty or cannot be read
+
         """
         # Method 1: Try to get schema from table attributes first (handles binary columns)
         try:
@@ -389,16 +398,15 @@ class YTProdClient(BaseYTClient):
                         return columns
         except Exception as e:
             self.logger.debug(
-                f"Could not get schema from attributes: {e}, trying to read table"
+                "Could not get schema from attributes: %s, trying to read table", e
             )
 
         # Method 2: Try to read one row (may fail with binary columns)
         try:
             rows = self.read_table(table_path)
             if not rows:
-                raise ValueError(
-                    f"Table {table_path} is empty, cannot determine columns"
-                )
+                msg = f"Table {table_path} is empty, cannot determine columns"
+                raise ValueError(msg)
             # Get column names from first row
             columns = list(rows[0].keys())
             # Filter out internal YQL columns like _other, _yql_column_*
@@ -434,7 +442,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
                     # Get schema from the temporary table
                     temp_attrs = self.client.get(temp_output, attributes=["schema"])  # type: ignore[assignment]
-                    if temp_attrs and isinstance(temp_attrs, dict) and "schema" in temp_attrs:  # type: ignore[operator]
+                    if (
+                        temp_attrs
+                        and isinstance(temp_attrs, dict)
+                        and "schema" in temp_attrs
+                    ):  # type: ignore[operator]
                         temp_schema = temp_attrs["schema"]  # type: ignore[index]
                         if temp_schema and isinstance(temp_schema, list):
                             columns = [
@@ -449,47 +461,40 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                             if columns:
                                 # Clean up temp table before returning
                                 if temp_output:
-                                    try:
+                                    with contextlib.suppress(Exception):
                                         self.client.remove(temp_output)
-                                    except Exception:
-                                        pass
                                 return columns
 
                     # Clean up temp table if we got here
                     if temp_output:
-                        try:
+                        with contextlib.suppress(Exception):
                             self.client.remove(temp_output)
-                        except Exception:
-                            pass
                 except Exception as yql_error:
                     self.logger.debug("YQL schema inference failed: %s", yql_error)
                     # Clean up temp table if it was created
                     if temp_output:
-                        try:
+                        with contextlib.suppress(Exception):
                             self.client.remove(temp_output)
-                        except Exception:
-                            pass
 
                 # If all methods fail, provide helpful error message
-                raise ValueError(
+                msg = (
                     f"Table {table_path} contains binary columns that cannot be decoded. "
                     f"This usually happens when a table was created with SELECT * and contains "
                     f"internal YQL columns like _yql_column_0. Please recreate the table with "
                     f"explicit column selection, or delete and recreate it. Original error: {read_error}"
-                ) from read_error
+                )
+                raise ValueError(msg) from read_error
 
-            raise ValueError(
-                f"Failed to get table columns from {table_path}: {read_error}"
-            ) from read_error
+            msg = f"Failed to get table columns from {table_path}: {read_error}"
+            raise ValueError(msg) from read_error
 
     def run_yql(
         self,
         query: str,
         pool: str = "default",
-        max_row_weight: Optional[str] = None,
+        max_row_weight: str | None = None,
     ) -> None:
-        """
-        Execute a YQL query on YT cluster.
+        """Execute a YQL query on YT cluster.
 
         Args:
             query: YQL query string to execute
@@ -498,14 +503,15 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Raises:
             Exception: If query execution fails
+
         """
         self.logger.info("Executing YQL query on YT cluster")
-        self.logger.debug(f"Pool: {pool}")
+        self.logger.debug("Pool: %s", pool)
         query_with_max_row_weight = ensure_max_row_weight_pragma(
             query=query,
             max_row_weight=max_row_weight,
         )
-        self.logger.debug(f"Query:\n{query_with_max_row_weight}")
+        self.logger.debug("Query:\n%s", query_with_max_row_weight)
 
         try:
             # Execute YQL query on YT cluster using Python API
@@ -516,7 +522,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             )
 
             # Wait for query to complete
-            self.logger.info(f"Query started: {query_obj.id}")
+            self.logger.info("Query started: %s", query_obj.id)
 
             # Check result
             state = query_obj.get_state()
@@ -524,10 +530,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 self.logger.info("✓ YQL query completed successfully")
             else:
                 error = query_obj.get_error()
-                raise RuntimeError(f"Query failed with state {state}: {error}")
+                msg = f"Query failed with state {state}: {error}"
+                raise RuntimeError(msg)
 
-        except Exception as e:
-            self.logger.error(f"Failed to execute YQL query: {e}")
+        except Exception:
+            self.logger.exception("Failed to execute YQL query")
             raise
 
     # Convenience methods for common YQL operations
@@ -537,14 +544,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         left_table: str,
         right_table: str,
         output_table: str,
-        on: Union[str, List[str], Dict[str, str]],
+        on: str | list[str] | dict[str, str],
         how: Literal["inner", "left", "right", "full"] = "left",
-        select_columns: Optional[List[str]] = None,
+        select_columns: list[str] | None = None,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Join two tables using YQL.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Join two tables using YQL.
 
         Args:
             left_table: Path to left table
@@ -560,6 +566,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
         from yt_framework.yt.yql_builder import build_join_query
 
@@ -585,10 +592,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_table: str,
         condition: str,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Filter table rows using WHERE condition.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Filter table rows using WHERE condition.
 
         Args:
             input_table: Path to input table
@@ -598,6 +604,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
         from yt_framework.yt.yql_builder import build_filter_query
 
@@ -622,12 +629,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self,
         input_table: str,
         output_table: str,
-        columns: List[str],
+        columns: list[str],
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Select specific columns from a table.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Select specific columns from a table.
 
         Args:
             input_table: Path to input table
@@ -637,6 +643,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
         from yt_framework.yt.yql_builder import build_select_query
 
@@ -657,13 +664,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self,
         input_table: str,
         output_table: str,
-        group_by: Union[str, List[str]],
-        aggregations: Dict[str, Union[str, Tuple[str, str]]],
+        group_by: str | list[str],
+        aggregations: dict[str, str | tuple[str, str]],
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Group by columns and compute aggregations.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Group by columns and compute aggregations.
 
         Args:
             input_table: Path to input table
@@ -675,6 +681,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
         from yt_framework.yt.yql_builder import build_group_by_query
 
@@ -694,13 +701,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
     def union_tables(
         self,
-        tables: List[str],
+        tables: list[str],
         output_table: str,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Union multiple tables.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Union multiple tables.
 
         Args:
             tables: List of table paths to union
@@ -709,6 +715,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
         from yt_framework.yt.yql_builder import build_union_query
 
@@ -733,12 +740,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self,
         input_table: str,
         output_table: str,
-        columns: Optional[List[str]] = None,
+        columns: list[str] | None = None,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Get distinct rows from a table.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Get distinct rows from a table.
 
         Args:
             input_table: Path to input table
@@ -748,6 +754,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
         from yt_framework.yt.yql_builder import build_distinct_query
 
@@ -768,13 +775,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self,
         input_table: str,
         output_table: str,
-        order_by: Union[str, List[str]],
+        order_by: str | list[str],
         ascending: bool = True,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Sort table by columns.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Sort table by columns.
 
         WARNING: Sorting large tables can be expensive. Use with caution.
 
@@ -787,6 +793,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
         from yt_framework.yt.yql_builder import build_sort_query
 
@@ -814,10 +821,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         output_table: str,
         limit: int,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Limit number of rows from a table.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Limit number of rows from a table.
 
         Args:
             input_table: Path to input table
@@ -827,6 +833,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
         from yt_framework.yt.yql_builder import build_limit_query
 
@@ -850,16 +857,15 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
     def upload_file(
         self, local_path: Path, yt_path: str, create_parent_dir: bool = False
     ) -> None:
-        """
-        Upload a file to YT.
+        """Upload a file to YT.
 
         Args:
             local_path: Local file path to upload
             yt_path: YT destination path
             create_parent_dir: If True, create parent directory if it doesn't exist (default: False)
-        """
-        self.logger.info(f"Uploading {local_path.name} → {yt_path}")
 
+        """
+        self.logger.info("Uploading %s → %s", local_path.name, yt_path)
         try:
             # Ensure parent directory exists before uploading if requested
             if create_parent_dir:
@@ -868,7 +874,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                     parent_dir = "/".join(yt_path.split("/")[:-1])
                     if parent_dir:
                         self.logger.debug(
-                            f"Ensuring parent directory exists: {parent_dir}"
+                            "Ensuring parent directory exists: %s", parent_dir
                         )
                         self.create_path(parent_dir, node_type="map_node")
 
@@ -879,16 +885,15 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                     force_create=True,
                     compute_md5=True,
                 )
-            self.logger.debug(f"Upload completed: {yt_path}")
-        except Exception as e:
-            self.logger.error(f"Failed to upload file: {e}")
+            self.logger.debug("Upload completed: %s", yt_path)
+        except Exception:
+            self.logger.exception("Failed to upload file")
             raise
 
     def upload_directory(
         self, local_dir: Path, yt_dir: str, pattern: str = "*"
-    ) -> List[str]:
-        """
-        Upload a directory to YT cluster.
+    ) -> list[str]:
+        """Upload a directory to YT cluster.
 
         Recursively uploads all files from a local directory to a YT directory,
         respecting .ytignore patterns if present.
@@ -903,10 +908,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Raises:
             Exception: If directory upload fails
-        """
-        self.logger.info(f"Uploading directory {local_dir} → {yt_dir}")
 
-        # Create YT directory
+        """
+        self.logger.info(
+            "Uploading directory %s → %s", local_dir, yt_dir
+        )  # Create YT directory
         self.create_path(yt_dir, node_type="map_node")
 
         # Initialize .ytignore matcher
@@ -919,7 +925,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 # Check if file should be ignored
                 if ignore_matcher.should_ignore(local_file):
                     self.logger.debug(
-                        f"Ignoring file (matched .ytignore): {local_file}"
+                        "Ignoring file (matched .ytignore): %s", local_file
                     )
                     ignored_count += 1
                     continue
@@ -937,10 +943,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 self.upload_file(local_file, yt_path)
                 uploaded.append(yt_path)
 
-        self.logger.info(f"Uploaded {len(uploaded)} files")
+        self.logger.info("Uploaded %s files", len(uploaded))
         if ignored_count > 0:
             self.logger.info(
-                f"Ignored {ignored_count} files (matched .ytignore patterns)"
+                "Ignored %s files (matched .ytignore patterns)", ignored_count
             )
         return uploaded
 
@@ -949,12 +955,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         command: Any,
         input_table: str,
         output_table: str,
-        files: List[Tuple[str, str]],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
-        output_schema: Optional[TableSchema] = None,
+        env: dict[str, str],
+        output_schema: TableSchema | None = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         job: Any = None,
         append: bool = False,
         **kwargs: Any,
@@ -983,15 +989,16 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Raises:
             Exception: If operation submission fails.
+
         """
         self.logger.info("Submitting map operation")
-        self.logger.info(f"  Input: {input_table}")
-        self.logger.info(f"  Output: {output_table}")
-        self.logger.info(f"  Append: {append}")
-        self.logger.info(f"  Output Schema: {output_schema}")
-        self.logger.info(f"  Command: {command}")
-        self.logger.info(f"  Files: {files}")
-        self.logger.info(f"  Resources: {resources}")
+        self.logger.info("  Input: %s", input_table)
+        self.logger.info("  Output: %s", output_table)
+        self.logger.info("  Append: %s", append)
+        self.logger.info("  Output Schema: %s", output_schema)
+        self.logger.info("  Command: %s", command)
+        self.logger.info("  Files: %s", files)
+        self.logger.info("  Resources: %s", resources)
 
         try:
             mapper_job = _resolve_aliased_job(
@@ -1038,7 +1045,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             # Set pool tree if specified
             if resources.pool_tree:
                 spec_builder = spec_builder.pool_trees([resources.pool_tree])
-                self.logger.debug(f"Set pool tree to {resources.pool_tree}")
+                self.logger.debug("Set pool tree to %s", resources.pool_tree)
 
             mapper_builder = (
                 spec_builder.begin_mapper()
@@ -1067,27 +1074,26 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
-                raise RuntimeError(
-                    "Failed to submit operation: run_operation returned None"
-                )
+                msg = "Failed to submit operation: run_operation returned None"
+                raise RuntimeError(msg)
 
-            self.logger.info(f"Operation submitted: {operation.id}")
+            self.logger.info("Operation submitted: %s", operation.id)
             return operation
 
-        except Exception as e:
-            self.logger.error(f"Failed to submit operation: {e}")
+        except Exception:
+            self.logger.exception("Failed to submit operation")
             raise
 
     def run_vanilla(
         self,
         command: str,
-        files: List[Tuple[str, str]],
-        env: Dict[str, str],
+        files: list[tuple[str, str]],
+        env: dict[str, str],
         task_name: str,
         resources: OperationResources,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         max_failed_jobs: int = 1,
-        job: Optional[str] = None,
+        job: str | None = None,
         **kwargs: Any,
     ) -> Operation:
         """Run a vanilla operation on YT cluster.
@@ -1112,12 +1118,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
 
         Raises:
             Exception: If operation submission fails.
+
         """
         self.logger.info("Submitting vanilla operation")
-        self.logger.info(f"  Task Name: {task_name}")
-        self.logger.info(f"  Command: {command}")
-        self.logger.info(f"  Files: {files}")
-        self.logger.info(f"  Resources: {resources}")
+        self.logger.info("  Task Name: %s", task_name)
+        self.logger.info("  Command: %s", command)
+        self.logger.info("  Files: %s", files)
+        self.logger.info("  Resources: %s", resources)
 
         try:
             vanilla_job = _resolve_aliased_job(
@@ -1165,7 +1172,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             # Set pool tree if specified
             if resources.pool_tree:
                 spec_builder = spec_builder.pool_trees([resources.pool_tree])
-                self.logger.debug(f"Set pool tree to {resources.pool_tree}")
+                self.logger.debug("Set pool tree to %s", resources.pool_tree)
 
             task_builder = (
                 spec_builder.begin_task(task_name)
@@ -1194,15 +1201,14 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
-                raise RuntimeError(
-                    "Failed to submit operation: run_operation returned None"
-                )
+                msg = "Failed to submit operation: run_operation returned None"
+                raise RuntimeError(msg)
 
-            self.logger.info(f"Operation submitted: {operation.id}")
+            self.logger.info("Operation submitted: %s", operation.id)
             return operation
 
-        except Exception as e:
-            self.logger.error(f"Failed to submit vanilla operation: {e}")
+        except Exception:
+            self.logger.exception("Failed to submit vanilla operation")
             raise
 
     def run_map_reduce(
@@ -1211,22 +1217,22 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         reducer: Any,
         input_table: str,
         output_table: str,
-        reduce_by: List[str],
-        files: List[Tuple[str, str]],
+        reduce_by: list[str],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
-        sort_by: Optional[List[str]] = None,
-        output_schema: Optional[TableSchema] = None,
+        env: dict[str, str],
+        sort_by: list[str] | None = None,
+        output_schema: TableSchema | None = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         map_job: Any = None,
         reduce_job: Any = None,
         **kwargs: Any,
     ) -> Operation:
         """Run a map-reduce operation on YT cluster."""
         self.logger.info("Submitting map-reduce operation")
-        self.logger.info(f"  Input: {input_table} -> Output: {output_table}")
-        self.logger.info(f"  Reduce by: {reduce_by}")
+        self.logger.info("  Input: %s -> Output: %s", input_table, output_table)
+        self.logger.info("  Reduce by: %s", reduce_by)
 
         try:
             kwargs = dict(kwargs)
@@ -1331,11 +1337,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
-                raise RuntimeError("Failed to submit map-reduce operation")
-            self.logger.info(f"Map-reduce operation submitted: {operation.id}")
+                msg = "Failed to submit map-reduce operation"
+                raise RuntimeError(msg)
+            self.logger.info("Map-reduce operation submitted: %s", operation.id)
             return operation
-        except Exception as e:
-            self.logger.error(f"Failed to submit map-reduce operation: {e}")
+        except Exception:
+            self.logger.exception("Failed to submit map-reduce operation")
             raise
 
     def run_reduce(
@@ -1343,20 +1350,20 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         reducer: Any,
         input_table: str,
         output_table: str,
-        reduce_by: List[str],
-        files: List[Tuple[str, str]],
+        reduce_by: list[str],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
-        output_schema: Optional[TableSchema] = None,
+        env: dict[str, str],
+        output_schema: TableSchema | None = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         job: Any = None,
         **kwargs: Any,
     ) -> Operation:
         """Run a reduce-only operation on YT cluster."""
         self.logger.info("Submitting reduce operation")
-        self.logger.info(f"  Input: {input_table} -> Output: {output_table}")
-        self.logger.info(f"  Reduce by: {reduce_by}")
+        self.logger.info("  Input: %s -> Output: %s", input_table, output_table)
+        self.logger.info("  Reduce by: %s", reduce_by)
 
         try:
             reducer_leg = _resolve_aliased_job(
@@ -1435,23 +1442,24 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
-                raise RuntimeError("Failed to submit reduce operation")
-            self.logger.info(f"Reduce operation submitted: {operation.id}")
+                msg = "Failed to submit reduce operation"
+                raise RuntimeError(msg)
+            self.logger.info("Reduce operation submitted: %s", operation.id)
             return operation
-        except Exception as e:
-            self.logger.error(f"Failed to submit reduce operation: {e}")
+        except Exception:
+            self.logger.exception("Failed to submit reduce operation")
             raise
 
     def run_sort(
         self,
         table_path: str,
-        sort_by: List[str],
-        pool: Optional[str] = None,
-        pool_tree: Optional[str] = None,
+        sort_by: list[str],
+        pool: str | None = None,
+        pool_tree: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Sort a table in place by the given columns."""
-        self.logger.info(f"Sorting table {table_path} by {sort_by}")
+        self.logger.info("Sorting table %s by %s", table_path, sort_by)
         try:
             from yt.wrapper import (
                 schema as yt_schema,
@@ -1469,6 +1477,6 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 kwargs["spec"] = spec
             self.client.run_sort(table_path, sort_by=sort_columns, **kwargs)
             self.logger.info("Sort completed")
-        except Exception as e:
-            self.logger.error(f"Failed to sort table: {e}")
+        except Exception:
+            self.logger.exception("Failed to sort table")
             raise

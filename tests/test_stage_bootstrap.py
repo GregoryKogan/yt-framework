@@ -6,6 +6,7 @@ import pickle
 import sys
 import tarfile
 from pathlib import Path
+
 import pytest
 
 import yt_framework.typed_jobs.stage_bootstrap as sb
@@ -39,9 +40,9 @@ def test_find_source_tarball_root_returns_none_when_no_tarball(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    assert (
-        sb._find_source_tarball_root() is None
-    ), "expected no tarball under search roots"
+    assert sb._find_source_tarball_root() is None, (
+        "expected no tarball under search roots"
+    )
 
 
 def test_find_source_tarball_root_finds_tarball_in_cwd(
@@ -56,9 +57,9 @@ def test_find_source_tarball_root_skips_empty_path_candidates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(os, "getcwd", lambda: "")
-    assert (
-        sb._find_source_tarball_root() is None
-    ), "empty cwd should yield only falsy candidates until /slot/sandbox check"
+    assert sb._find_source_tarball_root() is None, (
+        "empty cwd should yield only falsy candidates until /slot/sandbox check"
+    )
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX root parent walk")
@@ -75,9 +76,9 @@ def test_bootstrap_once_breaks_inner_parent_loop_at_root_and_uses_cwd_fallback(
 ) -> None:
     monkeypatch.chdir("/")
     sb._bootstrap_once("no_such_stage")
-    assert (
-        "/" in sys.path
-    ), "last-resort root should prepend filesystem root to sys.path"
+    assert "/" in sys.path, (
+        "last-resort root should prepend filesystem root to sys.path"
+    )
 
 
 def test_find_source_tarball_root_walks_parents_for_tarball(
@@ -89,9 +90,9 @@ def test_find_source_tarball_root_walks_parents_for_tarball(
     deep.mkdir(parents=True)
     (root / "source.tar.gz").touch()
     monkeypatch.chdir(deep)
-    assert sb._find_source_tarball_root() == str(
-        root
-    ), "tarball above cwd must be found"
+    assert sb._find_source_tarball_root() == str(root), (
+        "tarball above cwd must be found"
+    )
 
 
 def test_bootstrap_once_inserts_workspace_and_stage_src_without_archive(
@@ -103,9 +104,9 @@ def test_bootstrap_once_inserts_workspace_and_stage_src_without_archive(
     src.mkdir(parents=True)
     monkeypatch.chdir(src)
     sb._bootstrap_once(stage)
-    assert (
-        str(workspace) in sys.path and str(src) in sys.path
-    ), "root and stage src on path"
+    assert str(workspace) in sys.path and str(src) in sys.path, (
+        "root and stage src on path"
+    )
 
 
 def test_bootstrap_once_sets_job_config_path_when_config_exists(
@@ -119,9 +120,9 @@ def test_bootstrap_once_sets_job_config_path_when_config_exists(
     cfg.write_text("pipeline: {}\n", encoding="utf-8")
     monkeypatch.chdir(src)
     sb._bootstrap_once(stage)
-    assert os.environ.get("JOB_CONFIG_PATH") == str(
-        cfg
-    ), "config path exported for worker"
+    assert os.environ.get("JOB_CONFIG_PATH") == str(cfg), (
+        "config path exported for worker"
+    )
 
 
 def test_bootstrap_once_extracts_source_tar_when_ytjobs_marker_missing(
@@ -137,9 +138,9 @@ def test_bootstrap_once_extracts_source_tar_when_ytjobs_marker_missing(
         tf.addfile(info, io.BytesIO(payload))
     monkeypatch.chdir(workspace)
     sb._bootstrap_once("any_stage")
-    assert (
-        workspace / "ytjobs" / "__init__.py"
-    ).is_file(), "archive should extract ytjobs"
+    assert (workspace / "ytjobs" / "__init__.py").is_file(), (
+        "archive should extract ytjobs"
+    )
 
 
 def test_bootstrap_once_extracts_tokenizer_artifact_and_sets_default_dir(
@@ -191,9 +192,9 @@ def test_bootstrap_once_does_not_reopen_tarball_on_second_call(
     sb._bootstrap_once(stage)
     n_after_first = len(opens)
     sb._bootstrap_once(stage)
-    assert (
-        n_after_first >= 1 and len(opens) == n_after_first
-    ), "first call may extract tarball; second call should short-circuit before open"
+    assert n_after_first >= 1 and len(opens) == n_after_first, (
+        "first call may extract tarball; second call should short-circuit before open"
+    )
 
 
 def test_stage_bootstrap_typed_job_unpickle_runs_bootstrap_when_stage_name_set(

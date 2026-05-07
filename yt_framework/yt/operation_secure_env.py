@@ -4,19 +4,13 @@ from __future__ import annotations
 
 import os
 import shlex
+from collections.abc import Collection, Mapping, MutableMapping
 from typing import (
     Any,
-    Collection,
-    Dict,
-    FrozenSet,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Tuple,
 )
 
 # Keys that may stay in plain job ``environment`` (visible in the YT web UI).
-DEFAULT_PUBLIC_ENV_KEYS: FrozenSet[str] = frozenset(
+DEFAULT_PUBLIC_ENV_KEYS: frozenset[str] = frozenset(
     {
         "YT_STAGE_NAME",
         "YT_ALLOW_HTTP_REQUESTS_TO_YT_FROM_JOB",
@@ -33,18 +27,17 @@ _SKIP_PROMOTE_INNER = frozenset({"_PICKLING_KEY"})
 
 def partition_env_for_yt_spec(
     env: Mapping[str, str],
-    extra_public_keys: Optional[Collection[str]] = None,
-) -> Tuple[Dict[str, str], Dict[str, str]]:
-    """
-    Split env into (public_environment, secure_vault_flat_strings).
+    extra_public_keys: Collection[str] | None = None,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Split env into (public_environment, secure_vault_flat_strings).
 
     Non-allowlisted keys are placed in ``secure_vault`` as string scalars.
     """
     public_allow = set(DEFAULT_PUBLIC_ENV_KEYS)
     if extra_public_keys:
         public_allow.update(str(k) for k in extra_public_keys)
-    public: Dict[str, str] = {}
-    secure: Dict[str, str] = {}
+    public: dict[str, str] = {}
+    secure: dict[str, str] = {}
     for k, v in env.items():
         sk = str(k)
         if sk in public_allow:
@@ -55,8 +48,7 @@ def partition_env_for_yt_spec(
 
 
 def promote_secure_vault_environment() -> None:
-    """
-    Copy ``YT_SECURE_VAULT_<name>`` into ``<name>`` when unset (stdlib TypedJob hook).
+    """Copy ``YT_SECURE_VAULT_<name>`` into ``<name>`` when unset (stdlib TypedJob hook).
 
     Skips aggregate ``YT_SECURE_VAULT`` and internal ``_PICKLING_KEY``.
     """
@@ -70,8 +62,7 @@ def promote_secure_vault_environment() -> None:
 
 
 def wrap_shell_command_with_secure_vault_promotion(inner: str) -> str:
-    """
-    Prefix a shell command so vault vars are promoted then the user command runs under bash.
+    """Prefix a shell command so vault vars are promoted then the user command runs under bash.
 
     Uses only the Python stdlib (no ``yt_framework`` import) for minimal job sandboxes.
     This wrapper intentionally requires both ``python3`` and ``bash`` binaries in
@@ -105,18 +96,17 @@ def pop_secure_env_client_kwargs(
 def merge_secure_vault(
     env_secrets: Mapping[str, str],
     *,
-    docker_image: Optional[str],
-    docker_auth: Optional[Mapping[str, str]],
-    user_secure_vault: Optional[Mapping[str, Any]],
-) -> Dict[str, Any]:
-    """
-    Build a single ``secure_vault`` mapping for the operation spec.
+    docker_image: str | None,
+    docker_auth: Mapping[str, str] | None,
+    user_secure_vault: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Build a single ``secure_vault`` mapping for the operation spec.
 
     User ``secure_vault`` entries override framework env-derived keys except
     ``docker_auth``, which is shallow-merged with user sub-dict (user wins on
     duplicate keys).
     """
-    out: Dict[str, Any] = dict(env_secrets)
+    out: dict[str, Any] = dict(env_secrets)
     if docker_image:
         out["docker_auth"] = dict(docker_auth or {})
     if not user_secure_vault:

@@ -102,7 +102,9 @@ def test_prepare_local_archive_packs_directory_to_temporary_tar_gz(
     src.mkdir()
     (src / "x.txt").write_text("hi", encoding="utf-8")
     out = _prepare_local_archive(src, "tok")
-    assert out.is_file() and out.name.endswith(".tar.gz") and out != src
+    assert out.is_file()
+    assert out.name.endswith(".tar.gz")
+    assert out != src
     out.unlink(missing_ok=True)
 
 
@@ -211,9 +213,8 @@ def test_init_tokenizer_artifact_directory_uploads_packed_dir_when_missing_in_yt
     args, kwargs = yt.upload_file.call_args
     assert kwargs.get("create_parent_dir") is True
     local_sent, yt_dest = args[0], args[1]
-    assert (
-        str(local_sent).endswith(".tar.gz") and str(yt_dest) == "//yt/art/packed.tar.gz"
-    )
+    assert str(local_sent).endswith(".tar.gz")
+    assert str(yt_dest) == "//yt/art/packed.tar.gz"
 
 
 def test_init_tokenizer_artifact_directory_warns_when_local_path_missing_but_yt_has_artifact(
@@ -277,9 +278,9 @@ def test_init_tokenizer_artifact_directory_skips_upload_when_local_exists_and_yt
         }
     )
     init_tokenizer_artifact_directory(ctx, tok)
-    assert (
-        "already exists in YT" in caplog.text and not yt.upload_file.called
-    ), "existing YT artifact should log skip and not upload"
+    assert "already exists in YT" in caplog.text and not yt.upload_file.called, (
+        "existing YT artifact should log skip and not upload"
+    )
 
 
 def test_init_tokenizer_artifact_directory_raises_when_local_missing_and_yt_has_no_artifact(

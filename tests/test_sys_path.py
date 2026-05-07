@@ -27,9 +27,9 @@ def test_stage_src_path_moves_existing_entry_to_position_zero(tmp_path: Path) ->
         sys.path.insert(0, "/other_front")
         before_len = len(sys.path)
         with stage_src_path(stage):
-            assert (
-                sys.path[0] == src_str
-            ), "duplicate src path should be reinserted at 0"
+            assert sys.path[0] == src_str, (
+                "duplicate src path should be reinserted at 0"
+            )
         assert src_str not in sys.path
         assert len(sys.path) == before_len - 1
     finally:

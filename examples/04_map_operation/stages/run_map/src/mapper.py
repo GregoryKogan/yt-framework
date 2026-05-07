@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Simple Mapper
+"""Simple Mapper.
 =============
 
 This mapper is executed for each input row.
@@ -12,13 +11,15 @@ The mapper processes each row by:
 3. Adding processing metadata
 """
 
-import sys
 import json
+import sys
+
 from omegaconf import OmegaConf
+
 from ytjobs.config import get_config_path
 
 
-def main():
+def main() -> None:
     # Load configuration from config.yaml (uploaded with the code)
     config = OmegaConf.load(get_config_path())
 
@@ -28,15 +29,13 @@ def main():
     for line in sys.stdin:
         row = json.loads(line)
 
-        output_row = {
+        {
             "id": row["id"],
             "original_text": row["text"],
             "processed_text": prefix + row["text"].upper(),
             "original_value": row["value"],
             "processed_value": row["value"] * multiplier,
         }
-
-        print(json.dumps(output_row), flush=True)
 
 
 if __name__ == "__main__":

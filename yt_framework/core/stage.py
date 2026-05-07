@@ -3,21 +3,23 @@
 The framework derives the stage name from the `stages/<name>/` directory.
 """
 
-from abc import ABC, abstractmethod
-from typing import cast, Optional, TYPE_CHECKING, Dict, Any
-from dataclasses import dataclass, replace as _dataclass_replace
-from pathlib import Path
-import logging
 import inspect
+import logging
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from dataclasses import replace as _dataclass_replace
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig, OmegaConf
+
 from yt_framework.core.dependencies import StageDependencies
 
 if TYPE_CHECKING:
     from yt_framework.core.pipeline import DebugContext
 else:
     # Avoid circular import at runtime - DebugContext is Dict[str, Any]
-    DebugContext = Dict[str, Any]
+    DebugContext = dict[str, Any]
 
 
 @dataclass
@@ -30,6 +32,7 @@ class StageContext:
         stage_dir: Path to the stage directory (stages/<stage_name>/).
         logger: Logger instance for stage logging.
         deps: Injected dependencies (yt_client, pipeline_config, configs_dir).
+
     """
 
     name: str
@@ -40,8 +43,8 @@ class StageContext:
 
     def fork(
         self,
-        name: Optional[str] = None,
-        stage_dir: Optional[Path] = None,
+        name: str | None = None,
+        stage_dir: Path | None = None,
     ) -> "StageContext":
         """Return a shallow copy with selective overrides.
 
@@ -66,6 +69,7 @@ class StageContext:
 
             ctx_reduce = self.context.fork(name="mds", stage_dir=Path(__file__).parent)
             run_reduce(context=ctx_reduce, operation_config=reduce_cfg, reducer=MyReducer())
+
         """
         return _dataclass_replace(
             self,
@@ -75,8 +79,7 @@ class StageContext:
 
 
 class BaseStage(ABC):
-    """
-    Abstract base class for pipeline stages.
+    """Abstract base class for pipeline stages.
 
     Stage name and config are automatically detected from the directory.
     Directory structure: stages/<stage_name>/stage.py
@@ -97,6 +100,7 @@ class BaseStage(ABC):
                 # Stage logic here
                 # Note: 'debug' here is the shared data dict, NOT dependencies
                 return {"result": "value"}
+
     """
 
     def __init__(
@@ -104,8 +108,7 @@ class BaseStage(ABC):
         deps: StageDependencies,
         logger: logging.Logger,
     ) -> None:
-        """
-        Initialize stage with injected dependencies.
+        """Initialize stage with injected dependencies.
 
         Stage name and config are automatically detected from the directory containing stage.py.
 
@@ -119,6 +122,7 @@ class BaseStage(ABC):
         Raises:
             FileNotFoundError: If config.yaml file is not found in stage directory.
             ValueError: If config.yaml does not contain a dictionary.
+
         """
         self.deps = deps
         self.logger = logger
@@ -133,14 +137,14 @@ class BaseStage(ABC):
         # Automatically load stage-specific config
         config_path = stage_dir / "config.yaml"
         if not config_path.exists():
-            raise FileNotFoundError(f"Config file not found: {config_path}")
+            msg = f"Config file not found: {config_path}"
+            raise FileNotFoundError(msg)
         loaded_config = OmegaConf.load(config_path)
         # Ensure it's a DictConfig (not ListConfig)
         if not isinstance(loaded_config, DictConfig):
-            raise ValueError(
-                f"Stage config file must contain a dictionary, got {type(loaded_config).__name__}"
-            )
-        self.config = cast(DictConfig, loaded_config)
+            msg = f"Stage config file must contain a dictionary, got {type(loaded_config).__name__}"
+            raise ValueError(msg)
+        self.config = cast("DictConfig", loaded_config)
 
     @property
     def stage_dir(self) -> Path:
@@ -148,13 +152,13 @@ class BaseStage(ABC):
 
         Returns:
             Path: Absolute path to the stage directory (stages/<stage_name>/).
+
         """
         return Path(inspect.getfile(self.__class__)).parent
 
     @abstractmethod
     def run(self, debug: DebugContext) -> DebugContext:
-        """
-        Execute the stage.
+        """Execute the stage.
 
         Args:
             debug: Shared context dictionary from previous stages.
@@ -164,8 +168,8 @@ class BaseStage(ABC):
         Returns:
             DebugContext: Dictionary with stage results to be merged into context
                          and passed to the next stage.
+
         """
-        pass
 
     @property
     def context(self) -> StageContext:
@@ -174,6 +178,7 @@ class BaseStage(ABC):
         Returns:
             StageContext: Dataclass instance with name, config, stage_dir,
                          logger, and deps attributes.
+
         """
         return StageContext(
             name=self.name,

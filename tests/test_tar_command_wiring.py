@@ -14,15 +14,16 @@ _LOG = logging.getLogger("tests.tar_wiring")
 
 def test_bootstrap_shell_run_wrapper_extracts_archive_and_runs_script() -> None:
     cmd = bootstrap_shell_run_wrapper("code.tgz", "run.sh", _LOG)
-    assert (
-        "tar -xzf code.tgz" in cmd and "./run.sh" in cmd
-    ), "bootstrap should unpack archive then execute wrapper"
+    assert "tar -xzf code.tgz" in cmd and "./run.sh" in cmd, (
+        "bootstrap should unpack archive then execute wrapper"
+    )
 
 
 def test_wrap_bootstrap_as_bash_c_escapes_single_quotes_for_shell() -> None:
     inner = "echo 'hi'"
     wrapped = wrap_bootstrap_as_bash_c(inner)
-    assert wrapped.startswith("bash -c '") and wrapped.endswith("'")
+    assert wrapped.startswith("bash -c '")
+    assert wrapped.endswith("'")
     assert "'\"'\"'" in wrapped, "single quotes must be escaped for bash -c"
 
 

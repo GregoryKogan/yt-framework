@@ -94,9 +94,9 @@ def test_add_checkpoint_logs_debug_when_checkpoint_base_without_model_name(
     caplog.set_level(logging.DEBUG)
     out = add_checkpoint([], None, "//ck-only", _LOG)
     assert out == []
-    assert any(
-        "no model_name specified" in r.getMessage() for r in caplog.records
-    ), "expected debug skip when checkpoint_base set without model_name"
+    assert any("no model_name specified" in r.getMessage() for r in caplog.records), (
+        "expected debug skip when checkpoint_base set without model_name"
+    )
 
 
 def test_build_vanilla_dependencies_returns_vanilla_script_path(tmp_path: Path) -> None:

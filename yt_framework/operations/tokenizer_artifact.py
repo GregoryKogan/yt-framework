@@ -5,18 +5,18 @@ from __future__ import annotations
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
-
-from omegaconf import DictConfig
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from omegaconf import DictConfig
+
     from yt_framework.core.stage import StageContext
 
 
 def resolve_tokenizer_artifact_name(
     stage_config: DictConfig,
     tokenizer_artifact_config: DictConfig,
-) -> Optional[str]:
+) -> str | None:
     """Resolve logical tokenizer artifact name from config."""
     explicit = tokenizer_artifact_config.get("artifact_name")
     if explicit and str(explicit).strip():
@@ -48,7 +48,7 @@ def resolve_tokenizer_archive_name(artifact_name: str) -> str:
 def resolve_tokenizer_artifact_yt_path(
     stage_config: DictConfig,
     tokenizer_artifact_config: DictConfig,
-) -> Optional[str]:
+) -> str | None:
     """Resolve full YT file path for tokenizer artifact tarball."""
     artifact_base = tokenizer_artifact_config.get("artifact_base")
     if not artifact_base:
@@ -72,14 +72,13 @@ def _tar_directory(source_dir: Path, target_tar_gz: Path) -> None:
 
 
 def _prepare_local_archive(local_artifact_path: Path, artifact_name: str) -> Path:
-    """
-    Prepare local tar.gz path from `local_artifact_path`.
+    """Prepare local tar.gz path from `local_artifact_path`.
 
     - If source is a directory, pack it to a temporary `.tar.gz`.
     - If source is `.tar.gz`, use it directly.
     """
     if local_artifact_path.is_dir():
-        fd, tmp_name = tempfile.mkstemp(prefix=f"{artifact_name}_", suffix=".tar.gz")
+        _fd, tmp_name = tempfile.mkstemp(prefix=f"{artifact_name}_", suffix=".tar.gz")
         Path(tmp_name).unlink(missing_ok=True)
         tmp_archive = Path(tmp_name)
         _tar_directory(local_artifact_path, tmp_archive)
@@ -88,18 +87,18 @@ def _prepare_local_archive(local_artifact_path: Path, artifact_name: str) -> Pat
     if local_artifact_path.is_file() and local_artifact_path.name.endswith(".tar.gz"):
         return local_artifact_path
 
-    raise ValueError(
+    msg = (
         "local_artifact_path must point to a directory or to a .tar.gz file, "
         f"got: {local_artifact_path}"
     )
+    raise ValueError(msg)
 
 
 def init_tokenizer_artifact_directory(
-    context: "StageContext",
+    context: StageContext,
     tokenizer_artifact_config: DictConfig,
 ) -> None:
-    """
-    Initialize tokenizer artifact in YT (if configured).
+    """Initialize tokenizer artifact in YT (if configured).
 
     Behavior:
     - creates `artifact_base` if needed;
@@ -115,48 +114,53 @@ def init_tokenizer_artifact_directory(
         tokenizer_artifact_config=tokenizer_artifact_config,
     )
     if not artifact_name:
-        raise ValueError(
+        msg = (
             "tokenizer_artifact is configured but artifact_name cannot be resolved. "
             "Set tokenizer_artifact.artifact_name or job.tokenizer_name/model_name."
         )
+        raise ValueError(msg)
 
     archive_name = resolve_tokenizer_archive_name(artifact_name)
     yt_artifact_path = f"{artifact_base}/{archive_name}"
     local_artifact_path = tokenizer_artifact_config.get("local_artifact_path")
 
     context.deps.yt_client.create_path(artifact_base, node_type="map_node")
-    context.logger.info(f"Tokenizer artifact directory ready: {artifact_base}")
+    context.logger.info("Tokenizer artifact directory ready: %s", artifact_base)
 
-    temp_archive: Optional[Path] = None
+    temp_archive: Path | None = None
     try:
         if local_artifact_path:
             source = Path(str(local_artifact_path))
             if not source.exists():
                 context.logger.warning(
-                    f"tokenizer_artifact.local_artifact_path does not exist: {source}"
+                    "tokenizer_artifact.local_artifact_path does not exist: %s", source
                 )
             elif context.deps.yt_client.exists(yt_artifact_path):
                 context.logger.info(
-                    f"Tokenizer artifact already exists in YT: {yt_artifact_path} (skipping upload)"
+                    "Tokenizer artifact already exists in YT: %s (skipping upload)",
+                    yt_artifact_path,
                 )
             else:
                 archive_local_path = _prepare_local_archive(source, artifact_name)
                 if archive_local_path != source:
                     temp_archive = archive_local_path
                 context.logger.info(
-                    f"Uploading tokenizer artifact: {archive_local_path} -> {yt_artifact_path}"
+                    "Uploading tokenizer artifact: %s -> %s",
+                    archive_local_path,
+                    yt_artifact_path,
                 )
                 context.deps.yt_client.upload_file(
                     archive_local_path, yt_artifact_path, create_parent_dir=True
                 )
 
         if not context.deps.yt_client.exists(yt_artifact_path):
-            raise FileNotFoundError(
+            msg = (
                 f"Tokenizer artifact not found in YT: {yt_artifact_path}. "
                 "Provide tokenizer_artifact.local_artifact_path or upload manually."
             )
+            raise FileNotFoundError(msg)
 
-        context.logger.info(f"Tokenizer artifact verified: {yt_artifact_path}")
+        context.logger.info("Tokenizer artifact verified: %s", yt_artifact_path)
     finally:
         if temp_archive and temp_archive.exists():
             temp_archive.unlink(missing_ok=True)

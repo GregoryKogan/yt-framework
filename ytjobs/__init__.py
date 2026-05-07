@@ -6,18 +6,18 @@ should treat it as the sandbox stdlib extension.
 """
 
 # Re-export commonly used classes
-from .s3 import S3Client
-from .logging import get_logger, log_with_extra, redirect_stdout_to_stderr
 from .config import get_config_path
-from .mapper import read_input_rows, StreamMapper, BatchMapper
+from .logging import get_logger, log_with_extra, redirect_stdout_to_stderr
+from .mapper import BatchMapper, StreamMapper, read_input_rows
+from .s3 import S3Client
 
 __all__ = [
+    "BatchMapper",
     "S3Client",
+    "StreamMapper",
+    "get_config_path",
     "get_logger",
     "log_with_extra",
-    "redirect_stdout_to_stderr",
-    "get_config_path",
     "read_input_rows",
-    "StreamMapper",
-    "BatchMapper",
+    "redirect_stdout_to_stderr",
 ]

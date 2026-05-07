@@ -20,7 +20,9 @@ class CreateInputStage(BaseStage):
         )
 
         self.logger.info(
-            f"Created input table with {len(rows)} rows: {self.config.client.input_table}"
+            "Created input table with %s rows: %s",
+            len(rows),
+            self.config.client.input_table,
         )
 
         return debug

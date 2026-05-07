@@ -32,7 +32,8 @@ def test_tar_builder_map_wraps_bootstrap_in_bash_c_and_sets_mapper_script_path(
         _LOG,
     )
     assert r.script_path == "//build/stages/my_stage/src/mapper.py"
-    assert r.command is not None and r.command.startswith("bash -c '")
+    assert r.command is not None
+    assert r.command.startswith("bash -c '")
     assert "tar -xzf src.tar.gz" in r.command
     assert "operation_wrapper_my_stage_map.sh" in r.command
 
@@ -105,8 +106,10 @@ def test_tar_builder_map_reduce_tar_bootstrap_sets_distinct_mapper_reducer_comma
         reducer="./run_reducer.sh",
     )
     assert r.command is None
-    assert r.mapper_command is not None and r.mapper_command.startswith("bash -c '")
-    assert r.reducer_command is not None and r.reducer_command.startswith("bash -c '")
+    assert r.mapper_command is not None
+    assert r.mapper_command.startswith("bash -c '")
+    assert r.reducer_command is not None
+    assert r.reducer_command.startswith("bash -c '")
     assert r.mapper_command != r.reducer_command
 
 
@@ -126,7 +129,8 @@ def test_tar_builder_reduce_tar_bootstrap_sets_reducer_command_string_leg(
         _LOG,
         reducer="./reduce.sh",
     )
-    assert r.reducer_command is not None and "bash -c '" in r.reducer_command
+    assert r.reducer_command is not None
+    assert "bash -c '" in r.reducer_command
     assert r.mapper_command is None
 
 

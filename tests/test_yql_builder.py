@@ -98,7 +98,9 @@ def test_build_join_query_inner_with_using_when_select_columns_provided() -> Non
         how="inner",
         select_columns=["a.id", "b.name"],
     )
-    assert "INSERT INTO `//out`" in q and "USING (id)" in q and "INNER JOIN" in q
+    assert "INSERT INTO `//out`" in q
+    assert "USING (id)" in q
+    assert "INNER JOIN" in q
 
 
 def test_build_join_query_left_uses_on_when_dict_on_without_select_columns() -> None:
@@ -109,34 +111,28 @@ def test_build_join_query_left_uses_on_when_dict_on_without_select_columns() -> 
         on={"left": "uid", "right": "id"},
         how="left",
     )
-    assert (
-        "LEFT JOIN" in q
-        and "ON a.uid = b.id" in q
-        and "a.*, b.*" in q
-        and "USING" not in q
-    )
+    assert "LEFT JOIN" in q
+    assert "ON a.uid = b.id" in q
+    assert "a.*, b.*" in q
+    assert "USING" not in q
 
 
 def test_build_join_query_string_on_uses_on_clause_when_select_columns_omitted() -> (
     None
 ):
     q = build_join_query("//l", "//r", "//out", on="id", how="inner")
-    assert (
-        "INNER JOIN" in q
-        and "ON a.id = b.id" in q
-        and "a.*, b.*" in q
-        and "USING" not in q
-    )
+    assert "INNER JOIN" in q
+    assert "ON a.id = b.id" in q
+    assert "a.*, b.*" in q
+    assert "USING" not in q
 
 
 def test_build_join_query_list_on_uses_on_clause_when_select_columns_omitted() -> None:
     q = build_join_query("//l", "//r", "//out", on=["uid", "region"], how="right")
-    assert (
-        "RIGHT JOIN" in q
-        and "ON a.uid = b.uid AND a.region = b.region" in q
-        and "a.*, b.*" in q
-        and "USING" not in q
-    )
+    assert "RIGHT JOIN" in q
+    assert "ON a.uid = b.uid AND a.region = b.region" in q
+    assert "a.*, b.*" in q
+    assert "USING" not in q
 
 
 def test_build_join_query_full_maps_to_full_outer_join() -> None:
@@ -148,7 +144,8 @@ def test_build_join_query_full_maps_to_full_outer_join() -> None:
         how="full",
         select_columns=["a.k", "b.k"],
     )
-    assert "FULL OUTER JOIN" in q and "USING (k)" in q
+    assert "FULL OUTER JOIN" in q
+    assert "USING (k)" in q
 
 
 def test_build_join_query_formats_multi_column_using_when_on_is_list_with_select_columns() -> (
@@ -162,7 +159,8 @@ def test_build_join_query_formats_multi_column_using_when_on_is_list_with_select
         how="inner",
         select_columns=["a.uid", "b.uid", "a.region", "b.region"],
     )
-    assert "USING (uid, region)" in q and "INNER JOIN" in q
+    assert "USING (uid, region)" in q
+    assert "INNER JOIN" in q
 
 
 def test_build_join_query_uses_on_when_on_is_tuple_even_with_select_columns() -> None:
@@ -175,11 +173,9 @@ def test_build_join_query_uses_on_when_on_is_tuple_even_with_select_columns() ->
         how="left",
         select_columns=["a.uid", "a.region", "b.name"],
     )
-    assert (
-        "LEFT JOIN" in q
-        and "ON a.uid = b.uid AND a.region = b.region" in q
-        and "USING" not in q
-    )
+    assert "LEFT JOIN" in q
+    assert "ON a.uid = b.uid AND a.region = b.region" in q
+    assert "USING" not in q
 
 
 def test_build_union_query_raises_when_fewer_than_two_tables() -> None:
@@ -189,12 +185,10 @@ def test_build_union_query_raises_when_fewer_than_two_tables() -> None:
 
 def test_build_union_query_joins_two_tables_with_union_all() -> None:
     q = build_union_query(["//a", "//b"], "//out", ["id", "name"])
-    assert (
-        "UNION ALL" in q
-        and "FROM `//a`" in q
-        and "FROM `//b`" in q
-        and "INSERT INTO `//out`" in q
-    )
+    assert "UNION ALL" in q
+    assert "FROM `//a`" in q
+    assert "FROM `//b`" in q
+    assert "INSERT INTO `//out`" in q
 
 
 def test_build_filter_query_includes_where_clause() -> None:
@@ -204,12 +198,14 @@ def test_build_filter_query_includes_where_clause() -> None:
         "status = 'active'",
         ["id", "status"],
     )
-    assert "FROM `//in`" in q and "WHERE status = 'active'" in q
+    assert "FROM `//in`" in q
+    assert "WHERE status = 'active'" in q
 
 
 def test_build_select_query_lists_explicit_columns() -> None:
     q = build_select_query("//src", "//dst", ["a", "b"])
-    assert "SELECT\n    a,\n    b\n" in q and "FROM `//src`" in q
+    assert "SELECT\n    a,\n    b\n" in q
+    assert "FROM `//src`" in q
 
 
 def test_build_select_query_includes_default_max_row_weight_pragma() -> None:
@@ -234,7 +230,8 @@ def test_build_group_by_query_omits_group_by_when_group_by_empty_list() -> None:
         [],
         {"n": "count"},
     )
-    assert "GROUP BY" not in q and "COUNT(*) AS n" in q
+    assert "GROUP BY" not in q
+    assert "COUNT(*) AS n" in q
 
 
 def test_build_group_by_query_includes_group_by_when_group_by_is_string() -> None:
@@ -244,7 +241,8 @@ def test_build_group_by_query_includes_group_by_when_group_by_is_string() -> Non
         "region",
         {"n": "count"},
     )
-    assert "GROUP BY region" in q and "COUNT(*) AS n" in q
+    assert "GROUP BY region" in q
+    assert "COUNT(*) AS n" in q
 
 
 def test_build_distinct_query_selects_star_when_columns_omitted() -> None:
@@ -265,9 +263,11 @@ def test_build_sort_query_wraps_order_by_in_subquery() -> None:
         columns=["id", "name"],
         ascending=False,
     )
-    assert "ORDER BY id DESC" in q and "FROM (\n    SELECT *" in q
+    assert "ORDER BY id DESC" in q
+    assert "FROM (\n    SELECT *" in q
 
 
 def test_build_limit_query_appends_limit() -> None:
     q = build_limit_query("//in", "//out", limit=10, columns=["id"])
-    assert q.rstrip().endswith("LIMIT 10;") and "FROM `//in`" in q
+    assert q.rstrip().endswith("LIMIT 10;")
+    assert "FROM `//in`" in q

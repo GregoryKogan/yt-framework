@@ -1,19 +1,18 @@
-"""
-Mapper Utilities
+"""Mapper Utilities.
 ================
 
 Common utilities for YT mapper scripts.
 Includes Row class and input reading helpers.
 """
 
-import sys
 import json
-from typing import Iterable, Callable, Iterator, Any, Optional, Dict
+import sys
+from collections.abc import Callable, Iterable, Iterator
+from typing import Any
 
 
 def read_input_rows() -> Iterable[object]:
-    """
-    Read and parse input rows from stdin.
+    """Read and parse input rows from stdin.
 
     Reads JSON lines from stdin, parses them, and creates Row objects.
     Skips empty lines and logs parsing errors to stderr.
@@ -24,6 +23,7 @@ def read_input_rows() -> Iterable[object]:
     Example:
         for row in read_input_rows():
             print(row.bucket, row.path)
+
     """
     for line in sys.stdin:
         line = line.strip()
@@ -34,35 +34,35 @@ def read_input_rows() -> Iterable[object]:
             row_data = json.loads(line)
             yield row_data
         except Exception as e:
-            error_msg = {"error": f"Failed to parse row: {str(e)}", "row": line}
-            print(json.dumps(error_msg), file=sys.stderr)
+            error_msg = {"error": f"Failed to parse row: {e!s}", "row": line}
+            sys.stderr.write(json.dumps(error_msg) + "\n")
 
 
-def parse_json_line(line: str) -> Optional[Any]:
-    """
-    Parse a JSON line and log errors to stderr if parsing fails.
+def parse_json_line(line: str) -> Any | None:
+    """Parse a JSON line and log errors to stderr if parsing fails.
 
     Args:
         line: JSON string to parse
 
     Returns:
         Parsed JSON object, or None if parsing failed
+
     """
     try:
         return json.loads(line)
     except json.JSONDecodeError as e:
-        log_error({"error": f"Failed to parse row: {str(e)}", "row": line})
+        log_error({"error": f"Failed to parse row: {e!s}", "row": line})
         return None
 
 
-def log_error(error_dict: Dict[str, Any]) -> None:
-    """
-    Log an error message as JSON to stderr.
+def log_error(error_dict: dict[str, Any]) -> None:
+    """Log an error message as JSON to stderr.
 
     Args:
         error_dict: Dictionary containing error information
+
     """
-    print(json.dumps(error_dict), file=sys.stderr)
+    sys.stderr.write(json.dumps(error_dict) + "\n")
     sys.stderr.flush()
 
 
@@ -72,8 +72,7 @@ def process_and_write_results(
     redirect_output: bool = True,
     **kwargs: Any,
 ) -> None:
-    """
-    Execute a processing function and write results as they're yielded.
+    """Execute a processing function and write results as they're yielded.
 
     Streams results without loading them all into memory, which is critical
     for jobs processing millions of rows.
@@ -92,6 +91,7 @@ def process_and_write_results(
         redirect_output: If True, redirect stdout to stderr during processing,
                          then restore it for writing each result
         **kwargs: Additional keyword arguments to pass to processing_func
+
     """
     if redirect_output:
         # Save original stdout (same pattern as redirect_stdout_to_stderr)
@@ -105,7 +105,7 @@ def process_and_write_results(
             for result in processing_func(data, **kwargs):
                 # Temporarily restore stdout to write result
                 sys.stdout = original_stdout
-                print(json.dumps(result))
+                sys.stdout.write(json.dumps(result) + "\n")
                 sys.stdout.flush()
                 # Re-redirect to stderr for next iteration
                 sys.stdout = sys.stderr
@@ -115,5 +115,5 @@ def process_and_write_results(
     else:
         # No redirection - stream results directly
         for result in processing_func(data, **kwargs):
-            print(json.dumps(result))
+            sys.stdout.write(json.dumps(result) + "\n")
             sys.stdout.flush()

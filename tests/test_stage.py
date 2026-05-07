@@ -40,9 +40,9 @@ def test_stage_context_fork_overrides_name_and_stage_dir(tmp_path: Path) -> None
     other_dir = tmp_path / "stage_b"
     other_dir.mkdir()
     forked = ctx.fork(name="beta", stage_dir=other_dir)
-    assert (
-        forked.name == "beta" and forked.stage_dir == other_dir
-    ), "fork should replace name and stage_dir"
+    assert forked.name == "beta" and forked.stage_dir == other_dir, (
+        "fork should replace name and stage_dir"
+    )
 
 
 def test_stage_context_fork_preserves_config_logger_and_deps(tmp_path: Path) -> None:
@@ -50,11 +50,9 @@ def test_stage_context_fork_preserves_config_logger_and_deps(tmp_path: Path) -> 
     other_dir = tmp_path / "stage_b"
     other_dir.mkdir()
     forked = ctx.fork(name="beta", stage_dir=other_dir)
-    assert (
-        forked.config is ctx.config
-        and forked.logger is ctx.logger
-        and forked.deps is ctx.deps
-    )
+    assert forked.config is ctx.config
+    assert forked.logger is ctx.logger
+    assert forked.deps is ctx.deps
 
 
 def test_stage_context_fork_with_explicit_none_keeps_parent_name_and_dir(
@@ -62,7 +60,8 @@ def test_stage_context_fork_with_explicit_none_keeps_parent_name_and_dir(
 ) -> None:
     ctx = _minimal_stage_context(tmp_path)
     forked = ctx.fork(name=None, stage_dir=None)
-    assert forked.name == ctx.name and forked.stage_dir == ctx.stage_dir
+    assert forked.name == ctx.name
+    assert forked.stage_dir == ctx.stage_dir
 
 
 def _load_stage_impl_module(
@@ -76,7 +75,8 @@ def _load_stage_impl_module(
     impl_path.write_text(impl_body, encoding="utf-8")
     mod_name = f"_test_stage_impl_{id(stage_dir)}"
     spec = importlib.util.spec_from_file_location(mod_name, impl_path)
-    assert spec is not None and spec.loader is not None
+    assert spec is not None
+    assert spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules[mod_name] = mod
     spec.loader.exec_module(mod)

@@ -2,12 +2,10 @@
 
 import warnings
 from pathlib import Path
-from typing import Dict
 
 
-def load_env_file(env_path: Path) -> Dict[str, str]:
-    """
-    Load environment variables from a .env file.
+def load_env_file(env_path: Path) -> dict[str, str]:
+    """Load environment variables from a .env file.
 
     File format: KEY=VALUE (one per line, # for comments)
     Missing file is optional and returns empty dict.
@@ -26,6 +24,7 @@ def load_env_file(env_path: Path) -> Dict[str, str]:
     Example:
         >>> env_vars = load_env_file(Path("configs/secrets.env"))
         >>> print(env_vars.get("YT_TOKEN"))
+
     """
     env_vars = {}
 
@@ -34,7 +33,7 @@ def load_env_file(env_path: Path) -> Dict[str, str]:
         return env_vars
 
     try:
-        with open(env_path, "r") as f:
+        with open(env_path) as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
@@ -43,14 +42,13 @@ def load_env_file(env_path: Path) -> Dict[str, str]:
                     value = value.strip()
                     env_vars[key] = value
     except Exception as e:
-        warnings.warn(f"Could not load {env_path}: {e}", UserWarning)
+        warnings.warn(f"Could not load {env_path}: {e}", UserWarning, stacklevel=2)
 
     return env_vars
 
 
-def load_secrets(secrets_dir: Path, env_file: str = "secrets.env") -> Dict[str, str]:
-    """
-    Load secrets from secrets.env file in the specified directory.
+def load_secrets(secrets_dir: Path, env_file: str = "secrets.env") -> dict[str, str]:
+    """Load secrets from secrets.env file in the specified directory.
 
     Args:
         secrets_dir: Directory containing the secrets.env file
@@ -66,6 +64,7 @@ def load_secrets(secrets_dir: Path, env_file: str = "secrets.env") -> Dict[str, 
     Example:
         >>> secrets = load_secrets(Path("configs"))
         >>> yt_token = secrets.get("YT_TOKEN")
+
     """
     secrets_path = secrets_dir / env_file
     return load_env_file(secrets_path)

@@ -27,9 +27,9 @@ def test_text_formatter_includes_bracketed_name_level_and_message() -> None:
         exc_info=None,
     )
     line = formatter.format(record)
-    assert (
-        "[pkg.mod]" in line and "WARNING: watch" in line and "202" in line
-    ), "formatter should stamp name, level, and time"
+    assert "[pkg.mod]" in line and "WARNING: watch" in line and "202" in line, (
+        "formatter should stamp name, level, and time"
+    )
 
 
 def test_text_formatter_appends_extra_context_and_formats_collections() -> None:
@@ -70,7 +70,8 @@ def test_text_formatter_truncates_long_string_extra_values() -> None:
 def test_text_formatter_appends_exception_text_when_exc_info_set() -> None:
     formatter = TextFormatter()
     try:
-        raise RuntimeError("boom")
+        msg = "boom"
+        raise RuntimeError(msg)
     except RuntimeError:
         exc_info = sys.exc_info()
         record = logging.LogRecord(
@@ -83,7 +84,8 @@ def test_text_formatter_appends_exception_text_when_exc_info_set() -> None:
             exc_info=exc_info,
         )
     line = formatter.format(record)
-    assert "RuntimeError: boom" in line and "Traceback" in line
+    assert "RuntimeError: boom" in line
+    assert "Traceback" in line
 
 
 def test_get_logger_writes_to_stderr_and_stops_propagation() -> None:
@@ -92,9 +94,9 @@ def test_get_logger_writes_to_stderr_and_stops_propagation() -> None:
         log = get_logger("ytjobs_test_logger", level=logging.INFO)
         log.info("hello")
     text = buf.getvalue()
-    assert (
-        "hello" in text and "INFO" in text and log.propagate is False
-    ), "get_logger should attach stderr handler and not propagate"
+    assert "hello" in text and "INFO" in text and log.propagate is False, (
+        "get_logger should attach stderr handler and not propagate"
+    )
 
 
 def test_log_with_extra_adds_fields_visible_through_text_formatter() -> None:
@@ -102,11 +104,9 @@ def test_log_with_extra_adds_fields_visible_through_text_formatter() -> None:
     with patch.object(sys, "stderr", buf):
         log = get_logger("ytjobs_extra", level=logging.DEBUG)
         log_with_extra(log, logging.INFO, "evt", stage="s1", n=2)
-    assert (
-        "evt" in buf.getvalue()
-        and "stage=s1" in buf.getvalue()
-        and "n=2" in (buf.getvalue())
-    )
+    assert "evt" in buf.getvalue()
+    assert "stage=s1" in buf.getvalue()
+    assert "n=2" in (buf.getvalue())
 
 
 def test_manage_output_invalid_mode_raises_value_error() -> None:
@@ -128,7 +128,8 @@ def test_manage_output_suppress_mode_runs_function_without_stdout_noise() -> Non
     buf = io.StringIO()
     with patch.object(sys, "stdout", buf):
         _quiet()
-    assert seen == ["ran"] and buf.getvalue() == ""
+    assert seen == ["ran"]
+    assert buf.getvalue() == ""
 
 
 def test_manage_output_redirect_mode_sends_stdout_to_stderr() -> None:
@@ -144,15 +145,13 @@ def test_manage_output_redirect_mode_sends_stdout_to_stderr() -> None:
 
 def test_redirect_stdout_to_stderr_routes_print_to_stderr_stream() -> None:
     stderr_capture = io.StringIO()
-    with patch.object(sys, "stderr", stderr_capture):
-        with redirect_stdout_to_stderr():
-            print("marker", flush=True)
+    with patch.object(sys, "stderr", stderr_capture), redirect_stdout_to_stderr():
+        print("marker", flush=True)
     assert "marker" in stderr_capture.getvalue()
 
 
 def test_suppress_all_output_hides_stdout_print() -> None:
     buf = io.StringIO()
-    with patch.object(sys, "stdout", buf):
-        with suppress_all_output():
-            print("silent")
+    with patch.object(sys, "stdout", buf), suppress_all_output():
+        print("silent")
     assert buf.getvalue() == "", "prints inside suppress must not reach patched stdout"

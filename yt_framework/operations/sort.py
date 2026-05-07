@@ -1,11 +1,11 @@
 """Submit YT sort jobs using the same `(context, operation_config)` pattern as map."""
 
-import logging
 from typing import TYPE_CHECKING
 
 from omegaconf import DictConfig
 
 from yt_framework.utils.logging import log_header, log_success
+
 from .common import extract_operation_resources
 
 if TYPE_CHECKING:
@@ -16,8 +16,7 @@ def run_sort(
     context: "StageContext",
     operation_config: DictConfig,
 ) -> bool:
-    """
-    Run a YT sort operation and wait for completion.
+    """Run a YT sort operation and wait for completion.
 
     Args:
         context: Stage context (deps, logger, stage_dir, config).
@@ -49,21 +48,24 @@ def run_sort(
             {"input_table": intermediate_table},
         )
         run_sort(context=self.context, operation_config=sort_cfg)
+
     """
     logger = context.logger
     table_path = operation_config.get("input_table")
     sort_by = list(operation_config.get("sort_by") or [])
 
     if not table_path:
-        raise ValueError(
+        msg = (
             "operation_config must set input_table; "
             "expected at client.operations.sort.input_table"
         )
+        raise ValueError(msg)
     if not sort_by:
-        raise ValueError(
+        msg = (
             "operation_config must set sort_by; "
             "expected at client.operations.sort.sort_by"
         )
+        raise ValueError(msg)
 
     resources = extract_operation_resources(operation_config, logger)
 

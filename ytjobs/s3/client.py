@@ -1,16 +1,15 @@
 """Minimal boto3 wrapper for job-side list/get/put helpers."""
 
-import boto3
 import logging
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 from urllib.parse import urlparse
 
+import boto3
 from botocore.client import Config as BotoConfig
 
 
 def _decode_http_chunked_if_present(data: bytes, logger: logging.Logger) -> bytes:
-    """
-    If `data` is HTTP chunked-transfer encoded (stored by buggy S3-compatible
+    """If `data` is HTTP chunked-transfer encoded (stored by buggy S3-compatible
     backends when uploading from dev/local), decode it
     and return only the payload. Otherwise return `data` unchanged.
     """
@@ -23,10 +22,7 @@ def _decode_http_chunked_if_present(data: bytes, logger: logging.Logger) -> byte
         if line_end < 0:
             break
         line = data[i:line_end].strip(b"\r")
-        if b";" in line:
-            size_part = line.split(b";")[0].strip()
-        else:
-            size_part = line.strip()
+        size_part = line.split(b";")[0].strip() if b";" in line else line.strip()
         try:
             size = int(size_part, 16)
         except ValueError:
@@ -41,7 +37,7 @@ def _decode_http_chunked_if_present(data: bytes, logger: logging.Logger) -> byte
         while i < len(data) and data[i : i + 1] in (b"\r", b"\n"):
             i += 1
     if out:
-        logger.debug(f"Decoded HTTP chunked body ({len(out)} bytes payload)")
+        logger.debug("Decoded HTTP chunked body (%s bytes payload)", len(out))
         return bytes(out)
     return data
 
@@ -56,13 +52,12 @@ class S3Client:
         secret_key: str,
         max_retries: int = 30,
         timeout: int = 360,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
         *,
-        region_name: Optional[str] = None,
-        boto_config: Optional[BotoConfig] = None,
-    ):
-        """
-        Build a boto3 S3 client for the given endpoint and credentials.
+        region_name: str | None = None,
+        boto_config: BotoConfig | None = None,
+    ) -> None:
+        """Build a boto3 S3 client for the given endpoint and credentials.
 
         Args:
             endpoint: S3 API endpoint URL (e.g. from ``S3_ENDPOINT``).
@@ -73,6 +68,7 @@ class S3Client:
             logger: Optional logger; defaults to the module logger.
             region_name: Optional AWS region passed to ``boto3.client``.
             boto_config: If set, used as-is instead of the default ``BotoConfig``.
+
         """
         self.logger = logger or logging.getLogger(__name__)
 
@@ -86,23 +82,22 @@ class S3Client:
         else:
             config = boto_config
 
-        client_kwargs: Dict[str, Any] = dict(
-            service_name="s3",
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            endpoint_url=endpoint,
-            config=config,
-        )
+        client_kwargs: dict[str, Any] = {
+            "service_name": "s3",
+            "aws_access_key_id": access_key,
+            "aws_secret_access_key": secret_key,
+            "endpoint_url": endpoint,
+            "config": config,
+        }
         if region_name is not None:
             client_kwargs["region_name"] = region_name
         self.client = boto3.client(**client_kwargs)
 
-        self.logger.debug(f"S3 client initialized: {endpoint}")
+        self.logger.debug("S3 client initialized: %s", endpoint)
 
     @staticmethod
     def parse_s3_uri(uri: str) -> tuple[str, str]:
-        """
-        Split ``s3://bucket/key/path`` into ``(bucket, key)``.
+        """Split ``s3://bucket/key/path`` into ``(bucket, key)``.
 
         Args:
             uri: S3 URI with non-empty bucket and key path.
@@ -112,18 +107,19 @@ class S3Client:
 
         Raises:
             ValueError: If the URI is not a valid S3 URI.
+
         """
         u = urlparse(uri)
         if u.scheme != "s3" or not u.netloc or not u.path:
-            raise ValueError(f"Bad s3 uri: {uri}")
+            msg = f"Bad s3 uri: {uri}"
+            raise ValueError(msg)
         return u.netloc, u.path.lstrip("/")
 
     @staticmethod
     def create(
-        secrets: Dict[str, str], client_type: Literal["download", "upload"] = "download"
+        secrets: dict[str, str], client_type: Literal["download", "upload"] = "download"
     ) -> "S3Client":
-        """
-        Create S3 client from secrets dictionary.
+        """Create S3 client from secrets dictionary.
 
         Args:
             secrets: Dictionary containing S3 credentials. Expected keys:
@@ -139,8 +135,8 @@ class S3Client:
 
         Raises:
             ValueError: If ``client_type`` is unknown or required secrets are missing.
-        """
 
+        """
         if client_type == "upload":
             access_key = secrets.get("S3_UPLOAD_ACCESS_KEY")
             secret_key = secrets.get("S3_UPLOAD_SECRET_KEY")
@@ -148,16 +144,20 @@ class S3Client:
             access_key = secrets.get("S3_DOWNLOAD_ACCESS_KEY")
             secret_key = secrets.get("S3_DOWNLOAD_SECRET_KEY")
         else:
-            raise ValueError(f"Unknown client type: {client_type}")
+            msg = f"Unknown client type: {client_type}"
+            raise ValueError(msg)
 
         endpoint = secrets.get("S3_ENDPOINT")
 
         if not endpoint:
-            raise ValueError("S3_ENDPOINT is not set")
+            msg = "S3_ENDPOINT is not set"
+            raise ValueError(msg)
         if not access_key:
-            raise ValueError(f"S3_{client_type.upper()}_ACCESS_KEY is not set")
+            msg = f"S3_{client_type.upper()}_ACCESS_KEY is not set"
+            raise ValueError(msg)
         if not secret_key:
-            raise ValueError(f"S3_{client_type.upper()}_SECRET_KEY is not set")
+            msg = f"S3_{client_type.upper()}_SECRET_KEY is not set"
+            raise ValueError(msg)
 
         return S3Client(endpoint=endpoint, access_key=access_key, secret_key=secret_key)
 
@@ -165,11 +165,10 @@ class S3Client:
         self,
         bucket: str,
         prefix: str = "",
-        extension: Optional[str] = None,
-        max_files: Optional[int] = None,
-    ) -> List[str]:
-        """
-        List object keys under ``prefix`` in ``bucket``.
+        extension: str | None = None,
+        max_files: int | None = None,
+    ) -> list[str]:
+        """List object keys under ``prefix`` in ``bucket``.
 
         Args:
             bucket: Bucket name.
@@ -182,8 +181,9 @@ class S3Client:
 
         Raises:
             Exception: Propagates boto3/client errors after logging.
+
         """
-        self.logger.info(f"Listing files: s3://{bucket}/{prefix}")
+        self.logger.info("Listing files: s3://%s/%s", bucket, prefix)
 
         result = []
         truncated = True
@@ -196,8 +196,8 @@ class S3Client:
 
             try:
                 response = self.client.list_objects_v2(**params)
-            except Exception as e:
-                self.logger.error(f"Failed to list objects: {e}")
+            except Exception:
+                self.logger.exception("Failed to list objects")
                 raise
 
             for obj in response.get("Contents", []):
@@ -211,18 +211,17 @@ class S3Client:
 
                 # Check max files limit
                 if max_files and len(result) >= max_files:
-                    self.logger.info(f"Reached max_files limit ({max_files})")
+                    self.logger.info("Reached max_files limit (%s)", max_files)
                     return result
 
             truncated = response.get("IsTruncated", False)
             token = response.get("NextContinuationToken")
 
-        self.logger.info(f"Found {len(result)} files")
+        self.logger.info("Found %s files", len(result))
         return result
 
     def download(self, bucket: str, key: str) -> bytes:
-        """
-        Download one object body as bytes.
+        """Download one object body as bytes.
 
         Args:
             bucket: Bucket name.
@@ -233,22 +232,22 @@ class S3Client:
 
         Raises:
             Exception: Propagates boto3/client errors after logging.
+
         """
-        self.logger.debug(f"Downloading: s3://{bucket}/{key}")
+        self.logger.debug("Downloading: s3://%s/%s", bucket, key)
 
         try:
             response = self.client.get_object(Bucket=bucket, Key=key)
             data = response["Body"].read()
             data = _decode_http_chunked_if_present(data, self.logger)
-            self.logger.debug(f"Downloaded {len(data)} bytes")
+            self.logger.debug("Downloaded %s bytes", len(data))
             return data
-        except Exception as e:
-            self.logger.error(f"Failed to download: {e}")
+        except Exception:
+            self.logger.exception("Failed to download")
             raise
 
     def download_by_uri(self, s3_uri: str) -> bytes:
-        """
-        Download object bytes from ``s3://bucket/key``.
+        """Download object bytes from ``s3://bucket/key``.
 
         Args:
             s3_uri: Valid S3 URI.
@@ -259,15 +258,15 @@ class S3Client:
         Raises:
             ValueError: If ``s3_uri`` is invalid (via ``parse_s3_uri``).
             Exception: Propagates boto3/client errors from ``download``.
+
         """
         bucket, key = S3Client.parse_s3_uri(s3_uri)
         return self.download(bucket, key)
 
     def upload(
-        self, data: bytes, bucket: str, key: str, content_type: Optional[str] = None
+        self, data: bytes, bucket: str, key: str, content_type: str | None = None
     ) -> None:
-        """
-        Upload bytes to ``s3://bucket/key`` via ``put_object``.
+        """Upload bytes to ``s3://bucket/key`` via ``put_object``.
 
         Args:
             data: Object body.
@@ -277,8 +276,9 @@ class S3Client:
 
         Raises:
             Exception: Propagates boto3/client errors after logging.
+
         """
-        self.logger.debug(f"Uploading {len(data)} bytes to s3://{bucket}/{key}")
+        self.logger.debug("Uploading %s bytes to s3://%s/%s", len(data), bucket, key)
 
         try:
             params = {"Bucket": bucket, "Key": key, "Body": data}
@@ -287,13 +287,12 @@ class S3Client:
 
             self.client.put_object(**params)
             self.logger.debug("Upload completed")
-        except Exception as e:
-            self.logger.error(f"Failed to upload: {e}")
+        except Exception:
+            self.logger.exception("Failed to upload")
             raise
 
     def exists(self, bucket: str, key: str) -> bool:
-        """
-        Return whether an object exists (``head_object`` succeeds).
+        """Return whether an object exists (``head_object`` succeeds).
 
         Args:
             bucket: Bucket name.
@@ -301,6 +300,7 @@ class S3Client:
 
         Returns:
             ``True`` if the object exists; ``False`` on any ``head_object`` error.
+
         """
         try:
             self.client.head_object(Bucket=bucket, Key=key)

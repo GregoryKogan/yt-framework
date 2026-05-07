@@ -9,9 +9,10 @@ Example:
     >>> client = create_yt_client(mode="dev", pipeline_dir=Path("."))
     >>> client.write_table("//tmp/test", [{"id": 1, "value": "hello"}])
     >>> client.write_table("//tmp/test", [{"id": 2}], append=True)
+
 """
 
-from .factory import create_yt_client
 from .client_base import BaseYTClient
+from .factory import create_yt_client
 
-__all__ = ["create_yt_client", "BaseYTClient"]
+__all__ = ["BaseYTClient", "create_yt_client"]

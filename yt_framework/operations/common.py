@@ -2,16 +2,17 @@
 
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Any, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from omegaconf import DictConfig
 
-from yt_framework.yt.client_base import OperationResources
 from yt_framework.utils.env import load_secrets
+from yt_framework.yt.client_base import OperationResources
+
 from .tokenizer_artifact import (
     init_tokenizer_artifact_directory,
-    resolve_tokenizer_artifact_name,
     resolve_tokenizer_archive_name,
+    resolve_tokenizer_artifact_name,
 )
 
 if TYPE_CHECKING:
@@ -24,8 +25,7 @@ def _get_config_value_with_default(
     default: Any,
     logger: logging.Logger,
 ) -> Any:
-    """
-    Get config value with default, logging when default is used.
+    """Get config value with default, logging when default is used.
 
     Args:
         config: OmegaConf DictConfig object
@@ -35,32 +35,32 @@ def _get_config_value_with_default(
 
     Returns:
         Config value if present and not None, otherwise default
+
     """
     try:
         # Check if key exists in config
         if key not in config:
-            logger.info(f"  Using default {key}={default} (not specified in config)")
+            logger.info("  Using default %s=%s (not specified in config)", key, default)
             return default
 
         value = config.get(key)
         # If value is None, use default and log
         if value is None:
-            logger.info(f"  Using default {key}={default} (value is None in config)")
+            logger.info("  Using default %s=%s (value is None in config)", key, default)
             return default
 
         return value
     except Exception:
         # Key doesn't exist or access failed, use default
-        logger.info(f"  Using default {key}={default} (not specified in config)")
+        logger.info("  Using default %s=%s (not specified in config)", key, default)
         return default
 
 
 def build_environment(
     configs_dir: Path,
     logger: logging.Logger,
-) -> Dict[str, str]:
-    """
-    Build environment variables for map and vanilla operations.
+) -> dict[str, str]:
+    """Build environment variables for map and vanilla operations.
 
     Jobs read configuration from config.yaml, so only secrets are passed
     via environment variables.
@@ -71,6 +71,7 @@ def build_environment(
 
     Returns:
         Dictionary of secret environment variables
+
     """
     # Get all secrets loaded from secrets.env file
     logger.debug("Building environment with secrets...")
@@ -78,19 +79,18 @@ def build_environment(
 
     # Log secret keys (mask values)
     for key, value in env.items():
-        logger.debug(f"  {key}: {'*' * min(len(value), 10)}")
+        logger.debug("  %s: %s", key, "*" * min(len(value), 10))
 
-    logger.debug(f"Environment ready with {len(env)} secrets")
+    logger.debug("Environment ready with %s secrets", len(env))
     return env
 
 
 def prepare_docker_auth(
-    docker_image: Optional[str],
-    docker_username: Optional[str],
-    docker_password: Optional[str],
-) -> Optional[Dict[str, str]]:
-    """
-    Prepare Docker authentication dictionary.
+    docker_image: str | None,
+    docker_username: str | None,
+    docker_password: str | None,
+) -> dict[str, str] | None:
+    """Prepare Docker authentication dictionary.
 
     Args:
         docker_image: Optional Docker image name
@@ -99,6 +99,7 @@ def prepare_docker_auth(
 
     Returns:
         Docker authentication dict if all credentials provided, None otherwise
+
     """
     if docker_image and docker_username and docker_password:
         return {"username": docker_username, "password": docker_password}
@@ -139,9 +140,9 @@ def extract_operation_resources(
     )
 
 
-def extract_secure_env_client_kwargs(operation_config: DictConfig) -> Dict[str, Any]:
+def extract_secure_env_client_kwargs(operation_config: DictConfig) -> dict[str, Any]:
     """Options for ``YTProdClient`` secure vault / public env partitioning."""
-    out: Dict[str, Any] = {}
+    out: dict[str, Any] = {}
     epk = operation_config.get("environment_public_keys")
     if epk is not None:
         out["environment_public_keys"] = [str(x) for x in list(epk)]
@@ -152,17 +153,17 @@ def extract_secure_env_client_kwargs(operation_config: DictConfig) -> Dict[str, 
 
 def collect_passthrough_kwargs(
     operation_config: DictConfig,
-    reserved_keys: Set[str],
-) -> Dict[str, Any]:
-    """
-    Collect top-level config values to forward to YT client.
+    reserved_keys: set[str],
+) -> dict[str, Any]:
+    """Collect top-level config values to forward to YT client.
 
     OmegaConf dict nodes are resolved to plain Python containers.
     """
-    from omegaconf import DictConfig as OmegaDictConfig, OmegaConf
+    from omegaconf import DictConfig as OmegaDictConfig
+    from omegaconf import OmegaConf
 
-    out: Dict[str, Any] = {}
-    for k in operation_config.keys():
+    out: dict[str, Any] = {}
+    for k in operation_config:
         if k in reserved_keys:
             continue
         v = operation_config.get(k)
@@ -181,10 +182,8 @@ def build_operation_environment(
     logger: logging.Logger,
     include_stage_name: bool = True,
     include_tokenizer_artifact: bool = True,
-) -> Dict[str, str]:
-    """
-    Build operation environment from secrets + explicit env config + optional helpers.
-    """
+) -> dict[str, str]:
+    """Build operation environment from secrets + explicit env config + optional helpers."""
     env = build_environment(configs_dir=context.deps.configs_dir, logger=logger)
     for k, v in (operation_config.get("env") or {}).items():
         if v is not None:
@@ -218,8 +217,8 @@ def build_operation_environment(
 
 def extract_docker_auth_from_operation_config(
     operation_config: DictConfig,
-    env: Dict[str, str],
-) -> Optional[Dict[str, str]]:
+    env: dict[str, str],
+) -> dict[str, str] | None:
     """Resolve docker image from config and return auth payload if credentials exist."""
     docker_image = (operation_config.get("resources") or {}).get(
         "docker_image"

@@ -1,6 +1,6 @@
 """JSON stdin/stdout mapper helpers (`StreamMapper`, `BatchMapper`, row readers)."""
 
+from .mappers import BatchMapper, StreamMapper
 from .utils import read_input_rows
-from .mappers import StreamMapper, BatchMapper
 
-__all__ = ["read_input_rows", "StreamMapper", "BatchMapper"]
+__all__ = ["BatchMapper", "StreamMapper", "read_input_rows"]

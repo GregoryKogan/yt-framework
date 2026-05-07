@@ -32,8 +32,7 @@ def test_yql_to_sql_substitutes_loaded_yt_paths() -> None:
     sim = DuckDBSimulator(Path("/tmp"), logger)
     sim.loaded_tables["//cluster/input"] = "yt_input"
     sql, output = sim.yql_to_sql(
-        "INSERT INTO `//cluster/output` WITH TRUNCATE "
-        "SELECT * FROM `//cluster/input`;"
+        "INSERT INTO `//cluster/output` WITH TRUNCATE SELECT * FROM `//cluster/input`;"
     )
     assert output == "//cluster/output"
     assert "yt_input" in sql
@@ -61,9 +60,8 @@ def test_load_table_registers_dummy_table_when_jsonl_missing(tmp_path: Path) -> 
     sim = DuckDBSimulator(tmp_path, _null_logger("tests.dev_simulator.missing"))
     missing = tmp_path / "nope.jsonl"
     name = sim.load_table("//tmp/my_table", missing)
-    assert (
-        name == "yt_my_table" and sim.loaded_tables["//tmp/my_table"] == "yt_my_table"
-    )
+    assert name == "yt_my_table"
+    assert sim.loaded_tables["//tmp/my_table"] == "yt_my_table"
     sim.close()
 
 
@@ -120,5 +118,5 @@ def test_validated_table_identifier_rejects_non_whitelisted_names(
 ) -> None:
     sim = DuckDBSimulator(tmp_path, _null_logger("tests.dev_simulator.ident"))
     with pytest.raises(ValueError, match="invalid DuckDB table identifier"):
-        sim._validated_table_identifier("yt_; DROP TABLE")  # noqa: SLF001
+        sim._validated_table_identifier("yt_; DROP TABLE")
     sim.close()

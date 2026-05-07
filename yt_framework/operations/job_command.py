@@ -1,5 +1,4 @@
-"""
-TypedJob vs string command detection for YT operations.
+"""TypedJob vs string command detection for YT operations.
 
 Used by dependency building and map-reduce wiring so behavior follows job kind,
 not only operation name.
@@ -27,10 +26,11 @@ def map_reduce_leg_kind(obj: Any) -> LegKind:
         return "typed"
     if isinstance(obj, str):
         return "command"
-    raise TypeError(
+    msg = (
         "map-reduce mapper and reducer must each be a yt.TypedJob instance or a "
         f"command string, got {type(obj).__name__}"
     )
+    raise TypeError(msg)
 
 
 def resolve_aliased_job(
@@ -50,18 +50,18 @@ def resolve_aliased_job(
         and preferred_value is not None
         and legacy_value != preferred_value
     ):
-        raise ValueError(
+        msg = (
             f"Both '{legacy_name}' and '{preferred_name}' are set with different values; "
             "please provide only one"
         )
+        raise ValueError(msg)
     if preferred_value is not None:
         return preferred_value
     return legacy_value
 
 
 def require_consistent_map_reduce_legs(mapper: Any, reducer: Any) -> None:
-    """
-    Mapper and reducer must both use the same wire protocol: both TypedJob or both str.
+    """Mapper and reducer must both use the same wire protocol: both TypedJob or both str.
 
     Mixing TypedJob on one leg and a shell/Python command string on the other is
     unsupported.
@@ -69,7 +69,8 @@ def require_consistent_map_reduce_legs(mapper: Any, reducer: Any) -> None:
     km = map_reduce_leg_kind(mapper)
     kr = map_reduce_leg_kind(reducer)
     if km != kr:
-        raise ValueError(
+        msg = (
             "map-reduce mapper and reducer must use the same job kind: both TypedJob "
             f"instances or both command strings, not mixed. Got mapper={km}, reducer={kr}."
         )
+        raise ValueError(msg)

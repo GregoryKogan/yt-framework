@@ -7,9 +7,9 @@ class JoinTablesStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
         log_header(self.logger, "Joining Tables with YQL")
 
-        self.logger.info(f"Left table (results): {self.config.client.results_table}")
-        self.logger.info(f"Right table (paths): {self.config.client.paths_table}")
-        self.logger.info(f"Output table: {self.config.client.joined_table}")
+        self.logger.info("Left table (results): %s", self.config.client.results_table)
+        self.logger.info("Right table (paths): %s", self.config.client.paths_table)
+        self.logger.info("Output table: %s", self.config.client.joined_table)
 
         self.deps.yt_client.join_tables(
             left_table=self.config.client.results_table,
@@ -26,6 +26,6 @@ class JoinTablesStage(BaseStage):
         )
 
         self.logger.info("Join completed successfully")
-        self.logger.info(f"Results saved to: {self.config.client.joined_table}")
+        self.logger.info("Results saved to: %s", self.config.client.joined_table)
 
         return debug

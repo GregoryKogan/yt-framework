@@ -9,12 +9,12 @@ from pathlib import Path
 from typing import Protocol
 
 from omegaconf import DictConfig
+
 from yt_framework.yt.client_base import BaseYTClient
 
 
 class StageDependencies(Protocol):
-    """
-    Protocol defining what dependencies stages need.
+    """Protocol defining what dependencies stages need.
 
     This is NOT the same as the 'context' parameter in run() methods:
     - StageDependencies: Injected services/config (yt_client, config, etc.)
@@ -33,6 +33,7 @@ class StageDependencies(Protocol):
         Returns:
             BaseYTClient: YT client instance (either YTDevClient or YTProdClient)
                 for performing table operations, running map/vanilla jobs, etc.
+
         """
         ...
 
@@ -43,6 +44,7 @@ class StageDependencies(Protocol):
         Returns:
             DictConfig: OmegaConf configuration object containing pipeline-wide
                 settings like mode, build_folder, and other pipeline parameters.
+
         """
         ...
 
@@ -53,14 +55,14 @@ class StageDependencies(Protocol):
         Returns:
             Path: Absolute path to the configs directory where secrets.env
                 and other configuration files are stored.
+
         """
         ...
 
 
 @dataclass
 class PipelineStageDependencies:
-    """
-    Default implementation of StageDependencies.
+    """Default implementation of StageDependencies.
 
     Used by BasePipeline to inject dependencies into stages.
     This class is instantiated by the pipeline and passed to each stage.
@@ -71,6 +73,7 @@ class PipelineStageDependencies:
         pipeline_config: Pipeline-level configuration containing mode, build_folder,
             and other pipeline-wide settings.
         configs_dir: Path to directory containing secrets.env and configuration files.
+
     """
 
     yt_client: BaseYTClient

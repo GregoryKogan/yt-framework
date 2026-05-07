@@ -1,20 +1,21 @@
 """Driver helpers to package `src/vanilla.py` and submit YT vanilla operations."""
 
 import logging
-from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Optional, Any, TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from omegaconf import DictConfig, OmegaConf
 
 from yt_framework.utils.logging import log_header, log_success
+
 from .common import (
-    extract_secure_env_client_kwargs,
-    extract_operation_resources,
     build_operation_environment,
+    collect_passthrough_kwargs,
     extract_docker_auth_from_operation_config,
     extract_max_failed_jobs,
-    collect_passthrough_kwargs,
+    extract_operation_resources,
+    extract_secure_env_client_kwargs,
 )
 from .dependency_strategy import TarArchiveDependencyBuilder
 
@@ -32,13 +33,14 @@ class VanillaOperationData:
         environment: Environment variables dictionary (secrets only).
         docker_auth: Optional Docker authentication dictionary for private registries.
         command: Optional command to execute (used in tar archive mode).
+
     """
 
     script_path: str
-    dependencies: List[Tuple[str, str]]
-    environment: Dict[str, str]
-    docker_auth: Optional[Dict[str, str]]
-    command: Optional[str] = None
+    dependencies: list[tuple[str, str]]
+    environment: dict[str, str]
+    docker_auth: dict[str, str] | None
+    command: str | None = None
 
 
 def _prepare_vanilla_operation(
@@ -48,8 +50,7 @@ def _prepare_vanilla_operation(
     stage_dir: Path,
     logger: logging.Logger,
 ) -> VanillaOperationData:
-    """
-    Build tar-archive dependencies for a vanilla operation.
+    """Build tar-archive dependencies for a vanilla operation.
 
     Environment and docker_auth are intentionally left empty here; the caller
     builds them via ``build_operation_environment`` and sets them on the returned
@@ -64,6 +65,7 @@ def _prepare_vanilla_operation(
 
     Returns:
         VanillaOperationData with dependencies and command populated.
+
     """
     builder = TarArchiveDependencyBuilder()
     dep = builder.build_dependencies(
@@ -88,10 +90,9 @@ def _prepare_vanilla_operation(
 def run_vanilla(
     context: "StageContext",
     operation_config: DictConfig,
-    job: Optional[str] = None,
+    job: str | None = None,
 ) -> bool:
-    """
-    Run YT vanilla operation and wait for completion.
+    """Run YT vanilla operation and wait for completion.
 
     All job parameters (pool, memory, CPU, Docker image, etc.) are automatically
     extracted from operation_config. Operation config should be passed from
@@ -105,6 +106,7 @@ def run_vanilla(
 
     Returns:
         True if successful, False otherwise
+
     """
     logger = context.logger
     # Use stage name as task name
@@ -135,11 +137,12 @@ def run_vanilla(
         "Vanilla Operation",
         f"Task: {task_name} | Script: {vanilla_operation_data.script_path}",
     )
-    logger.debug(f"Dependencies: {len(vanilla_operation_data.dependencies)} files")
+    logger.debug("Dependencies: %s files", len(vanilla_operation_data.dependencies))
 
     # Command is always provided by the dependency builder (tar archive mode)
     if not vanilla_operation_data.command:
-        raise ValueError("Command not provided by dependency builder")
+        msg = "Command not provided by dependency builder"
+        raise ValueError(msg)
 
     command = job if job is not None else vanilla_operation_data.command
 
@@ -151,7 +154,7 @@ def run_vanilla(
     od = operation_config.get("operation_description")
     if od:
         if isinstance(od, str):
-            logger.info(f"Operation label: {od}")
+            logger.info("Operation label: %s", od)
             vanilla_kwargs["title"] = od
         else:
             vanilla_kwargs["operation_description"] = OmegaConf.to_container(
@@ -192,7 +195,7 @@ def run_vanilla(
         logger.error("Failed to submit vanilla operation: returned None")
         return False
 
-    logger.debug(f"Operation submitted: {operation.id}")
+    logger.debug("Operation submitted: %s", operation.id)
 
     # Wait for completion
     success = context.deps.yt_client.wait_for_operation(operation)

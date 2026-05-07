@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from integration.yt_cluster._job_uploads import upload_job_dep

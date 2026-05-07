@@ -1,15 +1,14 @@
-"""
-Base YT Client
+"""Base YT Client.
 ==============
 
 Abstract base class for YT client implementations.
 """
 
+import logging
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, Union, Tuple, Literal, TYPE_CHECKING
 from dataclasses import dataclass
 from pathlib import Path
-import logging
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from yt.wrapper import Operation  # pyright: ignore[reportMissingImports]
 
@@ -38,39 +37,37 @@ class OperationResources:
     Raises:
         ValueError: If memory_gb, cpu_limit, or job_count are not positive integers,
                    or if gpu_limit is negative.
+
     """
 
     pool: str = "default"
-    pool_tree: Optional[str] = None
-    docker_image: Optional[str] = None
+    pool_tree: str | None = None
+    docker_image: str | None = None
     memory_gb: int = 4
     cpu_limit: int = 2
     gpu_limit: int = 0
     job_count: int = 1
-    user_slots: Optional[int] = None
+    user_slots: int | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.memory_gb is None or self.memory_gb <= 0:
-            raise ValueError(
-                f"memory_gb must be set to a positive integer, got {self.memory_gb}"
-            )
+            msg = f"memory_gb must be set to a positive integer, got {self.memory_gb}"
+            raise ValueError(msg)
         if self.cpu_limit is None or self.cpu_limit <= 0:
-            raise ValueError(
-                f"cpu_limit must be set to a positive integer, got {self.cpu_limit}"
-            )
+            msg = f"cpu_limit must be set to a positive integer, got {self.cpu_limit}"
+            raise ValueError(msg)
         if self.gpu_limit is None or self.gpu_limit < 0:
-            raise ValueError(
+            msg = (
                 f"gpu_limit must be set to a non-negative integer, got {self.gpu_limit}"
             )
+            raise ValueError(msg)
         if self.job_count is None or self.job_count <= 0:
-            raise ValueError(
-                f"job_count must be set to a positive integer, got {self.job_count}"
-            )
+            msg = f"job_count must be set to a positive integer, got {self.job_count}"
+            raise ValueError(msg)
 
 
 class BaseYTClient(ABC):
-    """
-    Abstract base class for YT client implementations.
+    """Abstract base class for YT client implementations.
 
     Defines the interface that both production and development clients must implement.
     """
@@ -78,14 +75,14 @@ class BaseYTClient(ABC):
     def __init__(
         self,
         logger: logging.Logger,
-        pipeline_dir: Optional[Path] = None,
+        pipeline_dir: Path | None = None,
     ) -> None:
-        """
-        Initialize base YT client.
+        """Initialize base YT client.
 
         Args:
             logger: Logger instance
             pipeline_dir: Optional pipeline directory (used in dev mode)
+
         """
         self.logger = logger
         self.pipeline_dir = pipeline_dir
@@ -98,38 +95,35 @@ class BaseYTClient(ABC):
             "table", "file", "map_node", "list_node", "document"
         ] = "map_node",
     ) -> None:
-        """
-        Create a path in YT.
+        """Create a path in YT.
 
         Args:
             path: YT path to create
             node_type: Type of node to create (default: "map_node")
+
         """
-        pass
 
     @abstractmethod
     def exists(self, path: str) -> bool:
-        """
-        Check if a path exists in YT.
+        """Check if a path exists in YT.
 
         Args:
             path: YT path to check
 
         Returns:
             True if path exists, False otherwise
+
         """
-        pass
 
     @abstractmethod
     def write_table(
         self,
         table_path: str,
-        rows: List[Dict[str, Any]],
+        rows: list[dict[str, Any]],
         append: bool = False,
         replication_factor: int = 1,
     ) -> None:
-        """
-        Write rows to a YT table.
+        """Write rows to a YT table.
 
         Args:
             table_path: YT table path
@@ -139,38 +133,35 @@ class BaseYTClient(ABC):
 
         Note:
             Subclasses may accept additional parameters (e.g., make_parents in YTProdClient).
+
         """
-        pass
 
     @abstractmethod
-    def read_table(self, table_path: str) -> List[Dict[str, Any]]:
-        """
-        Read rows from a YT table.
+    def read_table(self, table_path: str) -> list[dict[str, Any]]:
+        """Read rows from a YT table.
 
         Args:
             table_path: YT table path
 
         Returns:
             List of dictionaries representing table rows
+
         """
-        pass
 
     @abstractmethod
     def row_count(self, table_path: str) -> int:
-        """
-        Get number of rows in a YT table.
+        """Get number of rows in a YT table.
 
         Args:
             table_path: YT table path
 
         Returns:
             Number of rows in the table
-        """
-        pass
 
-    def _get_table_columns(self, table_path: str) -> List[str]:
         """
-        Get column names from a table by reading one row.
+
+    def _get_table_columns(self, table_path: str) -> list[str]:
+        """Get column names from a table by reading one row.
 
         This is a helper method used internally by convenience methods.
         Subclasses should implement this method.
@@ -183,11 +174,13 @@ class BaseYTClient(ABC):
 
         Raises:
             ValueError: If table is empty or cannot be read
+
         """
         # Default implementation - subclasses should override
         rows = self.read_table(table_path)
         if not rows:
-            raise ValueError(f"Table {table_path} is empty, cannot determine columns")
+            msg = f"Table {table_path} is empty, cannot determine columns"
+            raise ValueError(msg)
         # Get column names from first row
         columns = list(rows[0].keys())
         # Filter out internal YQL columns like _other, _yql_column_*
@@ -202,10 +195,9 @@ class BaseYTClient(ABC):
         self,
         query: str,
         pool: str = "default",
-        max_row_weight: Optional[str] = None,
+        max_row_weight: str | None = None,
     ) -> None:
-        """
-        Execute a YQL query on YT cluster.
+        """Execute a YQL query on YT cluster.
 
         Args:
             query: YQL query string to execute
@@ -214,8 +206,8 @@ class BaseYTClient(ABC):
 
         Raises:
             Exception: If query execution fails
+
         """
-        pass
 
     # Convenience methods for common YQL operations
 
@@ -225,14 +217,13 @@ class BaseYTClient(ABC):
         left_table: str,
         right_table: str,
         output_table: str,
-        on: Union[str, List[str], Dict[str, str]],
+        on: str | list[str] | dict[str, str],
         how: Literal["inner", "left", "right", "full"] = "left",
-        select_columns: Optional[List[str]] = None,
+        select_columns: list[str] | None = None,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Join two tables using YQL.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Join two tables using YQL.
 
         Args:
             left_table: Path to left table
@@ -249,8 +240,8 @@ class BaseYTClient(ABC):
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
-        pass
 
     @abstractmethod
     def filter_table(
@@ -259,10 +250,9 @@ class BaseYTClient(ABC):
         output_table: str,
         condition: str,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Filter table rows using WHERE condition.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Filter table rows using WHERE condition.
 
         Args:
             input_table: Path to input table
@@ -273,20 +263,19 @@ class BaseYTClient(ABC):
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
-        pass
 
     @abstractmethod
     def select_columns(
         self,
         input_table: str,
         output_table: str,
-        columns: List[str],
+        columns: list[str],
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Select specific columns from a table.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Select specific columns from a table.
 
         Args:
             input_table: Path to input table
@@ -297,21 +286,20 @@ class BaseYTClient(ABC):
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
-        pass
 
     @abstractmethod
     def group_by_aggregate(
         self,
         input_table: str,
         output_table: str,
-        group_by: Union[str, List[str]],
-        aggregations: Dict[str, Union[str, Tuple[str, str]]],
+        group_by: str | list[str],
+        aggregations: dict[str, str | tuple[str, str]],
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Group by columns and compute aggregations.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Group by columns and compute aggregations.
 
         Args:
             input_table: Path to input table
@@ -324,19 +312,18 @@ class BaseYTClient(ABC):
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
-        pass
 
     @abstractmethod
     def union_tables(
         self,
-        tables: List[str],
+        tables: list[str],
         output_table: str,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Union multiple tables.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Union multiple tables.
 
         Args:
             tables: List of table paths to union
@@ -346,20 +333,19 @@ class BaseYTClient(ABC):
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
-        pass
 
     @abstractmethod
     def distinct(
         self,
         input_table: str,
         output_table: str,
-        columns: Optional[List[str]] = None,
+        columns: list[str] | None = None,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Get distinct rows from a table.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Get distinct rows from a table.
 
         Args:
             input_table: Path to input table
@@ -370,21 +356,20 @@ class BaseYTClient(ABC):
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
-        pass
 
     @abstractmethod
     def sort_table(
         self,
         input_table: str,
         output_table: str,
-        order_by: Union[str, List[str]],
+        order_by: str | list[str],
         ascending: bool = True,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Sort table by columns.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Sort table by columns.
 
         WARNING: Sorting large tables can be expensive. Use with caution.
 
@@ -398,8 +383,8 @@ class BaseYTClient(ABC):
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
-        pass
 
     @abstractmethod
     def limit_table(
@@ -408,10 +393,9 @@ class BaseYTClient(ABC):
         output_table: str,
         limit: int,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Limit number of rows from a table.
+        max_row_weight: str | None = None,
+    ) -> str | None:
+        """Limit number of rows from a table.
 
         Args:
             input_table: Path to input table
@@ -422,29 +406,27 @@ class BaseYTClient(ABC):
 
         Returns:
             YQL query string if dry_run=True, None otherwise
+
         """
-        pass
 
     @abstractmethod
     def upload_file(
         self, local_path: Path, yt_path: str, create_parent_dir: bool = False
     ) -> None:
-        """
-        Upload a file to YT.
+        """Upload a file to YT.
 
         Args:
             local_path: Local file path to upload
             yt_path: YT destination path
             create_parent_dir: If True, create parent directory if it doesn't exist (default: False)
+
         """
-        pass
 
     @abstractmethod
     def upload_directory(
         self, local_dir: Path, yt_dir: str, pattern: str = "*"
-    ) -> List[str]:
-        """
-        Upload a directory to YT.
+    ) -> list[str]:
+        """Upload a directory to YT.
 
         Recursively uploads all files from a local directory to a YT directory,
         respecting .ytignore patterns if present.
@@ -456,8 +438,8 @@ class BaseYTClient(ABC):
 
         Returns:
             List of uploaded YT file paths
+
         """
-        pass
 
     @abstractmethod
     def run_map(
@@ -465,18 +447,17 @@ class BaseYTClient(ABC):
         command: Any,
         input_table: str,
         output_table: str,
-        files: List[Tuple[str, str]],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
+        env: dict[str, str],
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         job: Any = None,
         append: bool = False,
         **kwargs: Any,
     ) -> Operation:
-        """
-        Run a map operation on YT.
+        """Run a map operation on YT.
 
         Args:
             command: Legacy mapper job argument (TypedJob instance or command string).
@@ -491,8 +472,8 @@ class BaseYTClient(ABC):
             job: Preferred mapper job argument (TypedJob instance or command string).
             append: If True, append mapper output to an existing output table.
             **kwargs: Extra options forwarded to the underlying YT client.
+
         """
-        pass
 
     @abstractmethod
     def run_map_reduce(
@@ -501,20 +482,19 @@ class BaseYTClient(ABC):
         reducer: Any,
         input_table: str,
         output_table: str,
-        reduce_by: List[str],
-        files: List[Tuple[str, str]],
+        reduce_by: list[str],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
-        sort_by: Optional[List[str]] = None,
+        env: dict[str, str],
+        sort_by: list[str] | None = None,
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         map_job: Any = None,
         reduce_job: Any = None,
         **kwargs: Any,
     ) -> Operation:
-        """
-        Run a map-reduce operation on YT.
+        """Run a map-reduce operation on YT.
 
         Args:
             mapper: Mapper job (TypedJob instance or command string).
@@ -532,8 +512,8 @@ class BaseYTClient(ABC):
             map_job: Preferred mapper job alias (TypedJob instance or command string).
             reduce_job: Preferred reducer job alias (TypedJob instance or command string).
             **kwargs: Extra options applied to the spec builder where supported.
+
         """
-        pass
 
     @abstractmethod
     def run_reduce(
@@ -541,18 +521,17 @@ class BaseYTClient(ABC):
         reducer: Any,
         input_table: str,
         output_table: str,
-        reduce_by: List[str],
-        files: List[Tuple[str, str]],
+        reduce_by: list[str],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
+        env: dict[str, str],
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         job: Any = None,
         **kwargs: Any,
     ) -> Operation:
-        """
-        Run a reduce-only operation on YT.
+        """Run a reduce-only operation on YT.
 
         Args:
             reducer: Reducer job (TypedJob instance or command string).
@@ -567,20 +546,19 @@ class BaseYTClient(ABC):
             docker_auth: Optional Docker auth.
             job: Preferred reducer job alias (TypedJob instance or command string).
             **kwargs: Extra options applied to the spec builder where supported.
+
         """
-        pass
 
     @abstractmethod
     def run_sort(
         self,
         table_path: str,
-        sort_by: List[str],
-        pool: Optional[str] = None,
-        pool_tree: Optional[str] = None,
+        sort_by: list[str],
+        pool: str | None = None,
+        pool_tree: str | None = None,
         **kwargs: Any,
     ) -> None:
-        """
-        Sort a table in place by the given columns.
+        """Sort a table in place by the given columns.
 
         Args:
             table_path: Table to sort.
@@ -588,21 +566,20 @@ class BaseYTClient(ABC):
             pool: Scheduler pool to run in.
             pool_tree: Pool tree to run in.
             **kwargs: Extra options forwarded to the underlying sort call.
+
         """
-        pass
 
     @abstractmethod
     def run_vanilla(
         self,
         command: Any,
-        files: List[Tuple[str, str]],
-        env: Dict[str, str],
+        files: list[tuple[str, str]],
+        env: dict[str, str],
         task_name: str,
         job: Any = None,
         **kwargs,
     ) -> Operation:
-        """
-        Run a vanilla operation on YT.
+        """Run a vanilla operation on YT.
 
         Args:
             command: Legacy vanilla command argument (e.g., "python3 vanilla.py")
@@ -618,18 +595,18 @@ class BaseYTClient(ABC):
 
         Returns:
             Operation object
+
         """
-        pass
 
     def wait_for_operation(self, operation: Operation) -> bool:
-        """
-        Wait for operation to complete.
+        """Wait for operation to complete.
 
         Args:
             operation: Operation to wait for
 
         Returns:
             True if successful, False otherwise
+
         """
         self.logger.info("Waiting for operation to complete...")
 
@@ -640,13 +617,12 @@ class BaseYTClient(ABC):
             if state == "completed":
                 self.logger.info("Operation completed successfully")
                 return True
-            else:
-                self.logger.error(f"Operation {state}")
-                self._log_operation_error(operation)
-                return False
+            self.logger.error("Operation %s", state)
+            self._log_operation_error(operation)
+            return False
 
         except Exception as e:
-            self.logger.error("Operation failed")
+            self.logger.exception("Operation failed")
             self._log_error_from_exception(e)
             return False
 
@@ -655,7 +631,7 @@ class BaseYTClient(ABC):
         try:
             error = operation.get_error()
             if error:
-                self.logger.error(f"Error: {error}")
+                self.logger.error("Error: %s", error)
         except Exception:
             pass
 
@@ -663,15 +639,11 @@ class BaseYTClient(ABC):
         """Extract and log error from exception."""
         try:
             if (
-                hasattr(exception, "attributes")
-                and "stderrs"
-                in exception.attributes  # pyright: ignore[reportAttributeAccessIssue]
+                hasattr(exception, "attributes") and "stderrs" in exception.attributes  # pyright: ignore[reportAttributeAccessIssue]
             ):
-                stderrs = (
-                    exception.attributes[  # pyright: ignore[reportAttributeAccessIssue]
-                        "stderrs"
-                    ]
-                )
+                stderrs = exception.attributes[  # pyright: ignore[reportAttributeAccessIssue]
+                    "stderrs"
+                ]
                 if stderrs and len(stderrs) > 0:
                     stderr = (
                         stderrs[0]
@@ -683,6 +655,6 @@ class BaseYTClient(ABC):
                         self.logger.error("Job stderr:")
                         for line in stderr.replace("\\n", "\n").split("\n"):
                             if line.strip():
-                                self.logger.error(f"  {line}")
+                                self.logger.error("  %s", line)
         except Exception:
-            self.logger.error(f"Error: {str(exception)}")
+            self.logger.exception("Error: %s", exception)
