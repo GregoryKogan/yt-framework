@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 import torch.multiprocessing as mp
@@ -44,11 +45,11 @@ def get_cached_model(model_name: str = "yolov8n-seg.pt"):
         checkpoint_file = os.environ.get("CHECKPOINT_FILE", model_name)
 
         # Check if file exists (mounted files are in current directory)
-        if not os.path.exists(checkpoint_file):
+        if not Path(checkpoint_file).exists():
             msg = (
                 f"Checkpoint file not found: {checkpoint_file}\n"
                 f"Current directory: {os.getcwd()}\n"
-                f"Files in directory: {os.listdir('.')}\n"
+                f"Files in directory: {[p.name for p in Path().iterdir()]}\n"
                 f"Please ensure checkpoint is mounted as a file in the job."
             )
             raise FileNotFoundError(msg)
@@ -63,8 +64,6 @@ def get_cached_model(model_name: str = "yolov8n-seg.pt"):
         # Move model to GPU if available
         if torch.cuda.is_available():
             model.to(device)
-        else:
-            pass
 
         _MODEL_CACHE[model_name] = model
 
@@ -133,8 +132,6 @@ def process_single_video(
 
     # Initialize S3 clients
     # Read secrets from environment (passed from pipeline, not loaded into global env)
-    import os
-
     secrets = {
         "S3_ENDPOINT": os.environ.get("S3_ENDPOINT", ""),
         "S3_DOWNLOAD_ACCESS_KEY": os.environ.get("S3_DOWNLOAD_ACCESS_KEY", ""),
@@ -156,9 +153,7 @@ def process_single_video(
         frame_count = get_video_frame_count(video_bytes)
 
         # Base name for output files
-        base_name = os.path.join(
-            output_prefix, os.path.splitext(os.path.basename(path))[0]
-        )
+        base_name = f"{output_prefix.rstrip('/')}/{Path(path).stem}"
 
         # Extract and process FIRST frame
         first_frame = extract_frame(video_bytes, 0, img_format)

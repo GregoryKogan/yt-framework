@@ -359,9 +359,9 @@ def _copy_stage_to_build_dir(
                     shutil.copy2(config_path, target_config)
                     file_count += 1
                     logger.debug("  Copied config: %s/config.yaml", stage_name)
-            except Exception:
-                # If config parsing fails, skip it
-                pass
+            except Exception as exc:
+                # If config parsing fails, skip this stage config.
+                logger.debug("Skipping invalid config %s: %s", config_path, exc)
         else:
             logger.debug(
                 "  Ignoring config: %s/config.yaml (matched .ytignore)", stage_name

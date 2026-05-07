@@ -5,9 +5,9 @@ Provides structured human-readable logging to stderr for the ptrack pipeline.
 All logs are formatted as readable text, written to stderr.
 """
 
+import datetime
 import logging
 import sys
-from datetime import datetime
 from typing import Any
 
 
@@ -25,7 +25,9 @@ class TextFormatter(logging.Formatter):
 
         """
         # Format timestamp
-        timestamp = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.datetime.fromtimestamp(
+            record.created, tz=datetime.UTC
+        ).strftime("%Y-%m-%d %H:%M:%S")
 
         # Format level
         level = record.levelname

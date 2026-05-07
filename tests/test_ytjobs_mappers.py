@@ -159,7 +159,9 @@ def test_batch_mapper_map_flushes_trailing_partial_batch_after_full_batches(
 def test_batch_mapper_process_in_batches_raises_when_batch_size_not_set() -> None:
     mapper = BatchMapper(None)
     with pytest.raises(ValueError, match="Batch size must be set"):
-        mapper._process_in_batches(lambda _rows, **_k: iter(()), True)
+        mapper._process_in_batches(
+            lambda _rows, **_k: iter(()), redirect_processing_output=True
+        )
 
 
 def test_batch_mapper_map_logs_batch_processing_failed_for_all_rows_mode(

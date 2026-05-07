@@ -259,7 +259,7 @@ def test_run_raises_when_stage_registry_not_set(tmp_path: Path) -> None:
 
 def test_run_raises_for_unknown_enabled_stage_name(tmp_path: Path) -> None:
     _touch_configs_secrets(tmp_path)
-    StageCls = _write_stage_module(tmp_path, "only_one")
+    stage_cls = _write_stage_module(tmp_path, "only_one")
     cfg = OmegaConf.create(
         {
             "pipeline": {"mode": "dev"},
@@ -269,7 +269,7 @@ def test_run_raises_for_unknown_enabled_stage_name(tmp_path: Path) -> None:
 
     class _P(BasePipeline):
         def setup(self) -> None:
-            self.set_stage_registry(StageRegistry().add_stage(StageCls))
+            self.set_stage_registry(StageRegistry().add_stage(stage_cls))
 
     p = _P(cfg, tmp_path)
     with pytest.raises(ValueError, match="Unknown stage"):
@@ -282,7 +282,7 @@ def test_run_executes_registered_stage_in_order(
     tmp_path: Path,
 ) -> None:
     _touch_configs_secrets(tmp_path)
-    StageCls = _write_stage_module(tmp_path, "step_a")
+    stage_cls = _write_stage_module(tmp_path, "step_a")
     cfg = OmegaConf.create(
         {
             "pipeline": {"mode": "dev"},
@@ -292,7 +292,7 @@ def test_run_executes_registered_stage_in_order(
 
     class _P(BasePipeline):
         def setup(self) -> None:
-            self.set_stage_registry(StageRegistry().add_stage(StageCls))
+            self.set_stage_registry(StageRegistry().add_stage(stage_cls))
 
     p = _P(cfg, tmp_path)
     p.run()
