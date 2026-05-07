@@ -69,7 +69,7 @@ Contributions come in many forms:
 
    If `which pip` points outside the Conda env (for example Homebrew), use `python -m pip install -e ".[dev,docs]"` instead. The same applies to one-off commands with `conda run -n yt-framework -- python -m pip ...`.
 
-   This installs runtime dependencies plus `black`, `pytest`, `pytest-cov`, `pre-commit`, and the Sphinx stack needed for `make -C docs html`. You do not need a separate `pip install -e ".[docs]"` step.
+   This installs runtime dependencies plus `ruff`, `pytest`, `pytest-cov`, `pre-commit`, and the Sphinx stack needed for `make -C docs html`. You do not need a separate `pip install -e ".[docs]"` step.
 
    **Without Conda:** use a Python 3.11+ virtual environment, then `pip install -e ".[dev,docs]"` (or `pip install -e .` and `pip install -e ".[dev]"` if you will not build docs locally).
 
@@ -82,11 +82,14 @@ Contributions come in many forms:
    pre-commit install --hook-type pre-push
    ```
 
-   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Black](https://github.com/psf/black) on staged Python files using [.pre-commit-config.yaml](.pre-commit-config.yaml). On each **push**, the pre-push hook runs the full test suite via `conda run -n yt-framework -- pytest` (requires Conda and the `yt-framework` env on your `PATH`, as when pushing from a normal shell). To skip the hook in an emergency, use `git push --no-verify`. To format or check the whole repository (for example before a large change), run:
+   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Ruff](https://docs.astral.sh/ruff/) (`ruff check --fix` and `ruff format`) on staged Python files via [.pre-commit-config.yaml](.pre-commit-config.yaml). A failing check blocks the commit. On each **push**, the pre-push hook runs the full test suite via `conda run -n yt-framework -- pytest` (requires Conda and the `yt-framework` env on your `PATH`, as when pushing from a normal shell). To skip the hook in an emergency, use `git push --no-verify`. To lint and format the whole repository (for example before a large change), run:
 
    ```bash
-   pre-commit run black --all-files
+   pre-commit run ruff-check --all-files
+   pre-commit run ruff-format --all-files
    ```
+
+   Or directly: `ruff check .` and `ruff format .` (with the dev extra installed).
 
 6. **Set up YT credentials** (for production mode testing):
 
@@ -176,7 +179,7 @@ This helps ensure you haven't broken existing functionality.
 ### Python Style
 
 - Follow **PEP 8** style guidelines
-- Use **Black** for formatting (line length 88; see `[tool.black]` in `pyproject.toml`). With `pre-commit install`, Black runs automatically on staged `.py` files when you commit.
+- Use **Ruff** for formatting and linting (line length 88, Python 3.11; see `[tool.ruff]` in `pyproject.toml`). Lint uses `select = ["ALL"]` with a small documented `ignore` list. With `pre-commit install`, Ruff runs on commit; fix reported issues before committing.
 - Use type hints where appropriate
 
 ### Naming Conventions

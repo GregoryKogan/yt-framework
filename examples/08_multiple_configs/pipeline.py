@@ -1,5 +1,4 @@
-"""
-Multiple Configs Pipeline
+"""Multiple Configs Pipeline.
 ==========================
 
 Demonstrates using multiple configuration files with the same pipeline.

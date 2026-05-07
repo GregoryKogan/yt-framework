@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from yt_framework.yt.factory import create_yt_client
-
 from integration.yt_cluster._cluster_config import secrets_dict_for_yt_client
+from yt_framework.yt.factory import create_yt_client
 
 
 @pytest.mark.yt_cluster
 def test_session_yt_root_exists(cluster_session, yt_client) -> None:
-    assert yt_client.exists(
-        cluster_session.yt_run_root
-    ), "session Cypress root must exist"
+    assert yt_client.exists(cluster_session.yt_run_root), (
+        "session Cypress root must exist"
+    )
 
 
 @pytest.mark.yt_cluster

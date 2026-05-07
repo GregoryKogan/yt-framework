@@ -19,11 +19,12 @@ class ProcessAndValidateStage(BaseStage):
             operation_config=self.config.client.operations.process,
         )
         if not success:
-            raise RuntimeError("Process operation failed")
+            msg = "Process operation failed"
+            raise RuntimeError(msg)
 
         output_table = self.config.client.operations.process.output_table
         row_count = self.deps.yt_client.row_count(output_table)
-        self.logger.info(f"Process operation completed: {row_count} rows processed")
+        self.logger.info("Process operation completed: %s rows processed", row_count)
 
         # =====================================================================
         # Step 2: Validate operation
@@ -35,7 +36,8 @@ class ProcessAndValidateStage(BaseStage):
             operation_config=self.config.client.operations.validate,
         )
         if not success:
-            raise RuntimeError("Validate operation failed")
+            msg = "Validate operation failed"
+            raise RuntimeError(msg)
 
         self.logger.info("Validate operation completed")
 

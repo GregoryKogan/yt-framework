@@ -2,10 +2,10 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
-from unittest.mock import MagicMock
 
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
 
@@ -45,10 +45,10 @@ class _StubBaseClient(BaseYTClient):
     def __init__(
         self,
         logger: logging.Logger,
-        rows: Optional[List[Dict[str, Any]]] = None,
+        rows: list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(logger)
-        self._rows: List[Dict[str, Any]] = (
+        self._rows: list[dict[str, Any]] = (
             rows if rows is not None else [{"visible": 1}]
         )
 
@@ -66,13 +66,13 @@ class _StubBaseClient(BaseYTClient):
     def write_table(
         self,
         table_path: str,
-        rows: List[Dict[str, Any]],
+        rows: list[dict[str, Any]],
         append: bool = False,
         replication_factor: int = 1,
     ) -> None:
         del table_path, rows, append, replication_factor
 
-    def read_table(self, table_path: str) -> List[Dict[str, Any]]:
+    def read_table(self, table_path: str) -> list[dict[str, Any]]:
         del table_path
         return list(self._rows)
 
@@ -84,7 +84,7 @@ class _StubBaseClient(BaseYTClient):
         self,
         query: str,
         pool: str = "default",
-        max_row_weight: Optional[str] = None,
+        max_row_weight: str | None = None,
     ) -> None:
         del query, pool, max_row_weight
 
@@ -95,9 +95,9 @@ class _StubBaseClient(BaseYTClient):
         output_table: str,
         on: Any,
         how: Any = "left",
-        select_columns: Optional[List[str]] = None,
+        select_columns: list[str] | None = None,
         dry_run: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         del left_table, right_table, output_table, on, how, select_columns, dry_run
         return None
 
@@ -107,7 +107,7 @@ class _StubBaseClient(BaseYTClient):
         output_table: str,
         condition: str,
         dry_run: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         del input_table, output_table, condition, dry_run
         return None
 
@@ -115,9 +115,9 @@ class _StubBaseClient(BaseYTClient):
         self,
         input_table: str,
         output_table: str,
-        columns: List[str],
+        columns: list[str],
         dry_run: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         del input_table, output_table, columns, dry_run
         return None
 
@@ -126,18 +126,18 @@ class _StubBaseClient(BaseYTClient):
         input_table: str,
         output_table: str,
         group_by: Any,
-        aggregations: Dict[str, Any],
+        aggregations: dict[str, Any],
         dry_run: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         del input_table, output_table, group_by, aggregations, dry_run
         return None
 
     def union_tables(
         self,
-        tables: List[str],
+        tables: list[str],
         output_table: str,
         dry_run: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         del tables, output_table, dry_run
         return None
 
@@ -145,9 +145,9 @@ class _StubBaseClient(BaseYTClient):
         self,
         input_table: str,
         output_table: str,
-        columns: Optional[List[str]] = None,
+        columns: list[str] | None = None,
         dry_run: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         del input_table, output_table, columns, dry_run
         return None
 
@@ -158,7 +158,7 @@ class _StubBaseClient(BaseYTClient):
         order_by: Any,
         ascending: bool = True,
         dry_run: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         del input_table, output_table, order_by, ascending, dry_run
         return None
 
@@ -168,7 +168,7 @@ class _StubBaseClient(BaseYTClient):
         output_table: str,
         limit: int,
         dry_run: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         del input_table, output_table, limit, dry_run
         return None
 
@@ -185,7 +185,7 @@ class _StubBaseClient(BaseYTClient):
         local_dir: Path,
         yt_dir: str,
         pattern: str = "*",
-    ) -> List[str]:
+    ) -> list[str]:
         del local_dir, yt_dir, pattern
         return []
 
@@ -194,12 +194,12 @@ class _StubBaseClient(BaseYTClient):
         command: Any,
         input_table: str,
         output_table: str,
-        files: List[Tuple[str, str]],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
+        env: dict[str, str],
         output_schema: Any = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         job: Any = None,
         append: bool = False,
         **kwargs: Any,
@@ -226,14 +226,14 @@ class _StubBaseClient(BaseYTClient):
         reducer: Any,
         input_table: str,
         output_table: str,
-        reduce_by: List[str],
-        files: List[Tuple[str, str]],
+        reduce_by: list[str],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
-        sort_by: Optional[List[str]] = None,
+        env: dict[str, str],
+        sort_by: list[str] | None = None,
         output_schema: Any = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         map_job: Any = None,
         reduce_job: Any = None,
         **kwargs: Any,
@@ -262,13 +262,13 @@ class _StubBaseClient(BaseYTClient):
         reducer: Any,
         input_table: str,
         output_table: str,
-        reduce_by: List[str],
-        files: List[Tuple[str, str]],
+        reduce_by: list[str],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
+        env: dict[str, str],
         output_schema: Any = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         job: Any = None,
         **kwargs: Any,
     ) -> Any:
@@ -291,9 +291,9 @@ class _StubBaseClient(BaseYTClient):
     def run_sort(
         self,
         table_path: str,
-        sort_by: List[str],
-        pool: Optional[str] = None,
-        pool_tree: Optional[str] = None,
+        sort_by: list[str],
+        pool: str | None = None,
+        pool_tree: str | None = None,
         **kwargs: Any,
     ) -> None:
         del table_path, sort_by, pool, pool_tree, kwargs
@@ -301,8 +301,8 @@ class _StubBaseClient(BaseYTClient):
     def run_vanilla(
         self,
         command: Any,
-        files: List[Tuple[str, str]],
-        env: Dict[str, str],
+        files: list[tuple[str, str]],
+        env: dict[str, str],
         task_name: str,
         job: Any = None,
         **kwargs: Any,

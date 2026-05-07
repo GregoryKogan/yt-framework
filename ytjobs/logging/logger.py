@@ -1,5 +1,4 @@
-"""
-Text Logger for ptrack Pipeline
+"""Text Logger for ptrack Pipeline.
 =================================
 
 Provides structured human-readable logging to stderr for the ptrack pipeline.
@@ -9,21 +8,21 @@ All logs are formatted as readable text, written to stderr.
 import logging
 import sys
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 
 class TextFormatter(logging.Formatter):
     """Formatter that outputs logs as human-readable text."""
 
     def format(self, record: logging.LogRecord) -> str:
-        """
-        Format log record as human-readable text.
+        """Format log record as human-readable text.
 
         Args:
             record: Log record to format
 
         Returns:
             Formatted log string
+
         """
         # Format timestamp
         timestamp = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S")
@@ -85,23 +84,21 @@ class TextFormatter(logging.Formatter):
         """Format a value for readable output."""
         if value is None:
             return "None"
-        elif isinstance(value, (list, tuple)):
+        if isinstance(value, (list, tuple)):
             return "[" + ", ".join(str(self._format_value(v)) for v in value) + "]"
-        elif isinstance(value, dict):
+        if isinstance(value, dict):
             items = ", ".join(f"{k}={self._format_value(v)}" for k, v in value.items())
             return "{" + items + "}"
-        elif isinstance(value, str):
+        if isinstance(value, str):
             # Truncate very long strings
             if len(value) > 100:
                 return value[:97] + "..."
             return value
-        else:
-            return str(value)
+        return str(value)
 
 
-def get_logger(name: Optional[str] = None, level: int = logging.INFO) -> logging.Logger:
-    """
-    Get a logger configured for human-readable text output to stderr.
+def get_logger(name: str | None = None, level: int = logging.INFO) -> logging.Logger:
+    """Get a logger configured for human-readable text output to stderr.
 
     Args:
         name: Logger name (default: root logger)
@@ -109,6 +106,7 @@ def get_logger(name: Optional[str] = None, level: int = logging.INFO) -> logging
 
     Returns:
         Configured logger instance
+
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -135,14 +133,14 @@ def get_logger(name: Optional[str] = None, level: int = logging.INFO) -> logging
 def log_with_extra(
     logger: logging.Logger, level: int, message: str, **kwargs: Any
 ) -> None:
-    """
-    Log a message with extra context fields.
+    """Log a message with extra context fields.
 
     Args:
         logger: Logger instance
         level: Log level (e.g., logging.INFO)
         message: Log message
         **kwargs: Additional context fields to include in log
+
     """
     # Use the standard logging mechanism with extra parameter
     # This adds the kwargs to the record's __dict__

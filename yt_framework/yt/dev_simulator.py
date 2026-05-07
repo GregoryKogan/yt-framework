@@ -1,5 +1,4 @@
-"""
-DuckDB Dev Mode Simulator
+"""DuckDB Dev Mode Simulator.
 ==========================
 
 Simulates YQL operations locally using DuckDB for dev mode testing.
@@ -8,7 +7,7 @@ Simulates YQL operations locally using DuckDB for dev mode testing.
 import logging
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 import duckdb
 
@@ -16,24 +15,23 @@ _VALID_DUCKDB_TABLE_IDENT = re.compile(r"\Ayt_[a-zA-Z0-9_]*\Z")
 
 
 class DuckDBSimulator:
-    """
-    DuckDB-based simulator for YQL operations in dev mode.
+    """DuckDB-based simulator for YQL operations in dev mode.
 
     Provides local execution of SQL queries with YT-like table storage.
     """
 
-    def __init__(self, dev_dir: Path, logger: logging.Logger):
-        """
-        Initialize DuckDB simulator.
+    def __init__(self, dev_dir: Path, logger: logging.Logger) -> None:
+        """Initialize DuckDB simulator.
 
         Args:
             dev_dir: Directory containing .jsonl table files
             logger: Logger instance
+
         """
         self.dev_dir = dev_dir
         self.logger = logger
         self.conn = duckdb.connect(":memory:")
-        self.loaded_tables: Dict[str, str] = {}  # Maps YT paths to DuckDB table names
+        self.loaded_tables: dict[str, str] = {}  # Maps YT paths to DuckDB table names
 
     def _table_basename(self, yt_path: str) -> str:
         """Extract basename from YT table path."""
@@ -50,12 +48,12 @@ class DuckDBSimulator:
     def _validated_table_identifier(self, table_name: str) -> str:
         """Return table_name if it matches the safe DuckDB identifier charset."""
         if _VALID_DUCKDB_TABLE_IDENT.fullmatch(table_name) is None:
-            raise ValueError(f"invalid DuckDB table identifier: {table_name!r}")
+            msg = f"invalid DuckDB table identifier: {table_name!r}"
+            raise ValueError(msg)
         return table_name
 
     def load_table(self, yt_path: str, local_jsonl_path: Path) -> str:
-        """
-        Load a .jsonl table file into DuckDB.
+        """Load a .jsonl table file into DuckDB.
 
         Args:
             yt_path: YT table path (for reference)
@@ -63,9 +61,10 @@ class DuckDBSimulator:
 
         Returns:
             DuckDB table name
+
         """
         if not local_jsonl_path.exists():
-            self.logger.warning(f"Table file not found: {local_jsonl_path}")
+            self.logger.warning("Table file not found: %s", local_jsonl_path)
             # Create empty table
             table_name = self._validated_table_identifier(
                 self._sanitize_table_name(yt_path)
@@ -90,24 +89,23 @@ class DuckDBSimulator:
             count_result = self.conn.execute(
                 "SELECT COUNT(*) FROM " + table_name
             ).fetchone()
-            if count_result is None:
-                row_count = 0
-            else:
-                row_count = count_result[0]
+            row_count = 0 if count_result is None else count_result[0]
             self.logger.debug(
-                f"Loaded {row_count} rows from {local_jsonl_path} into {table_name}"
+                "Loaded %s rows from %s into %s",
+                row_count,
+                local_jsonl_path,
+                table_name,
             )
 
             self.loaded_tables[yt_path] = table_name
             return table_name
 
-        except Exception as e:
-            self.logger.error(f"Failed to load table {yt_path}: {e}")
+        except Exception:
+            self.logger.exception("Failed to load table %s", yt_path)
             raise
 
-    def yql_to_sql(self, yql_query: str) -> tuple[str, Optional[str]]:
-        """
-        Convert YQL query to DuckDB SQL.
+    def yql_to_sql(self, yql_query: str) -> tuple[str, str | None]:
+        """Convert YQL query to DuckDB SQL.
 
         This is a simplified conversion that handles common patterns.
         For complex queries, users should use raw run_yql with DuckDB-compatible SQL.
@@ -117,6 +115,7 @@ class DuckDBSimulator:
 
         Returns:
             Tuple of (sql_query, output_table_path)
+
         """
         # Remove PRAGMA directives (YT-specific)
         sql = re.sub(r"PRAGMA\s+\w+\.[^;]+;", "", yql_query, flags=re.IGNORECASE)
@@ -148,42 +147,41 @@ class DuckDBSimulator:
 
         return sql, output_table
 
-    def execute_query(self, sql: str) -> List[Dict[str, Any]]:
-        """
-        Execute SQL query and return results.
+    def execute_query(self, sql: str) -> list[dict[str, Any]]:
+        """Execute SQL query and return results.
 
         Args:
             sql: SQL query string
 
         Returns:
             List of result rows as dicts
+
         """
         try:
-            self.logger.debug(f"Executing SQL: {sql}")
+            self.logger.debug("Executing SQL: %s", sql)
             result = self.conn.execute(sql).fetchall()
 
             # Get column names
             if result:
                 columns = [desc[0] for desc in self.conn.description]
                 # Convert to list of dicts
-                return [dict(zip(columns, row)) for row in result]
-            else:
-                return []
+                return [dict(zip(columns, row, strict=False)) for row in result]
+            return []
 
-        except Exception as e:
-            self.logger.error(f"Failed to execute SQL query: {e}")
-            self.logger.error(f"Query: {sql}")
+        except Exception:
+            self.logger.exception("Failed to execute SQL query")
+            self.logger.exception("Query: %s", sql)
             raise
 
-    def execute_yql(self, yql_query: str) -> tuple[List[Dict[str, Any]], Optional[str]]:
-        """
-        Execute YQL query by converting to SQL.
+    def execute_yql(self, yql_query: str) -> tuple[list[dict[str, Any]], str | None]:
+        """Execute YQL query by converting to SQL.
 
         Args:
             yql_query: YQL query string
 
         Returns:
             Tuple of (results, output_table_path)
+
         """
         sql, output_table = self.yql_to_sql(yql_query)
         results = self.execute_query(sql)
@@ -194,6 +192,7 @@ class DuckDBSimulator:
 
         Returns:
             None
+
         """
         if hasattr(self, "conn"):
             self.conn.close()
@@ -205,13 +204,13 @@ class DuckDBSimulator:
 
         Returns:
             None
+
         """
         self.close()
 
 
-def extract_table_references(yql_query: str) -> List[str]:
-    """
-    Extract table references from YQL query.
+def extract_table_references(yql_query: str) -> list[str]:
+    """Extract table references from YQL query.
 
     This is a simple regex-based parser that finds table names in backticks.
 
@@ -220,6 +219,7 @@ def extract_table_references(yql_query: str) -> List[str]:
 
     Returns:
         List of table paths referenced in the query
+
     """
     # Find all backtick-quoted strings that look like table paths
     pattern = r"`(//[^`]+)`"
@@ -230,20 +230,18 @@ def extract_table_references(yql_query: str) -> List[str]:
     output_matches = re.findall(output_pattern, yql_query, re.IGNORECASE)
 
     # Return input tables (not output tables)
-    input_tables = [match for match in matches if match not in output_matches]
-
-    return input_tables
+    return [match for match in matches if match not in output_matches]
 
 
-def extract_output_table(yql_query: str) -> Optional[str]:
-    """
-    Extract output table path from YQL query.
+def extract_output_table(yql_query: str) -> str | None:
+    """Extract output table path from YQL query.
 
     Args:
         yql_query: YQL query string
 
     Returns:
         Output table path or None
+
     """
     pattern = r"INSERT\s+INTO\s+`([^`]+)`"
     match = re.search(pattern, yql_query, re.IGNORECASE)

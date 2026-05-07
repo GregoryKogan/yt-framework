@@ -6,13 +6,9 @@ import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator, cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
-
-from yt_framework.yt.client_base import OperationResources
-from yt_framework.yt.client_prod import YTProdClient
-from yt_framework.yt.factory import create_yt_client
 
 from integration.yt_cluster._cluster_config import (
     configure_global_yt_for_checkpoint,
@@ -21,6 +17,13 @@ from integration.yt_cluster._cluster_config import (
     operation_resources_from_env,
     secrets_dict_for_yt_client,
 )
+from yt_framework.yt.factory import create_yt_client
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from yt_framework.yt.client_base import OperationResources
+    from yt_framework.yt.client_prod import YTProdClient
 
 
 def _null_logger(name: str) -> logging.Logger:
@@ -53,7 +56,7 @@ def cluster_session() -> Generator[ClusterSessionContext, None, None]:
 
     logger = _null_logger("tests.integration.yt_cluster.session")
     client = cast(
-        YTProdClient,
+        "YTProdClient",
         create_yt_client(
             logger=logger,
             mode="prod",

@@ -13,8 +13,7 @@ def init_checkpoint_directory(
     context: "StageContext",
     checkpoint_config: DictConfig,
 ) -> None:
-    """
-    Initialize checkpoint directory in YTsaurus if it doesn't exist.
+    """Initialize checkpoint directory in YTsaurus if it doesn't exist.
 
     Uses checkpoint_base from checkpoint_config. Also uploads local checkpoint if specified.
     Validates that required checkpoint exists in YT before proceeding.
@@ -29,6 +28,7 @@ def init_checkpoint_directory(
     Raises:
         FileNotFoundError: If required checkpoint not found in YT
         Exception: If checkpoint initialization fails
+
     """
     # Get checkpoint-related config values from checkpoint_config
     checkpoint_base = checkpoint_config.get("checkpoint_base")
@@ -48,7 +48,7 @@ def init_checkpoint_directory(
     try:
         # Create checkpoint directory in YT
         context.deps.yt_client.create_path(checkpoint_base, node_type="map_node")
-        context.logger.info(f"Checkpoint directory ready: {checkpoint_base}")
+        context.logger.info("Checkpoint directory ready: %s", checkpoint_base)
 
         # Upload local checkpoint if specified and exists (only if not already in YT)
         if local_checkpoint_path:
@@ -60,25 +60,28 @@ def init_checkpoint_directory(
                 # Check if checkpoint already exists in YT
                 if context.deps.yt_client.exists(yt_checkpoint_path):
                     context.logger.info(
-                        f"Checkpoint already exists in YT: {yt_checkpoint_path} (skipping upload)"
+                        "Checkpoint already exists in YT: %s (skipping upload)",
+                        yt_checkpoint_path,
                     )
                 else:
                     context.logger.info(
-                        f"Uploading local checkpoint: {local_path} → {yt_checkpoint_path}"
+                        "Uploading local checkpoint: %s → %s",
+                        local_path,
+                        yt_checkpoint_path,
                     )
                     try:
                         context.deps.yt_client.upload_file(
                             local_path, yt_checkpoint_path, create_parent_dir=True
                         )
                         context.logger.debug(
-                            f"Checkpoint uploaded: {yt_checkpoint_path}"
+                            "Checkpoint uploaded: %s", yt_checkpoint_path
                         )
-                    except Exception as e:
-                        context.logger.error(f"Failed to upload checkpoint: {e}")
+                    except Exception:
+                        context.logger.exception("Failed to upload checkpoint")
                         raise
             else:
                 context.logger.warning(
-                    f"Local checkpoint path does not exist: {local_path}"
+                    "Local checkpoint path does not exist: %s", local_path
                 )
 
         # Validate that required checkpoint exists in YT
@@ -95,7 +98,7 @@ def init_checkpoint_directory(
                 context.logger.error(error_msg)
                 raise FileNotFoundError(error_msg)
 
-            context.logger.debug(f"Required checkpoint verified: {yt_checkpoint_path}")
+            context.logger.debug("Required checkpoint verified: %s", yt_checkpoint_path)
         else:
             context.logger.debug(
                 "No model_name specified, skipping checkpoint validation"
@@ -103,8 +106,8 @@ def init_checkpoint_directory(
 
     except FileNotFoundError:
         raise  # Re-raise checkpoint validation errors
-    except Exception as e:
-        context.logger.error(
-            f"Could not initialize checkpoint directory {checkpoint_base}: {e}"
+    except Exception:
+        context.logger.exception(
+            "Could not initialize checkpoint directory %s", checkpoint_base
         )
         raise

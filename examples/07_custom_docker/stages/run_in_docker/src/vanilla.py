@@ -2,12 +2,14 @@
 
 import logging
 import subprocess
+
 from omegaconf import OmegaConf
-from ytjobs.logging.logger import get_logger
+
 from ytjobs.config import get_config_path
+from ytjobs.logging.logger import get_logger
 
 
-def main():
+def main() -> None:
     logger = get_logger("custom_docker", level=logging.INFO)
 
     logger.info("=" * 60)
@@ -21,12 +23,13 @@ def main():
         result = subprocess.run(
             ["cowsay", config.job.message], capture_output=True, text=True, check=True
         )
-        logger.info(f"\n{result.stdout}\n")
-    except Exception as e:
-        logger.error(f"Error running cowsay: {e}")
+        logger.info("\n%s\n", result.stdout)
+    except Exception:
+        logger.exception("Error running cowsay")
         logger.info("This job will run only in a custom Docker image!")
         logger.info("Custom Docker images are only used in production mode!")
-        raise RuntimeError("This job will run only in a custom Docker image!")
+        msg = "This job will run only in a custom Docker image!"
+        raise RuntimeError(msg)
 
     logger.info("")
     logger.info("=" * 60)

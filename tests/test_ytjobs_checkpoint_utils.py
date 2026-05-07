@@ -2,9 +2,9 @@
 
 import json
 import logging
+from unittest.mock import MagicMock
 
 import pytest
-from unittest.mock import MagicMock
 
 import ytjobs.checkpoint.utils as ckpt_utils
 from ytjobs.checkpoint.utils import (
@@ -59,7 +59,8 @@ def test_save_checkpoint_writes_payload_at_joined_yt_path(
     assert path == "//root/cp/f.bin", "save_checkpoint must return full YT path"
     mock_yt.write_file.assert_called_once()
     args, _kwargs = mock_yt.write_file.call_args
-    assert args[0] == "//root/cp/f.bin" and args[1] == b"payload"
+    assert args[0] == "//root/cp/f.bin"
+    assert args[1] == b"payload"
 
 
 def test_save_checkpoint_writes_metadata_sidecar_after_main_blob(
@@ -260,7 +261,8 @@ def test_save_checkpoint_warns_when_metadata_write_fails(
 
     def _write(path: str, *_a, **_k) -> None:
         if str(path).endswith(".meta"):
-            raise OSError("meta write fail")
+            msg = "meta write fail"
+            raise OSError(msg)
 
     mock_yt.write_file.side_effect = _write
     monkeypatch.setattr(ckpt_utils, "yt", mock_yt)
@@ -272,7 +274,8 @@ def test_save_checkpoint_warns_when_metadata_write_fails(
         metadata={"a": 1},
         logger=_silent_logger("test_ckpt_meta_w"),
     )
-    assert path == "//z/m.bin" and "Failed to save checkpoint metadata" in caplog.text
+    assert path == "//z/m.bin"
+    assert "Failed to save checkpoint metadata" in caplog.text
 
 
 def test_load_checkpoint_returns_none_tuple_when_read_raises(
@@ -287,7 +290,8 @@ def test_load_checkpoint_returns_none_tuple_when_read_raises(
     out = load_checkpoint(
         "x", base_path="//b", logger=_silent_logger("test_ld_read_exc")
     )
-    assert out == (None, None) and "Failed to load checkpoint" in caplog.text
+    assert out == (None, None)
+    assert "Failed to load checkpoint" in caplog.text
 
 
 def test_load_checkpoint_returns_body_and_warns_when_metadata_json_invalid(
@@ -306,9 +310,8 @@ def test_load_checkpoint_returns_body_and_warns_when_metadata_json_invalid(
     out = load_checkpoint(
         "p.bin", base_path="//z", logger=_silent_logger("test_ld_bad_meta")
     )
-    assert (
-        out == (b"body", None) and "Failed to load checkpoint metadata" in caplog.text
-    )
+    assert out == (b"body", None)
+    assert "Failed to load checkpoint metadata" in caplog.text
 
 
 def test_list_checkpoints_returns_empty_when_list_raises(
@@ -322,8 +325,8 @@ def test_list_checkpoints_returns_empty_when_list_raises(
     caplog.set_level(logging.ERROR)
     assert (
         list_checkpoints(base_path="//d", logger=_silent_logger("test_list_exc")) == []
-        and "Failed to list checkpoints" in caplog.text
     )
+    assert "Failed to list checkpoints" in caplog.text
 
 
 def test_delete_checkpoint_returns_false_when_remove_raises(
@@ -353,4 +356,5 @@ def test_load_processing_state_returns_none_when_json_unmarshalling_fails(
     out = load_processing_state(
         state_name="bad", base_path="//p", logger=_silent_logger("test_lps_badjson")
     )
-    assert out is None and "Failed to parse processing state" in caplog.text
+    assert out is None
+    assert "Failed to parse processing state" in caplog.text

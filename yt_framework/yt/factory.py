@@ -2,22 +2,21 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Literal
 
 from yt_framework.yt.client_base import BaseYTClient
-from yt_framework.yt.client_prod import YTProdClient
 from yt_framework.yt.client_dev import YTDevClient
+from yt_framework.yt.client_prod import YTProdClient
 
 
 def create_yt_client(
-    logger: Optional[logging.Logger] = None,
-    mode: Optional[Literal["prod", "dev"]] = "dev",
-    pipeline_dir: Optional[Union[Path, str]] = None,
-    secrets: Optional[Dict[str, str]] = None,
-    pickling: Optional[Dict[str, Any]] = None,
+    logger: logging.Logger | None = None,
+    mode: Literal["prod", "dev"] | None = "dev",
+    pipeline_dir: Path | str | None = None,
+    secrets: dict[str, str] | None = None,
+    pickling: dict[str, Any] | None = None,
 ) -> BaseYTClient:
-    """
-    Factory function to create appropriate YT client based on mode.
+    """Factory function to create appropriate YT client based on mode.
 
     Args:
         logger: Logger instance (default: creates new logger)
@@ -41,16 +40,17 @@ def create_yt_client(
         >>> # Prod mode (real YT cluster)
         >>> secrets = {"YT_PROXY": "my-proxy", "YT_TOKEN": "my-token"}
         >>> client = create_yt_client(mode="prod", secrets=secrets)
+
     """
     _logger = logger or logging.getLogger(__name__)
     if mode == "prod":
         if secrets is None:
-            raise ValueError("secrets are required for prod mode")
+            msg = "secrets are required for prod mode"
+            raise ValueError(msg)
         return YTProdClient(logger=_logger, secrets=secrets, pickling=pickling or {})
-    else:
-        _pipeline_dir: Optional[Path] = None
-        if pipeline_dir is not None:
-            _pipeline_dir = (
-                Path(pipeline_dir) if isinstance(pipeline_dir, str) else pipeline_dir
-            )
-        return YTDevClient(logger=_logger, pipeline_dir=_pipeline_dir)
+    _pipeline_dir: Path | None = None
+    if pipeline_dir is not None:
+        _pipeline_dir = (
+            Path(pipeline_dir) if isinstance(pipeline_dir, str) else pipeline_dir
+        )
+    return YTDevClient(logger=_logger, pipeline_dir=_pipeline_dir)

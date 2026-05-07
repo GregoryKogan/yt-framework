@@ -1,5 +1,4 @@
-"""
-Mapper Base Classes
+"""Mapper Base Classes.
 ===================
 
 Reusable mapper classes that handle stdin/stdout boilerplate.
@@ -7,14 +6,14 @@ Allows users to focus on processing logic.
 """
 
 import sys
-from typing import Callable, Iterator, Optional, List, Any
+from collections.abc import Callable, Iterator
+from typing import Any
 
-from .utils import parse_json_line, log_error, process_and_write_results
+from .utils import log_error, parse_json_line, process_and_write_results
 
 
 class StreamMapper:
-    """
-    Mapper that processes stdin one line at a time.
+    """Mapper that processes stdin one line at a time.
 
     Reads JSON lines from stdin, processes each individually,
     and writes results to stdout. Define ``processing_func(row)`` that yields
@@ -27,13 +26,13 @@ class StreamMapper:
         redirect_processing_output: bool = True,
         **kwargs: Any,
     ) -> None:
-        """
-        Read stdin line-by-line, process each, write results to stdout.
+        """Read stdin line-by-line, process each, write results to stdout.
 
         Args:
             processing_func: Function that takes a row dict and returns Iterator of results
             redirect_processing_output: If True, redirect stdout to stderr during processing
             **kwargs: Additional keyword arguments to pass to processing_func
+
         """
         for line in sys.stdin:
             line = line.strip()
@@ -51,13 +50,12 @@ class StreamMapper:
                     processing_func, row_data, redirect_processing_output, **kwargs
                 )
             except Exception as e:
-                log_error({"error": f"Processing failed: {str(e)}", "row": line})
+                log_error({"error": f"Processing failed: {e!s}", "row": line})
                 raise
 
 
 class BatchMapper:
-    """
-    Mapper that processes stdin in batches.
+    """Mapper that processes stdin in batches.
 
     Reads JSON lines from stdin in batches, processes each batch,
     and writes results to stdout. Pass ``batch_size`` (or ``None`` to buffer all
@@ -65,12 +63,12 @@ class BatchMapper:
     call ``mapper.map(processing_func)``.
     """
 
-    def __init__(self, batch_size: Optional[int] = None):
-        """
-        Initialize batch mapper.
+    def __init__(self, batch_size: int | None = None) -> None:
+        """Initialize batch mapper.
 
         Args:
             batch_size: Number of rows per batch, or None to process all rows at once
+
         """
         self.batch_size = batch_size
 
@@ -80,13 +78,13 @@ class BatchMapper:
         redirect_processing_output: bool = True,
         **kwargs: Any,
     ) -> None:
-        """
-        Read stdin in batches, process each batch, write results to stdout.
+        """Read stdin in batches, process each batch, write results to stdout.
 
         Args:
             processing_func: Function that takes a list of rows (and optional kwargs) and returns Iterator of results
             redirect_processing_output: If True, redirect stdout to stderr during processing
             **kwargs: Additional keyword arguments to pass to processing_func
+
         """
         if self.batch_size is None:
             self._process_all_rows(
@@ -114,7 +112,7 @@ class BatchMapper:
             except Exception as e:
                 log_error(
                     {
-                        "error": f"Batch processing failed: {str(e)}",
+                        "error": f"Batch processing failed: {e!s}",
                         "total_rows": len(rows),
                     }
                 )
@@ -128,7 +126,8 @@ class BatchMapper:
     ) -> None:
         """Process rows from stdin in batches."""
         if self.batch_size is None:
-            raise ValueError("Batch size must be set")
+            msg = "Batch size must be set"
+            raise ValueError(msg)
 
         batch = []
         batch_count = 0
@@ -166,7 +165,7 @@ class BatchMapper:
                 **kwargs,
             )
 
-    def _read_all_rows(self) -> List[Any]:
+    def _read_all_rows(self) -> list[Any]:
         """Read all rows from stdin."""
         rows = []
         for line in sys.stdin:
@@ -182,7 +181,7 @@ class BatchMapper:
 
     def _process_batch(
         self,
-        batch: List[Any],
+        batch: list[Any],
         batch_number: int,
         processing_func: Callable[..., Iterator[Any]],
         redirect_processing_output: bool,
@@ -196,7 +195,7 @@ class BatchMapper:
         except Exception as e:
             log_error(
                 {
-                    "error": f"Batch {batch_number} processing failed: {str(e)}",
+                    "error": f"Batch {batch_number} processing failed: {e!s}",
                     "batch_size": len(batch),
                     "batch_number": batch_number,
                 }

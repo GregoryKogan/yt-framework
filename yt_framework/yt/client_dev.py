@@ -1,20 +1,19 @@
 """Local filesystem stand-in for Cypress tables and subprocess-backed jobs."""
 
 import json
-import os
 import logging
-import subprocess
+import os
 import shutil
+import subprocess
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union, Tuple, Literal
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from yt.wrapper import Operation  # pyright: ignore[reportMissingImports]
-from typing import TYPE_CHECKING
 
-from yt_framework.yt.client_base import BaseYTClient, OperationResources
-from yt_framework.yt.operation_secure_env import pop_secure_env_client_kwargs
 from yt_framework.operations.job_command import is_typed_job, resolve_aliased_job
+from yt_framework.yt.client_base import BaseYTClient, OperationResources
 from yt_framework.yt.max_row_weight import ensure_max_row_weight_pragma
+from yt_framework.yt.operation_secure_env import pop_secure_env_client_kwargs
 
 if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
@@ -23,7 +22,7 @@ if TYPE_CHECKING:
 class _DevOperation:
     """Fake operation for dev run_map; implements wait, get_state, get_error."""
 
-    def __init__(self, returncode: int, stderr_message: str = ""):
+    def __init__(self, returncode: int, stderr_message: str = "") -> None:
         self._returncode = returncode
         self._stderr = stderr_message
         self.id = f"dev-operation-{id(self)}"  # Fake operation ID for dev mode
@@ -34,15 +33,14 @@ class _DevOperation:
     def get_state(self) -> str:
         return "completed" if self._returncode == 0 else "failed"
 
-    def get_error(self) -> Optional[str]:
+    def get_error(self) -> str | None:
         if self._returncode == 0:
             return None
         return self._stderr or f"Mapper exited with code {self._returncode}"
 
 
 class YTDevClient(BaseYTClient):
-    """
-    Development YT client implementation.
+    """Development YT client implementation.
 
     Uses local file system for all operations, simulating YT behavior.
     Tables are stored as .jsonl files in .dev/ directory.
@@ -51,14 +49,14 @@ class YTDevClient(BaseYTClient):
     def __init__(
         self,
         logger: logging.Logger,
-        pipeline_dir: Optional[Path] = None,
+        pipeline_dir: Path | None = None,
     ) -> None:
-        """
-        Initialize development YT client.
+        """Initialize development YT client.
 
         Args:
             logger: Logger instance
             pipeline_dir: Pipeline directory (required for dev mode)
+
         """
         if pipeline_dir is not None:
             resolved_pipeline_dir = Path(pipeline_dir).resolve()
@@ -74,10 +72,16 @@ class YTDevClient(BaseYTClient):
 
         super().__init__(logger, pipeline_dir=resolved_pipeline_dir)
 
+    def _pipeline_dir_or_raise(self) -> Path:
+        pd = self.pipeline_dir
+        if pd is None:
+            msg = "pipeline_dir is required in dev mode"
+            raise RuntimeError(msg)
+        return pd
+
     def _dev_dir(self) -> Path:
         """Return .dev directory under pipeline_dir. Caller should mkdir when writing."""
-        assert self.pipeline_dir is not None, "pipeline_dir is required in dev mode"
-        return self.pipeline_dir / ".dev"
+        return self._pipeline_dir_or_raise() / ".dev"
 
     def _table_basename(self, yt_path: str) -> str:
         """Last path component of a YT table path, e.g. //home/.../name -> name."""
@@ -102,12 +106,11 @@ class YTDevClient(BaseYTClient):
 
         Returns:
             None
+
         """
-        pass
 
     def exists(self, path: str) -> bool:
-        """
-        Check if a path exists in YT.
+        """Check if a path exists in YT.
 
         In dev mode, always returns True (assumes files exist locally).
 
@@ -116,17 +119,18 @@ class YTDevClient(BaseYTClient):
 
         Returns:
             bool: Always True in dev mode.
+
         """
         return True
 
     def write_table(
         self,
         table_path: str,
-        rows: List[Dict[str, Any]],
+        rows: list[dict[str, Any]],
         append: bool = False,
         replication_factor: int = 1,
     ) -> None:
-        """Write rows to a YT table (saves as local .jsonl file).
+        r"""Write rows to a YT table (saves as local .jsonl file).
 
         In dev mode, tables are stored as JSONL files in the .dev directory.
         Each row is written as a JSON object on a single line.
@@ -143,17 +147,16 @@ class YTDevClient(BaseYTClient):
         Example:
             >>> client.write_table("//tmp/data", [{"id": 1, "name": "Alice"}])
             >>> # Creates .dev/data.jsonl with: {"id":1,"name":"Alice"}\\n
+
         """
         mode_str = "append" if append else "overwrite"
-        self.logger.info(f"Writing {len(rows)} rows → {table_path} ({mode_str})")
-
+        self.logger.info("Writing %s rows → %s (%s)", len(rows), table_path, mode_str)
         p = self._table_local_path(table_path)
         self._dev_dir().mkdir(parents=True, exist_ok=True)
         with open(p, "a" if append else "w") as f:
-            for row in rows:
-                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+            f.writelines(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
 
-    def read_table(self, table_path: str) -> List[Dict[str, Any]]:
+    def read_table(self, table_path: str) -> list[dict[str, Any]]:
         """Read rows from a YT table (reads from local .jsonl file).
 
         Args:
@@ -162,20 +165,21 @@ class YTDevClient(BaseYTClient):
         Returns:
             List[Dict[str, Any]]: List of dictionaries representing table rows.
                                   Returns empty list if file doesn't exist.
+
         """
-        self.logger.info(f"Reading table: {table_path}")
+        self.logger.info("Reading table: %s", table_path)
 
         p = self._table_local_path(table_path)
         if not p.exists():
-            self.logger.warning(f"Table file not found: {p}, returning empty list")
+            self.logger.warning("Table file not found: %s, returning empty list", p)
             return []
         results = []
-        with open(p, "r") as f:
+        with open(p) as f:
             for line in f:
                 line = line.strip()
                 if line:
                     results.append(json.loads(line))
-        self.logger.info(f"✓ Read {len(results)} rows")
+        self.logger.info("✓ Read %s rows", len(results))
         return results
 
     def row_count(self, table_path: str) -> int:
@@ -186,18 +190,18 @@ class YTDevClient(BaseYTClient):
 
         Returns:
             int: Number of non-empty lines in the JSONL file. Returns 0 if file doesn't exist.
+
         """
         p = self._table_local_path(table_path)
         if not p.exists():
             return 0
         with open(p) as f:
             n = sum(1 for line in f if line.strip())
-        self.logger.debug(f"Row count: {n}")
+        self.logger.debug("Row count: %s", n)
         return n
 
-    def _get_table_columns(self, table_path: str) -> List[str]:
-        """
-        Get column names from a table by reading one row.
+    def _get_table_columns(self, table_path: str) -> list[str]:
+        """Get column names from a table by reading one row.
 
         In dev mode, tables are stored as JSONL files, so binary columns are less likely.
         This implementation matches the production client structure for consistency.
@@ -210,13 +214,13 @@ class YTDevClient(BaseYTClient):
 
         Raises:
             ValueError: If table is empty or cannot be read
+
         """
         try:
             rows = self.read_table(table_path)
             if not rows:
-                raise ValueError(
-                    f"Table {table_path} is empty, cannot determine columns"
-                )
+                msg = f"Table {table_path} is empty, cannot determine columns"
+                raise ValueError(msg)
             # Get column names from first row
             columns = list(rows[0].keys())
             # Filter out internal YQL columns like _other, _yql_column_*
@@ -225,36 +229,36 @@ class YTDevClient(BaseYTClient):
                 # If all columns were filtered out, use all keys (fallback)
                 columns = list(rows[0].keys())
             return columns
-        except Exception as e:
-            self.logger.error(f"Failed to get table columns: {e}")
+        except Exception:
+            self.logger.exception("Failed to get table columns")
             raise
 
     def run_yql(
         self,
         query: str,
         pool: str = "default",
-        max_row_weight: Optional[str] = None,
+        max_row_weight: str | None = None,
     ) -> None:
-        """
-        Execute a YQL query locally using DuckDB simulation.
+        """Execute a YQL query locally using DuckDB simulation.
 
         Args:
             query: YQL query string to execute
             pool: YT pool name (default: 'default')
             max_row_weight: Optional max row weight override
+
         """
         self.logger.info("Executing YQL query (dev mode - DuckDB simulation)")
-        self.logger.debug(f"Pool: {pool}")
+        self.logger.debug("Pool: %s", pool)
         query_with_max_row_weight = ensure_max_row_weight_pragma(
             query=query,
             max_row_weight=max_row_weight,
         )
-        self.logger.debug(f"Query:\n{query_with_max_row_weight}")
+        self.logger.debug("Query:\n%s", query_with_max_row_weight)
 
         from yt_framework.yt.dev_simulator import (
             DuckDBSimulator,
-            extract_table_references,
             extract_output_table,
+            extract_table_references,
         )
 
         # Create DuckDB simulator
@@ -265,8 +269,8 @@ class YTDevClient(BaseYTClient):
             input_tables = extract_table_references(query_with_max_row_weight)
             output_table = extract_output_table(query_with_max_row_weight)
 
-            self.logger.debug(f"Input tables: {input_tables}")
-            self.logger.debug(f"Output table: {output_table}")
+            self.logger.debug("Input tables: %s", input_tables)
+            self.logger.debug("Output table: %s", output_table)
 
             # Load input tables
             for table_path in input_tables:
@@ -274,7 +278,7 @@ class YTDevClient(BaseYTClient):
                 if local_path.exists():
                     simulator.load_table(table_path, local_path)
                 else:
-                    self.logger.warning(f"Input table not found: {local_path}")
+                    self.logger.warning("Input table not found: %s", local_path)
 
             # Execute query
             results, _ = simulator.execute_yql(query_with_max_row_weight)
@@ -282,12 +286,12 @@ class YTDevClient(BaseYTClient):
             # Save results if output table specified
             if output_table and results is not None:
                 self.write_table(output_table, results, append=False)
-                self.logger.info(f"Wrote {len(results)} rows to {output_table}")
+                self.logger.info("Wrote %s rows to %s", len(results), output_table)
 
             self.logger.info("✓ YQL query executed successfully")
 
-        except Exception as e:
-            self.logger.error(f"Failed to execute YQL query in dev mode: {e}")
+        except Exception:
+            self.logger.exception("Failed to execute YQL query in dev mode")
             raise
         finally:
             simulator.close()
@@ -299,12 +303,12 @@ class YTDevClient(BaseYTClient):
         left_table: str,
         right_table: str,
         output_table: str,
-        on: Union[str, List[str], Dict[str, str]],
+        on: str | list[str] | dict[str, str],
         how: Literal["inner", "left", "right", "full"] = "left",
-        select_columns: Optional[List[str]] = None,
+        select_columns: list[str] | None = None,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
+        max_row_weight: str | None = None,
+    ) -> str | None:
         """Join two tables using YQL (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_join_query
 
@@ -330,8 +334,8 @@ class YTDevClient(BaseYTClient):
         output_table: str,
         condition: str,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
+        max_row_weight: str | None = None,
+    ) -> str | None:
         """Filter table rows using WHERE condition (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_filter_query
 
@@ -356,10 +360,10 @@ class YTDevClient(BaseYTClient):
         self,
         input_table: str,
         output_table: str,
-        columns: List[str],
+        columns: list[str],
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
+        max_row_weight: str | None = None,
+    ) -> str | None:
         """Select specific columns from a table (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_select_query
 
@@ -380,11 +384,11 @@ class YTDevClient(BaseYTClient):
         self,
         input_table: str,
         output_table: str,
-        group_by: Union[str, List[str]],
-        aggregations: Dict[str, Union[str, Tuple[str, str]]],
+        group_by: str | list[str],
+        aggregations: dict[str, str | tuple[str, str]],
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
+        max_row_weight: str | None = None,
+    ) -> str | None:
         """Group by columns and compute aggregations (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_group_by_query
 
@@ -404,11 +408,11 @@ class YTDevClient(BaseYTClient):
 
     def union_tables(
         self,
-        tables: List[str],
+        tables: list[str],
         output_table: str,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
+        max_row_weight: str | None = None,
+    ) -> str | None:
         """Union multiple tables (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_union_query
 
@@ -433,10 +437,10 @@ class YTDevClient(BaseYTClient):
         self,
         input_table: str,
         output_table: str,
-        columns: Optional[List[str]] = None,
+        columns: list[str] | None = None,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
+        max_row_weight: str | None = None,
+    ) -> str | None:
         """Get distinct rows from a table (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_distinct_query
 
@@ -457,11 +461,11 @@ class YTDevClient(BaseYTClient):
         self,
         input_table: str,
         output_table: str,
-        order_by: Union[str, List[str]],
+        order_by: str | list[str],
         ascending: bool = True,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
+        max_row_weight: str | None = None,
+    ) -> str | None:
         """Sort table by columns (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_sort_query
 
@@ -489,8 +493,8 @@ class YTDevClient(BaseYTClient):
         output_table: str,
         limit: int,
         dry_run: bool = False,
-        max_row_weight: Optional[str] = None,
-    ) -> Optional[str]:
+        max_row_weight: str | None = None,
+    ) -> str | None:
         """Limit number of rows from a table (executed locally with DuckDB in dev mode)."""
         from yt_framework.yt.yql_builder import build_limit_query
 
@@ -514,19 +518,19 @@ class YTDevClient(BaseYTClient):
     def upload_file(
         self, local_path: Path, yt_path: str, create_parent_dir: bool = False
     ) -> None:
-        """
-        Upload a file to YT (no-op in dev mode).
+        """Upload a file to YT (no-op in dev mode).
 
         Args:
             local_path: Local file path to upload
             yt_path: YT destination path
             create_parent_dir: If True, create parent directory if it doesn't exist (default: False)
+
         """
-        self.logger.debug(f"Dev: upload_file no-op {local_path.name} → {yt_path}")
+        self.logger.debug("Dev: upload_file no-op %s → %s", local_path.name, yt_path)
 
     def upload_directory(
         self, local_dir: Path, yt_dir: str, pattern: str = "*"
-    ) -> List[str]:
+    ) -> list[str]:
         """Upload a directory to YT (no-op in dev mode).
 
         Args:
@@ -536,8 +540,9 @@ class YTDevClient(BaseYTClient):
 
         Returns:
             List[str]: Empty list in dev mode.
+
         """
-        self.logger.debug(f"Dev: upload_directory no-op {local_dir} → {yt_dir}")
+        self.logger.debug("Dev: upload_directory no-op %s → %s", local_dir, yt_dir)
         return []
 
     def run_map(
@@ -545,12 +550,12 @@ class YTDevClient(BaseYTClient):
         command: Any,
         input_table: str,
         output_table: str,
-        files: List[Tuple[str, str]],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
+        env: dict[str, str],
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         job: Any = None,
         append: bool = False,
         **kwargs: Any,
@@ -586,21 +591,23 @@ class YTDevClient(BaseYTClient):
             ...     resources=OperationResources(),
             ...     env={}
             ... )
+
         """
-        assert self.pipeline_dir is not None
+        self._pipeline_dir_or_raise()
         _kw = dict(kwargs)
         pop_secure_env_client_kwargs(_kw)
 
         self.logger.info("Submitting map operation")
-        self.logger.info(f"  Input: {input_table}")
-        self.logger.info(f"  Output: {output_table}")
+        self.logger.info("  Input: %s", input_table)
+        self.logger.info("  Output: %s", output_table)
         mapper_job = job if job is not None else command
-        self.logger.info(f"  Command: {mapper_job}")
+        self.logger.info("  Command: %s", mapper_job)
         if not isinstance(mapper_job, str):
-            raise NotImplementedError(
+            msg = (
                 "Dev mode run_map supports only string commands; "
                 "TypedJob mappers are supported in prod mode."
             )
+            raise NotImplementedError(msg)
 
         # Prepare sandbox and input/output files
         sandbox_dir, sandbox_input, sandbox_output = self._prepare_map_sandbox(
@@ -643,10 +650,10 @@ class YTDevClient(BaseYTClient):
     def run_vanilla(
         self,
         command: str,
-        files: List[Tuple[str, str]],
-        env: Dict[str, str],
+        files: list[tuple[str, str]],
+        env: dict[str, str],
         task_name: str = "main",
-        job: Optional[str] = None,
+        job: str | None = None,
         **kwargs,
     ) -> Operation:
         """Run a vanilla operation locally using subprocess.
@@ -663,15 +670,16 @@ class YTDevClient(BaseYTClient):
 
         Returns:
             Operation: Mock operation object that simulates YT operation.
+
         """
         self.logger.info("Submitting vanilla operation")
         _kw = dict(kwargs)
         pop_secure_env_client_kwargs(_kw)
         vanilla_job = job if job is not None else command
-        self.logger.info(f"  Command: {vanilla_job}")
-        self.logger.info(f"  Task: {task_name}")
+        self.logger.info("  Command: %s", vanilla_job)
+        self.logger.info("  Task: %s", task_name)
 
-        assert self.pipeline_dir is not None
+        self._pipeline_dir_or_raise()
         self._dev_dir().mkdir(parents=True, exist_ok=True)
 
         sandbox_dir = self._dev_dir() / f"{task_name}_sandbox"
@@ -685,7 +693,7 @@ class YTDevClient(BaseYTClient):
             stage_config_dest = sandbox_dir / "stages" / task_name / "config.yaml"
             stage_config_dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(stage_config_source, stage_config_dest)
-            self.logger.debug(f"  Dev: copied config.yaml to {stage_config_dest}")
+            self.logger.debug("  Dev: copied config.yaml to %s", stage_config_dest)
 
         # Convert YT paths in command to local sandbox paths
         # YT path format: //tmp/.../build/stages/.../vanilla.py
@@ -712,7 +720,7 @@ class YTDevClient(BaseYTClient):
                 )
                 if local_command != vanilla_job:
                     self.logger.debug(
-                        f"  Dev: converted command: {vanilla_job} -> {local_command}"
+                        "  Dev: converted command: %s -> %s", vanilla_job, local_command
                     )
                 else:
                     # Fallback: simple string replacement
@@ -722,7 +730,9 @@ class YTDevClient(BaseYTClient):
                             yt_full_path, local_path.split()[0]
                         )
                         self.logger.debug(
-                            f"  Dev: converted command (fallback): {vanilla_job} -> {local_command}"
+                            "  Dev: converted command (fallback): %s -> %s",
+                            vanilla_job,
+                            local_command,
                         )
 
         logs_path = self._dev_dir() / f"{task_name}.log"
@@ -732,14 +742,14 @@ class YTDevClient(BaseYTClient):
         config_path_in_sandbox = sandbox_dir / "stages" / task_name / "config.yaml"
         if config_path_in_sandbox.exists():
             env_merged["JOB_CONFIG_PATH"] = str(config_path_in_sandbox)
-            self.logger.debug(f"  Dev: JOB_CONFIG_PATH={config_path_in_sandbox}")
+            self.logger.debug("  Dev: JOB_CONFIG_PATH=%s", config_path_in_sandbox)
         else:
             self.logger.warning(
-                f"  Dev: config file not found at {config_path_in_sandbox}"
+                "  Dev: config file not found at %s", config_path_in_sandbox
             )
 
-        self.logger.info(f"  Dev: sandbox={sandbox_dir}")
-        self.logger.info(f"  Dev: stderr={logs_path}")
+        self.logger.info("  Dev: sandbox=%s", sandbox_dir)
+        self.logger.info("  Dev: stderr=%s", logs_path)
         with open(logs_path, "w") as ferr:
             proc = subprocess.run(
                 ["bash", "-c", local_command],
@@ -757,14 +767,14 @@ class YTDevClient(BaseYTClient):
         reducer: Any,
         input_table: str,
         output_table: str,
-        reduce_by: List[str],
-        files: List[Tuple[str, str]],
+        reduce_by: list[str],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
-        sort_by: Optional[List[str]] = None,
+        env: dict[str, str],
+        sort_by: list[str] | None = None,
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         map_job: Any = None,
         reduce_job: Any = None,
         **kwargs: Any,
@@ -798,7 +808,7 @@ class YTDevClient(BaseYTClient):
             _leg_desc(reducer_leg),
         )
         self.logger.info("Dev: map-reduce no-op (copying input -> output)")
-        assert self.pipeline_dir is not None
+        self._pipeline_dir_or_raise()
         self._dev_dir().mkdir(parents=True, exist_ok=True)
         input_path = self._table_local_path(input_table)
         output_path = self._table_local_path(output_table)
@@ -814,13 +824,13 @@ class YTDevClient(BaseYTClient):
         reducer: Any,
         input_table: str,
         output_table: str,
-        reduce_by: List[str],
-        files: List[Tuple[str, str]],
+        reduce_by: list[str],
+        files: list[tuple[str, str]],
         resources: OperationResources,
-        env: Dict[str, str],
+        env: dict[str, str],
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
-        docker_auth: Optional[Dict[str, str]] = None,
+        docker_auth: dict[str, str] | None = None,
         job: Any = None,
         **kwargs: Any,
     ) -> Operation:
@@ -841,7 +851,7 @@ class YTDevClient(BaseYTClient):
             rdesc = f"invalid leg type {type(reducer_leg).__name__} (expected TypedJob or str)"
         self.logger.info("Dev: reduce leg: %s", rdesc)
         self.logger.info("Dev: reduce no-op (copying input -> output)")
-        assert self.pipeline_dir is not None
+        self._pipeline_dir_or_raise()
         self._dev_dir().mkdir(parents=True, exist_ok=True)
         input_path = self._table_local_path(input_table)
         output_path = self._table_local_path(output_table)
@@ -855,17 +865,16 @@ class YTDevClient(BaseYTClient):
     def run_sort(
         self,
         table_path: str,
-        sort_by: List[str],
-        pool: Optional[str] = None,
-        pool_tree: Optional[str] = None,
+        sort_by: list[str],
+        pool: str | None = None,
+        pool_tree: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Dev: no-op (table unchanged)."""
-        self.logger.info(f"Dev: run_sort no-op for {table_path} by {sort_by}")
+        self.logger.info("Dev: run_sort no-op for %s by %s", table_path, sort_by)
 
-    def _build_env(self, env: Dict[str, str]) -> Dict[str, str]:
+    def _build_env(self, env: dict[str, str]) -> dict[str, str]:
         """Build environment variables for subprocess."""
-
         # Set PYTHONPATH to include pipeline dir
         env_merged = {**os.environ, **(env or {})}
         pp_parts = [str(self.pipeline_dir)]
@@ -890,15 +899,15 @@ class YTDevClient(BaseYTClient):
 
         return env_merged
 
-    def _upload_files(self, files: List[Tuple[str, str]], sandbox_dir: Path) -> None:
+    def _upload_files(self, files: list[tuple[str, str]], sandbox_dir: Path) -> None:
         """Upload files to sandbox directory."""
-        assert self.pipeline_dir is not None
+        self._pipeline_dir_or_raise()
 
         # Try to get local checkpoint path from stage config for checkpoint files
         local_checkpoint_path = self._get_local_checkpoint_path()
         if local_checkpoint_path:
             self.logger.debug(
-                f"  Dev: local_checkpoint_path available: {local_checkpoint_path}"
+                "  Dev: local_checkpoint_path available: %s", local_checkpoint_path
             )
 
         for file_info in files:
@@ -911,23 +920,22 @@ class YTDevClient(BaseYTClient):
                 checkpoint_filename = Path(local_checkpoint_path).name
                 yt_filename = Path(yt_path).name
                 # Check if this is a checkpoint file (matches by filename)
-                if (
-                    checkpoint_filename == yt_filename
-                    or checkpoint_filename == local_name
-                ):
+                if checkpoint_filename in (yt_filename, local_name):
                     checkpoint_path = Path(local_checkpoint_path)
                     if checkpoint_path.exists():
                         # Use the expected local_name in sandbox (from dependency)
                         dest_file = sandbox_dir / local_name
                         dest_file.parent.mkdir(parents=True, exist_ok=True)
                         self.logger.info(
-                            f"  Dev: copying checkpoint {checkpoint_path} -> {dest_file}"
+                            "  Dev: copying checkpoint %s -> %s",
+                            checkpoint_path,
+                            dest_file,
                         )
                         shutil.copy2(checkpoint_path, dest_file)
                         copied = True
                     else:
                         self.logger.warning(
-                            f"  Dev: checkpoint path does not exist: {checkpoint_path}"
+                            "  Dev: checkpoint path does not exist: %s", checkpoint_path
                         )
 
             # Handle build files (source.tar.gz, etc.)
@@ -942,7 +950,7 @@ class YTDevClient(BaseYTClient):
                         dest_file = sandbox_dir / local_name
                         dest_file.parent.mkdir(parents=True, exist_ok=True)
                         self.logger.debug(
-                            f"  Dev: copying {source_file} -> {dest_file}"
+                            "  Dev: copying %s -> %s", source_file, dest_file
                         )
                         shutil.copy2(source_file, dest_file)
                         copied = True
@@ -955,47 +963,49 @@ class YTDevClient(BaseYTClient):
                 if source_file.exists():
                     dest_file = sandbox_dir / local_name
                     dest_file.parent.mkdir(parents=True, exist_ok=True)
-                    self.logger.debug(f"  Dev: copying {source_file} -> {dest_file}")
+                    self.logger.debug("  Dev: copying %s -> %s", source_file, dest_file)
                     shutil.copy2(source_file, dest_file)
                     copied = True
-                else:
-                    # Also try ytjobs files - they might be in the installed package
-                    if local_name.startswith("ytjobs/"):
-                        try:
-                            import ytjobs
+                # Also try ytjobs files - they might be in the installed package
+                elif local_name.startswith("ytjobs/"):
+                    try:
+                        import ytjobs
 
-                            ytjobs_dir = Path(ytjobs.__file__).parent
-                            ytjobs_rel_path = local_name.replace("ytjobs/", "")
-                            source_file = ytjobs_dir / ytjobs_rel_path
-                            if source_file.exists():
-                                dest_file = sandbox_dir / local_name
-                                dest_file.parent.mkdir(parents=True, exist_ok=True)
-                                self.logger.debug(
-                                    f"  Dev: copying ytjobs {source_file} -> {dest_file}"
-                                )
-                                shutil.copy2(source_file, dest_file)
-                                copied = True
-                        except ImportError:
-                            pass
+                        ytjobs_dir = Path(ytjobs.__file__).parent
+                        ytjobs_rel_path = local_name.replace("ytjobs/", "")
+                        source_file = ytjobs_dir / ytjobs_rel_path
+                        if source_file.exists():
+                            dest_file = sandbox_dir / local_name
+                            dest_file.parent.mkdir(parents=True, exist_ok=True)
+                            self.logger.debug(
+                                "  Dev: copying ytjobs %s -> %s", source_file, dest_file
+                            )
+                            shutil.copy2(source_file, dest_file)
+                            copied = True
+                    except ImportError:
+                        pass
 
             if not copied:
                 self.logger.debug(
-                    f"  Dev: skipping file {yt_path} -> {local_name} (not found locally)"
+                    "  Dev: skipping file %s -> %s (not found locally)",
+                    yt_path,
+                    local_name,
                 )
 
     def _prepare_map_sandbox(
         self, input_table: str, output_table: str
-    ) -> Tuple[Path, Path, Path]:
+    ) -> tuple[Path, Path, Path]:
         """Prepare sandbox directory and input/output file paths."""
-        assert self.pipeline_dir is not None
+        self._pipeline_dir_or_raise()
 
         input_path = self._table_local_path(input_table)
 
         if not input_path.exists():
-            raise FileNotFoundError(
+            msg = (
                 f"Dev: input table file not found: {input_path}. "
                 "Create it (e.g. run a previous stage or add .jsonl manually)."
             )
+            raise FileNotFoundError(msg)
 
         self._dev_dir().mkdir(parents=True, exist_ok=True)
 
@@ -1011,12 +1021,12 @@ class YTDevClient(BaseYTClient):
         sandbox_output = sandbox_dir / "output.jsonl"
         shutil.copy2(input_path, sandbox_input)
 
-        self.logger.info(f"  Dev: sandbox={sandbox_dir}")
-        self.logger.info(f"  Dev: stdin={sandbox_input}, stdout={sandbox_output}")
+        self.logger.info("  Dev: sandbox=%s", sandbox_dir)
+        self.logger.info("  Dev: stdin=%s, stdout=%s", sandbox_input, sandbox_output)
 
         return sandbox_dir, sandbox_input, sandbox_output
 
-    def _setup_map_environment(self, env: Dict[str, str]) -> Dict[str, str]:
+    def _setup_map_environment(self, env: dict[str, str]) -> dict[str, str]:
         """Setup environment variables for map operation."""
         env_merged = self._build_env(env)
 
@@ -1027,9 +1037,8 @@ class YTDevClient(BaseYTClient):
 
         return env_merged
 
-    def _find_checkpoint_in_config(self, stage_config) -> Optional[str]:
-        """
-        Find checkpoint local_checkpoint_path in stage config.
+    def _find_checkpoint_in_config(self, stage_config) -> str | None:
+        """Find checkpoint local_checkpoint_path in stage config.
 
         Searches through all operations in client.operations dynamically,
         then falls back to client.local_checkpoint_path (legacy).
@@ -1039,6 +1048,7 @@ class YTDevClient(BaseYTClient):
 
         Returns:
             Local checkpoint path string if found, None otherwise
+
         """
         from omegaconf import OmegaConf
 
@@ -1052,7 +1062,7 @@ class YTDevClient(BaseYTClient):
         # Then, iterate over all operations dynamically
         operations = OmegaConf.select(stage_config, "client.operations")
         if operations:
-            for op_name in operations.keys():
+            for op_name in operations:
                 checkpoint_path = (
                     f"client.operations.{op_name}.checkpoint.local_checkpoint_path"
                 )
@@ -1062,9 +1072,9 @@ class YTDevClient(BaseYTClient):
 
         return None
 
-    def _get_local_checkpoint_path(self) -> Optional[str]:
+    def _get_local_checkpoint_path(self) -> str | None:
         """Get local checkpoint path from stage config if available."""
-        assert self.pipeline_dir is not None
+        self._pipeline_dir_or_raise()
 
         # Try to find stage config by scanning stages directory
         stages_dir = self.pipeline_dir / "stages"
@@ -1089,23 +1099,24 @@ class YTDevClient(BaseYTClient):
                                 checkpoint_path = Path(local_checkpoint).resolve()
                                 if checkpoint_path.exists():
                                     self.logger.debug(
-                                        f"  Dev: found local_checkpoint_path: {checkpoint_path}"
+                                        "  Dev: found local_checkpoint_path: %s",
+                                        checkpoint_path,
                                     )
                                     return str(checkpoint_path)
                         except Exception as e:
                             # Continue to next stage config
                             self.logger.debug(
-                                f"  Dev: error reading {stage_config_path}: {e}"
+                                "  Dev: error reading %s: %s", stage_config_path, e
                             )
                             continue
         except Exception as e:
-            self.logger.debug(f"  Dev: error scanning stages directory: {e}")
+            self.logger.debug("  Dev: error scanning stages directory: %s", e)
 
         return None
 
-    def _setup_checkpoint_config(self, env_merged: Dict[str, str]) -> None:
+    def _setup_checkpoint_config(self, env_merged: dict[str, str]) -> None:
         """Setup checkpoint config from stage config if available."""
-        assert self.pipeline_dir is not None
+        self._pipeline_dir_or_raise()
 
         # Try to find stage config by scanning stages directory
         # This is a best-effort approach since we no longer have mapper_script path
@@ -1147,18 +1158,21 @@ class YTDevClient(BaseYTClient):
                                     )
                                     env_merged["CHECKPOINT_FILE"] = checkpoint_filename
                                     self.logger.info(
-                                        f"  Dev: checkpoint file set to: {checkpoint_filename} (from {checkpoint_path})"
+                                        "  Dev: checkpoint file set to: %s (from %s)",
+                                        checkpoint_filename,
+                                        checkpoint_path,
                                     )
                                 else:
                                     self.logger.warning(
-                                        f"  Dev: local_checkpoint_path not found: {checkpoint_path}"
+                                        "  Dev: local_checkpoint_path not found: %s",
+                                        checkpoint_path,
                                     )
                         except Exception as e:
                             self.logger.warning(
-                                f"  Dev: failed to load checkpoint config: {e}"
+                                "  Dev: failed to load checkpoint config: %s", e
                             )
 
                         # Only use first found config as fallback
                         break
         except Exception as e:
-            self.logger.debug(f"  Dev: could not setup checkpoint config: {e}")
+            self.logger.debug("  Dev: could not setup checkpoint config: %s", e)

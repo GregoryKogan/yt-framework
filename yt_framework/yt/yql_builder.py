@@ -1,11 +1,8 @@
-"""
-YQL Query Builder
+"""YQL Query Builder.
 =================
 
 Utility functions for building YQL queries programmatically.
 """
-
-from typing import List, Dict, Union, Optional, Tuple
 
 from yt_framework.yt.max_row_weight import build_max_row_weight_pragma
 
@@ -18,24 +15,26 @@ def _escape_table_name(table: str) -> str:
 
     Returns:
         str: Escaped table name (e.g., "`//tmp/my_table`").
+
     """
     return f"`{table}`"
 
 
-def _format_column_list(columns: List[str]) -> str:
-    """Format column list for SELECT clause.
+def _format_column_list(columns: list[str]) -> str:
+    r"""Format column list for SELECT clause.
 
     Args:
         columns: List of column names or expressions (e.g., ["a.id", "b.name"]).
 
     Returns:
         str: Formatted column list with indentation (e.g., "a.id,\n    b.name").
+
     """
     return ",\n    ".join(columns)
 
 
 def _format_join_conditions(
-    on: Union[str, List[str], Dict[str, str]],
+    on: str | list[str] | dict[str, str],
     left_alias: str = "a",
     right_alias: str = "b",
 ) -> str:
@@ -53,11 +52,12 @@ def _format_join_conditions(
 
     Returns:
         str: Formatted JOIN condition (e.g., "a.id = b.id" or "a.user_id = b.id AND a.region = b.region_code").
+
     """
     if isinstance(on, str):
         # Same column name on both sides
         return f"{left_alias}.{on} = {right_alias}.{on}"
-    elif isinstance(on, dict):
+    if isinstance(on, dict):
         # Different column names: {"left": "user_id", "right": "id"}
         # or multiple pairs: {"left": ["user_id", "region"], "right": ["id", "region_code"]}
         if isinstance(on.get("left"), list):
@@ -66,19 +66,17 @@ def _format_join_conditions(
             right_cols = on["right"]
             conditions = [
                 f"{left_alias}.{left_col} = {right_alias}.{right_col}"
-                for left_col, right_col in zip(left_cols, right_cols)
+                for left_col, right_col in zip(left_cols, right_cols, strict=False)
             ]
             return " AND ".join(conditions)
-        else:
-            # Single column pair
-            return f"{left_alias}.{on['left']} = {right_alias}.{on['right']}"
-    else:
-        # List of column names - same on both sides
-        conditions = [f"{left_alias}.{col} = {right_alias}.{col}" for col in on]
-        return " AND ".join(conditions)
+        # Single column pair
+        return f"{left_alias}.{on['left']} = {right_alias}.{on['right']}"
+    # List of column names - same on both sides
+    conditions = [f"{left_alias}.{col} = {right_alias}.{col}" for col in on]
+    return " AND ".join(conditions)
 
 
-def _format_group_by_list(group_by: Union[str, List[str]]) -> str:
+def _format_group_by_list(group_by: str | list[str]) -> str:
     """Format GROUP BY column list.
 
     Args:
@@ -86,6 +84,7 @@ def _format_group_by_list(group_by: Union[str, List[str]]) -> str:
 
     Returns:
         str: Formatted GROUP BY clause (e.g., "region" or "region, status").
+
     """
     if isinstance(group_by, str):
         return group_by
@@ -93,8 +92,8 @@ def _format_group_by_list(group_by: Union[str, List[str]]) -> str:
 
 
 def _format_aggregations(
-    aggregations: Dict[str, Union[str, Tuple[str, str]]],
-    group_by: Union[str, List[str]],
+    aggregations: dict[str, str | tuple[str, str]],
+    group_by: str | list[str],
 ) -> str:
     """Format aggregation expressions for SELECT clause.
 
@@ -104,6 +103,7 @@ def _format_aggregations(
                      - Explicit column format: {"total_amount": ("sum", "amount")} -> SUM(amount) AS total_amount
                      - Column with alias: {"total_amount": ("sum", "a.amount")} -> SUM(a.amount) AS total_amount
         group_by: Column(s) to group by
+
     """
     # Include group by columns
     group_cols = [group_by] if isinstance(group_by, str) else group_by
@@ -139,9 +139,7 @@ def _format_aggregations(
     return ",\n    ".join(select_parts)
 
 
-def _format_order_by_list(
-    order_by: Union[str, List[str]], ascending: bool = True
-) -> str:
+def _format_order_by_list(order_by: str | list[str], ascending: bool = True) -> str:
     """Format ORDER BY column list.
 
     Args:
@@ -151,6 +149,7 @@ def _format_order_by_list(
     Returns:
         str: Formatted ORDER BY clause (e.g., "id ASC" or "id ASC, name ASC").
              All columns use the same sort direction (mixed directions not supported).
+
     """
     direction = "ASC" if ascending else "DESC"
     if isinstance(order_by, str):
@@ -158,7 +157,7 @@ def _format_order_by_list(
     return ", ".join([f"{col} {direction}" for col in order_by])
 
 
-def _pragma_header(max_row_weight: Optional[str] = None) -> str:
+def _pragma_header(max_row_weight: str | None = None) -> str:
     return (
         f"{build_max_row_weight_pragma(max_row_weight)}\nPRAGMA yt.InferSchema = '1';"
     )
@@ -168,13 +167,12 @@ def build_join_query(
     left_table: str,
     right_table: str,
     output_table: str,
-    on: Union[str, List[str], Dict[str, str]],
+    on: str | list[str] | dict[str, str],
     how: str = "left",
-    select_columns: Optional[List[str]] = None,
-    max_row_weight: Optional[str] = None,
+    select_columns: list[str] | None = None,
+    max_row_weight: str | None = None,
 ) -> str:
-    """
-    Build a YQL JOIN query.
+    """Build a YQL JOIN query.
 
     Args:
         left_table: Left table path
@@ -190,6 +188,7 @@ def build_join_query(
 
     Returns:
         YQL query string
+
     """
     join_type = how.upper()
     if join_type == "FULL":
@@ -245,9 +244,9 @@ def build_join_query(
 
     if use_using:
         # Format USING clause
-        assert (
-            using_columns is not None
-        ), "using_columns must be set when use_using is True"
+        if using_columns is None:
+            msg = "using_columns must be set when use_using is True"
+            raise ValueError(msg)
         if len(using_columns) == 1:
             using_clause = f"USING ({using_columns[0]})"
         else:
@@ -261,9 +260,9 @@ FROM {_escape_table_name(left_table)} AS a
 {join_type} JOIN {_escape_table_name(right_table)} AS b
 {using_clause};"""
     else:
-        assert (
-            join_conditions is not None
-        ), "join_conditions must be set when use_using is False"
+        if join_conditions is None:
+            msg = "join_conditions must be set when use_using is False"
+            raise ValueError(msg)
         query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
@@ -279,11 +278,10 @@ def build_filter_query(
     input_table: str,
     output_table: str,
     condition: str,
-    columns: List[str],
-    max_row_weight: Optional[str] = None,
+    columns: list[str],
+    max_row_weight: str | None = None,
 ) -> str:
-    """
-    Build a YQL filter query with WHERE clause.
+    """Build a YQL filter query with WHERE clause.
 
     Args:
         input_table: Input table path
@@ -293,27 +291,25 @@ def build_filter_query(
 
     Returns:
         YQL query string
+
     """
     select_clause = _format_column_list(columns)
 
-    query = f"""{_pragma_header(max_row_weight)}
+    return f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
 FROM {_escape_table_name(input_table)}
 WHERE {condition};"""
 
-    return query
-
 
 def build_select_query(
     input_table: str,
     output_table: str,
-    columns: List[str],
-    max_row_weight: Optional[str] = None,
+    columns: list[str],
+    max_row_weight: str | None = None,
 ) -> str:
-    """
-    Build a YQL query to select specific columns.
+    """Build a YQL query to select specific columns.
 
     Args:
         input_table: Input table path
@@ -322,27 +318,25 @@ def build_select_query(
 
     Returns:
         YQL query string
+
     """
     select_clause = _format_column_list(columns)
 
-    query = f"""{_pragma_header(max_row_weight)}
+    return f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
 FROM {_escape_table_name(input_table)};"""
 
-    return query
-
 
 def build_group_by_query(
     input_table: str,
     output_table: str,
-    group_by: Union[str, List[str]],
-    aggregations: Dict[str, Union[str, Tuple[str, str]]],
-    max_row_weight: Optional[str] = None,
+    group_by: str | list[str],
+    aggregations: dict[str, str | tuple[str, str]],
+    max_row_weight: str | None = None,
 ) -> str:
-    """
-    Build a YQL GROUP BY query with aggregations.
+    """Build a YQL GROUP BY query with aggregations.
 
     Args:
         input_table: Input table path
@@ -354,6 +348,7 @@ def build_group_by_query(
 
     Returns:
         YQL query string
+
     """
     select_clause = _format_aggregations(aggregations, group_by)
     group_clause = _format_group_by_list(group_by)
@@ -377,13 +372,12 @@ GROUP BY {group_clause};"""
 
 
 def build_union_query(
-    tables: List[str],
+    tables: list[str],
     output_table: str,
-    columns: List[str],
-    max_row_weight: Optional[str] = None,
+    columns: list[str],
+    max_row_weight: str | None = None,
 ) -> str:
-    """
-    Build a YQL UNION ALL query.
+    """Build a YQL UNION ALL query.
 
     Args:
         tables: List of table paths to union
@@ -392,9 +386,11 @@ def build_union_query(
 
     Returns:
         YQL query string
+
     """
     if len(tables) < 2:
-        raise ValueError("UNION requires at least 2 tables")
+        msg = "UNION requires at least 2 tables"
+        raise ValueError(msg)
 
     select_clause = _format_column_list(columns)
     union_parts = [
@@ -403,21 +399,18 @@ def build_union_query(
     ]
     union_clause = "\nUNION ALL\n".join(union_parts)
 
-    query = f"""{_pragma_header(max_row_weight)}
+    return f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 {union_clause};"""
-
-    return query
 
 
 def build_distinct_query(
     input_table: str,
     output_table: str,
-    columns: Optional[List[str]] = None,
-    max_row_weight: Optional[str] = None,
+    columns: list[str] | None = None,
+    max_row_weight: str | None = None,
 ) -> str:
-    """
-    Build a YQL DISTINCT query.
+    """Build a YQL DISTINCT query.
 
     Args:
         input_table: Input table path
@@ -426,31 +419,26 @@ def build_distinct_query(
 
     Returns:
         YQL query string
-    """
-    if columns:
-        select_clause = _format_column_list(columns)
-    else:
-        select_clause = "*"
 
-    query = f"""{_pragma_header(max_row_weight)}
+    """
+    select_clause = _format_column_list(columns) if columns else "*"
+
+    return f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT DISTINCT
     {select_clause}
 FROM {_escape_table_name(input_table)};"""
 
-    return query
-
 
 def build_sort_query(
     input_table: str,
     output_table: str,
-    order_by: Union[str, List[str]],
-    columns: List[str],
+    order_by: str | list[str],
+    columns: list[str],
     ascending: bool = True,
-    max_row_weight: Optional[str] = None,
+    max_row_weight: str | None = None,
 ) -> str:
-    """
-    Build a YQL ORDER BY query.
+    """Build a YQL ORDER BY query.
 
     Uses a subquery pattern to prevent YQL from adding internal binary columns
     like _yql_column_0 that can appear with ORDER BY operations.
@@ -464,13 +452,14 @@ def build_sort_query(
 
     Returns:
         YQL query string
+
     """
     order_clause = _format_order_by_list(order_by, ascending)
     select_clause = _format_column_list(columns)
 
     # Use subquery pattern to prevent YQL from adding internal binary columns
     # Inner query does the ORDER BY, outer query selects only desired columns
-    query = f"""{_pragma_header(max_row_weight)}
+    return f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
@@ -480,18 +469,15 @@ FROM (
     ORDER BY {order_clause}
 );"""
 
-    return query
-
 
 def build_limit_query(
     input_table: str,
     output_table: str,
     limit: int,
-    columns: List[str],
-    max_row_weight: Optional[str] = None,
+    columns: list[str],
+    max_row_weight: str | None = None,
 ) -> str:
-    """
-    Build a YQL LIMIT query.
+    """Build a YQL LIMIT query.
 
     Args:
         input_table: Input table path
@@ -501,14 +487,13 @@ def build_limit_query(
 
     Returns:
         YQL query string
+
     """
     select_clause = _format_column_list(columns)
 
-    query = f"""{_pragma_header(max_row_weight)}
+    return f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
 FROM {_escape_table_name(input_table)}
 LIMIT {limit};"""
-
-    return query

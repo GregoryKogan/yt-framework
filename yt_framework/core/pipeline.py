@@ -5,31 +5,32 @@ Subclass ``BasePipeline``, implement ``setup()`` to register stages with
 ``DefaultPipeline`` auto-discovers stages under ``stages/*/stage.py``.
 """
 
-import sys
 import argparse
 import logging
+import sys
 import traceback
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Optional, Dict, Any, cast, TypeAlias, List
+from typing import Any, TypeAlias, cast
 
-from omegaconf import OmegaConf, DictConfig, ListConfig
-from yt_framework.yt.factory import create_yt_client
+from omegaconf import DictConfig, ListConfig, OmegaConf
+
+from yt_framework.core.dependencies import PipelineStageDependencies
+from yt_framework.core.registry import StageRegistry
+from yt_framework.operations.upload import upload_all_code
+from yt_framework.utils.env import load_secrets
 from yt_framework.utils.logging import (
-    setup_logging,
     log_header,
     log_operation,
     log_success,
+    setup_logging,
 )
-from yt_framework.utils.env import load_secrets
-from yt_framework.core.registry import StageRegistry
-from yt_framework.core.dependencies import PipelineStageDependencies
-from yt_framework.operations.upload import upload_all_code
+from yt_framework.yt.factory import create_yt_client
 
-DebugContext: TypeAlias = Dict[str, Any]
+DebugContext: TypeAlias = dict[str, Any]
 
 
-def _normalize_upload_modules(raw: Any) -> List[str]:
+def _normalize_upload_modules(raw: Any) -> list[str]:
     """Normalize upload_modules config: accept list, tuple, or single string."""
     if raw is None:
         return []
@@ -38,38 +39,39 @@ def _normalize_upload_modules(raw: Any) -> List[str]:
         return [s] if s else []
     if isinstance(raw, (list, tuple, ListConfig)):
         return [str(m).strip() for m in raw if str(m).strip()]
-    raise ValueError(
-        "upload_modules must be a list of module names or a single string."
-    )
+    msg = "upload_modules must be a list of module names or a single string."
+    raise ValueError(msg)
 
 
-def _normalize_upload_paths(raw: Any) -> List[Dict[str, str]]:
+def _normalize_upload_paths(raw: Any) -> list[dict[str, str]]:
     """Normalize upload_paths config: must be a list of {source, target?} mappings."""
     if raw is None:
         return []
 
     if not isinstance(raw, (list, tuple, ListConfig)):
-        raise ValueError("upload_paths must be a list of {source, target?} dicts.")
+        msg = "upload_paths must be a list of {source, target?} dicts."
+        raise ValueError(msg)
 
-    normalized: List[Dict[str, str]] = []
+    normalized: list[dict[str, str]] = []
     for idx, element in enumerate(raw):
         if isinstance(element, DictConfig):
             element = OmegaConf.to_container(element, resolve=True)
         if not isinstance(element, Mapping):
-            raise ValueError(
+            msg = (
                 f"upload_paths[{idx}] must be a mapping with at least a 'source' key, "
                 f"got {type(element).__name__!r}."
             )
+            raise ValueError(msg)
         if "source" not in element:
-            raise ValueError(f"upload_paths[{idx}] is missing required 'source' key.")
+            msg = f"upload_paths[{idx}] is missing required 'source' key."
+            raise ValueError(msg)
         normalized.append({k: str(v) for k, v in element.items()})
 
     return normalized
 
 
 class BasePipeline:
-    """
-    Base class for all pipelines.
+    """Base class for all pipelines.
 
     Provides common functionality:
     - CLI entry point via main() class method
@@ -90,9 +92,8 @@ class BasePipeline:
         config: DictConfig,
         pipeline_dir: Path,
         log_level: int = logging.INFO,
-    ):
-        """
-        Initialize the base pipeline.
+    ) -> None:
+        """Initialize the base pipeline.
 
         Args:
             config: Configuration object (OmegaConf DictConfig)
@@ -104,6 +105,7 @@ class BasePipeline:
 
         Raises:
             ValueError: If pipeline directory does not exist.
+
         """
         self.config = config
         self.pipeline_dir = Path(pipeline_dir).resolve()
@@ -114,7 +116,8 @@ class BasePipeline:
 
         # Verify pipeline directory exists
         if not self.pipeline_dir.exists():
-            raise ValueError(f"Pipeline directory not found: {self.pipeline_dir}")
+            msg = f"Pipeline directory not found: {self.pipeline_dir}"
+            raise ValueError(msg)
 
         # Set up logger with custom name based on class
         self.logger = setup_logging(level=log_level, name=self.__class__.__name__)
@@ -128,27 +131,27 @@ class BasePipeline:
             OmegaConf.to_container(pickling_cfg, resolve=True) if pickling_cfg else {}
         )
         if pickling_dict and not isinstance(pickling_dict, Mapping):
-            raise TypeError(
+            msg = (
                 "pipeline.pickling must be a mapping-compatible config, "
                 f"got {type(pickling_dict).__name__}"
             )
+            raise TypeError(msg)
         self.yt = create_yt_client(
             logger=self.logger,
             mode=self.config.pipeline.get("mode"),
             pipeline_dir=self.pipeline_dir,
-            secrets=secrets if secrets else None,
+            secrets=secrets or None,
             pickling=pickling_dict,
         )
 
         # Initialize stage registry (set by setup())
-        self._stage_registry: Optional[StageRegistry] = None
+        self._stage_registry: StageRegistry | None = None
 
         # Call setup hook for pipeline-specific initialization
         self.setup()
 
     def setup(self) -> None:
-        """
-        Hook for pipeline-specific initialization.
+        """Hook for pipeline-specific initialization.
 
         Override this method in subclasses to:
         1. Register stages using StageRegistry and set_stage_registry()
@@ -158,30 +161,30 @@ class BasePipeline:
 
         Returns:
             None
+
         """
-        pass
 
     def set_stage_registry(self, registry: StageRegistry) -> None:
-        """
-        Set the stage registry for this pipeline.
+        """Set the stage registry for this pipeline.
 
         Args:
             registry: StageRegistry instance with registered stages
 
         Returns:
             None
+
         """
         self._stage_registry = registry
 
     def create_stage_dependencies(self) -> PipelineStageDependencies:
-        """
-        Create stage dependencies for injection.
+        """Create stage dependencies for injection.
 
         This method creates a dependency container with only what stages need,
         following the Interface Segregation Principle.
 
         Returns:
             PipelineStageDependencies with yt_client, pipeline_config, configs_dir
+
         """
         return PipelineStageDependencies(
             yt_client=self.yt,
@@ -190,13 +193,13 @@ class BasePipeline:
         )
 
     def _stages_need_code_execution(self) -> bool:
-        """
-        Check if any enabled stages need code execution on YT.
+        """Check if any enabled stages need code execution on YT.
 
         Stages need code execution if they have src/mapper.py or src/vanilla.py files.
 
         Returns:
             True if any enabled stage needs code execution, False otherwise
+
         """
         enabled_stages = self.config.stages.enabled_stages
         if not enabled_stages:
@@ -214,9 +217,8 @@ class BasePipeline:
 
         return False
 
-    def upload_code(self, build_folder: Optional[str] = None) -> None:
-        """
-        Upload code to YT build folder.
+    def upload_code(self, build_folder: str | None = None) -> None:
+        """Upload code to YT build folder.
 
         Only uploads code if any enabled stages need code execution on YT.
         If no stages need code execution, this method does nothing.
@@ -230,6 +232,7 @@ class BasePipeline:
 
         Raises:
             ValueError: If build_folder is required but not provided in config.
+
         """
         # Check if any stages need code execution
         if not self._stages_need_code_execution():
@@ -242,11 +245,12 @@ class BasePipeline:
         if build_folder is None:
             build_folder = self.config.pipeline.get("build_folder")
             if not build_folder:
-                raise ValueError(
+                msg = (
                     "build_folder not found in [pipeline] config section. "
                     "Stages with src/ directory require code execution on YT. "
                     'Add: build_folder = "//path/to/build/folder"'
                 )
+                raise ValueError(msg)
 
         # Get upload_modules and upload_paths from config
         upload_modules = _normalize_upload_modules(
@@ -264,8 +268,7 @@ class BasePipeline:
         )
 
     def run(self) -> None:
-        """
-        Run the pipeline by executing enabled stages.
+        """Run the pipeline by executing enabled stages.
 
         Default implementation:
         1. Upload code to YT (only if stages need code execution)
@@ -281,6 +284,7 @@ class BasePipeline:
         Raises:
             ValueError: If no enabled_stages found in config or unknown stage name.
             AttributeError: If stage registry is not set in setup().
+
         """
         # Upload code once
         self.upload_code()
@@ -288,10 +292,11 @@ class BasePipeline:
         # Get enabled stages from config
         enabled_stages = self.config.stages.enabled_stages
         if not enabled_stages:
-            raise ValueError(
+            msg = (
                 "No enabled_stages found in stages config section. "
                 'Add: enabled_stages: ["stage1", "stage2", "stage3"]'
             )
+            raise ValueError(msg)
 
         log_header(
             self.logger, "Pipeline", f"Starting execution | Stages: {enabled_stages}"
@@ -299,10 +304,11 @@ class BasePipeline:
 
         # Verify stage registry is set
         if self._stage_registry is None:
-            raise AttributeError(
+            msg = (
                 f"{self.__class__.__name__}.setup() must create and set stage registry. "
                 "Example: self.set_stage_registry(StageRegistry().add_stage(MyStage))"
             )
+            raise AttributeError(msg)
 
         # Execute stages in order
         # Note: 'context' here is the shared data dict passed between stages
@@ -314,9 +320,8 @@ class BasePipeline:
         for stage_name in enabled_stages:
             if not self._stage_registry.has_stage(stage_name):
                 available = list(self._stage_registry.get_all_stages().keys())
-                raise ValueError(
-                    f"Unknown stage: {stage_name}. " f"Available stages: {available}"
-                )
+                msg = f"Unknown stage: {stage_name}. Available stages: {available}"
+                raise ValueError(msg)
 
             # Instantiate and run stage
             stage_class = self._stage_registry.get_stage(stage_name)
@@ -334,8 +339,7 @@ class BasePipeline:
 
     @classmethod
     def main(cls, argv=None) -> None:
-        """
-        CLI entry point for the pipeline.
+        """CLI entry point for the pipeline.
 
         Handles:
         - Argument parsing (--config option)
@@ -352,6 +356,7 @@ class BasePipeline:
         Usage:
             python pipeline.py
             python pipeline.py --config configs/custom.yaml
+
         """
         logger = setup_logging(level=logging.INFO, name=cls.__name__)
 
@@ -374,7 +379,7 @@ class BasePipeline:
             config_path = pipeline_dir / config_path
 
         if not config_path.exists():
-            logger.error(f"Config file not found: {config_path}")
+            logger.error("Config file not found: %s", config_path)
             sys.exit(1)
 
         # Determine mode for logging
@@ -385,8 +390,8 @@ class BasePipeline:
                 if isinstance(temp_config, DictConfig)
                 else "dev"
             )
-        except Exception as e:
-            logger.error(f"Failed to determine mode: {e}")
+        except Exception:
+            logger.exception("Failed to determine mode")
             mode = "dev"
 
         config_rel_path = (
@@ -406,12 +411,13 @@ class BasePipeline:
             # Ensure it's a DictConfig (not ListConfig)
             if not isinstance(loaded_config, DictConfig):
                 logger.error(
-                    f"Config file must contain a dictionary, got {type(loaded_config).__name__}"
+                    "Config file must contain a dictionary, got %s",
+                    type(loaded_config).__name__,
                 )
                 sys.exit(1)
-            config = cast(DictConfig, loaded_config)
-        except Exception as e:
-            logger.error(f"Failed to load config: {e}")
+            config = cast("DictConfig", loaded_config)
+        except Exception:
+            logger.exception("Failed to load config")
             traceback.print_exc()
             sys.exit(1)
 
@@ -422,15 +428,14 @@ class BasePipeline:
             log_success(logger, "Pipeline completed successfully")
             sys.exit(0)
 
-        except Exception as e:
-            logger.error(f"Pipeline failed: {e}")
+        except Exception:
+            logger.exception("Pipeline failed")
             traceback.print_exc()
             sys.exit(1)
 
 
 class DefaultPipeline(BasePipeline):
-    """
-    Pipeline with automatic stage discovery.
+    """Pipeline with automatic stage discovery.
 
     Discovers ``BaseStage`` subclasses from ``stages/<name>/stage.py`` and
     registers them. Run with ``DefaultPipeline.main()`` from ``pipeline.py``.
@@ -438,14 +443,14 @@ class DefaultPipeline(BasePipeline):
     """
 
     def setup(self) -> None:
-        """
-        Automatically discover and register stages from the ``stages`` directory.
+        """Automatically discover and register stages from the ``stages`` directory.
 
         Looks for ``stage.py`` under each ``stages/<name>/`` folder and registers
         every ``BaseStage`` subclass found.
 
         Returns:
             None
+
         """
         from yt_framework.core.discovery import discover_stages
 

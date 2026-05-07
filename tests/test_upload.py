@@ -5,7 +5,6 @@ import sys
 import tarfile
 import types
 from pathlib import Path
-from typing import List, Tuple
 
 import pytest
 
@@ -33,7 +32,7 @@ class _FakeUploadYtClient:
     """Records upload_file calls for upload_code_archive contract tests."""
 
     def __init__(self) -> None:
-        self.upload_calls: List[Tuple[Path, str, bool]] = []
+        self.upload_calls: list[tuple[Path, str, bool]] = []
 
     def upload_file(
         self,
@@ -98,9 +97,9 @@ def test_resolve_build_code_dir_removes_pre_existing_dot_build_tree(
     stale.parent.mkdir(parents=True)
     stale.write_text("old", encoding="utf-8")
     out = _resolve_build_code_dir(pipeline_dir=tmp_path, logger=logger)
-    assert (
-        out == tmp_path / ".build" and out.is_dir() and not stale.exists()
-    ), "pre-existing .build must be replaced with a fresh directory"
+    assert out == tmp_path / ".build" and out.is_dir() and not stale.exists(), (
+        "pre-existing .build must be replaced with a fresh directory"
+    )
 
 
 def test_validate_upload_config_rejects_upload_modules_targeting_reserved_name() -> (
@@ -140,9 +139,9 @@ def test_upload_all_code_creates_tarball_under_pipeline_dot_build(
     client = YTDevClient(logger=logger, pipeline_dir=tmp_path)
     upload_all_code(client, "//yt/test/build", tmp_path, logger)
     archive = tmp_path / ".build" / "source.tar.gz"
-    assert (
-        archive.is_file() and archive.stat().st_size > 0
-    ), "expected non-empty archive after full upload pipeline"
+    assert archive.is_file() and archive.stat().st_size > 0, (
+        "expected non-empty archive after full upload pipeline"
+    )
 
 
 def test_copy_module_to_build_dir_raises_value_error_on_import_error(
@@ -185,7 +184,8 @@ def test_copy_module_to_build_dir_copies_package_tree(tmp_path: Path) -> None:
         logger.addHandler(logging.NullHandler())
         target = tmp_path / "build_pkg" / "upload_pkg"
         n = _copy_module_to_build_dir("upload_pkg", target, logger)
-        assert n >= 2 and (target / "mod.py").is_file()
+        assert n >= 2
+        assert (target / "mod.py").is_file()
     finally:
         sys.path.remove(str(tmp_path))
 
@@ -318,7 +318,8 @@ def test_copy_path_to_build_dir_copies_directory_tree(tmp_path: Path) -> None:
         pipeline_dir=tmp_path,
         logger=logger,
     )
-    assert n == 1 and (build / "my_extra" / "a.txt").read_text(encoding="utf-8") == "1"
+    assert n == 1
+    assert (build / "my_extra" / "a.txt").read_text(encoding="utf-8") == "1"
 
 
 def test_copy_path_to_build_dir_skips_ytignored_files(tmp_path: Path) -> None:
@@ -359,9 +360,9 @@ def test_copy_stage_to_build_dir_skips_src_file_when_matched_by_ytignore(
     build = tmp_path / "b_igsrc"
     n = _copy_stage_to_build_dir(build, stage, logger)
     tgt = build / "stages" / "st_igsrc" / "src"
-    assert (
-        n == 2 and (tgt / "keep.py").is_file() and not (tgt / "skip.py").exists()
-    ), "patterned src file must be skipped; config and keep.py copy"
+    assert n == 2 and (tgt / "keep.py").is_file() and not (tgt / "skip.py").exists(), (
+        "patterned src file must be skipped; config and keep.py copy"
+    )
 
 
 def test_load_stage_job_section_returns_empty_when_config_yaml_missing(
@@ -398,9 +399,9 @@ def test_resolve_map_reduce_command_scripts_treats_non_mapping_as_empty(
         encoding="utf-8",
     )
     mapper, reducer = _resolve_map_reduce_command_scripts(stage, logger)
-    assert (
-        mapper == "mapper.py" and reducer is None
-    ), "scalar map_reduce_command must fall back like empty dict"
+    assert mapper == "mapper.py" and reducer is None, (
+        "scalar map_reduce_command must fall back like empty dict"
+    )
 
 
 def test_resolve_map_reduce_command_scripts_returns_none_when_mapper_missing(
@@ -417,12 +418,10 @@ def test_resolve_map_reduce_command_scripts_returns_none_when_mapper_missing(
         encoding="utf-8",
     )
     mapper, reducer = _resolve_map_reduce_command_scripts(stage, logger)
-    assert (
-        mapper is None
-        and reducer is None
-        and "ghost.py" in caplog.text
-        and "skipping map_reduce_mapper" in caplog.text
-    )
+    assert mapper is None
+    assert reducer is None
+    assert "ghost.py" in caplog.text
+    assert "skipping map_reduce_mapper" in caplog.text
 
 
 def test_resolve_map_reduce_command_scripts_writes_both_wrappers_when_reducer_resolved(
@@ -463,9 +462,9 @@ def test_create_map_reduce_command_wrappers_writes_nothing_when_mapper_unresolva
     build = tmp_path / "build_mr_empty"
     build.mkdir()
     _create_map_reduce_command_wrappers("st_mr_empty", stage, build, logger)
-    assert (
-        list(build.glob("operation_wrapper_*")) == []
-    ), "no mapper script means no wrapper files"
+    assert list(build.glob("operation_wrapper_*")) == [], (
+        "no mapper script means no wrapper files"
+    )
 
 
 def test_resolve_map_reduce_command_scripts_auto_discovers_reducer_mds_file(
@@ -482,9 +481,9 @@ def test_resolve_map_reduce_command_scripts_auto_discovers_reducer_mds_file(
         encoding="utf-8",
     )
     mapper, reducer = _resolve_map_reduce_command_scripts(stage, logger)
-    assert (
-        mapper == "mapper.py" and reducer == "reducer_mds.py"
-    ), "candidate list should pick reducer_mds.py when reducer_script omitted"
+    assert mapper == "mapper.py" and reducer == "reducer_mds.py", (
+        "candidate list should pick reducer_mds.py when reducer_script omitted"
+    )
 
 
 def test_resolve_reduce_command_script_ignores_scalar_reduce_command_value(
@@ -499,9 +498,9 @@ def test_resolve_reduce_command_script_ignores_scalar_reduce_command_value(
         "job:\n  reduce_command: not_a_mapping\n",
         encoding="utf-8",
     )
-    assert (
-        _resolve_reduce_command_script(stage, logger) == "reducer.py"
-    ), "non-dict reduce_command must fall back to default reducer filename"
+    assert _resolve_reduce_command_script(stage, logger) == "reducer.py", (
+        "non-dict reduce_command must fall back to default reducer filename"
+    )
 
 
 def test_resolve_reduce_command_script_returns_explicit_name_when_file_exists(
@@ -549,9 +548,9 @@ def test_build_code_locally_creates_vanilla_wrapper_for_vanilla_only_stage(
         create_wrappers=True,
     )
     wrap = build_dir / "operation_wrapper_van_only_vanilla.sh"
-    assert wrap.is_file() and "vanilla.py" in wrap.read_text(
-        encoding="utf-8"
-    ), "vanilla-only stage should get vanilla operation wrapper"
+    assert wrap.is_file() and "vanilla.py" in wrap.read_text(encoding="utf-8"), (
+        "vanilla-only stage should get vanilla operation wrapper"
+    )
 
 
 def test_build_code_locally_creates_reduce_wrapper_when_reduce_command_configured(
@@ -575,9 +574,9 @@ def test_build_code_locally_creates_reduce_wrapper_when_reduce_command_configure
         create_wrappers=True,
     )
     sh = build_dir / "operation_wrapper_red_wrap_st_reduce.sh"
-    assert sh.is_file() and "red_only.py" in sh.read_text(
-        encoding="utf-8"
-    ), "reduce_command should produce reduce shell wrapper"
+    assert sh.is_file() and "red_only.py" in sh.read_text(encoding="utf-8"), (
+        "reduce_command should produce reduce shell wrapper"
+    )
 
 
 def test_build_code_locally_copies_upload_modules_package_into_build_dir(
@@ -646,9 +645,9 @@ def test_build_code_locally_creates_only_map_reduce_mapper_wrapper_when_no_reduc
     )
     mapper_sh = build_dir / "operation_wrapper_mr_stage_map_reduce_mapper.sh"
     reducer_sh = build_dir / "operation_wrapper_mr_stage_map_reduce_reducer.sh"
-    assert (
-        mapper_sh.is_file() and not reducer_sh.exists()
-    ), "expected mapper wrapper without reducer when no reducer script resolves"
+    assert mapper_sh.is_file() and not reducer_sh.exists(), (
+        "expected mapper wrapper without reducer when no reducer script resolves"
+    )
 
 
 def test_copy_stage_to_build_dir_copies_job_config_and_src_files(
@@ -739,10 +738,8 @@ def test_resolve_reduce_command_script_returns_none_after_warning_when_no_reduce
         "job:\n  reduce_command:\n    reducer_script: ghost.py\n",
         encoding="utf-8",
     )
-    assert (
-        _resolve_reduce_command_script(stage, logger) is None
-        and "ghost.py" in caplog.text
-    )
+    assert _resolve_reduce_command_script(stage, logger) is None
+    assert "ghost.py" in caplog.text
 
 
 def test_load_stage_job_section_returns_empty_dict_and_warns_when_config_unreadable(
@@ -756,9 +753,9 @@ def test_load_stage_job_section_returns_empty_dict_and_warns_when_config_unreada
     stage.mkdir()
     (stage / "config.yaml").write_text("{ bad", encoding="utf-8")
     job = _load_stage_job_section(stage, logger)
-    assert (
-        job == {} and "Could not read" in caplog.text and "config.yaml" in caplog.text
-    )
+    assert job == {}
+    assert "Could not read" in caplog.text
+    assert "config.yaml" in caplog.text
 
 
 def test_create_map_reduce_command_wrappers_logs_warning_when_reducer_unresolvable(
@@ -778,9 +775,9 @@ def test_create_map_reduce_command_wrappers_logs_warning_when_reducer_unresolvab
     build = tmp_path / "build_mrw"
     build.mkdir()
     _create_map_reduce_command_wrappers("st_mrw", stage, build, logger)
-    assert (
-        "map_reduce_mapper wrapper created but no reducer script" in caplog.text
-    ), "expected warning when mapper wrapper exists but reducer file cannot be resolved"
+    assert "map_reduce_mapper wrapper created but no reducer script" in caplog.text, (
+        "expected warning when mapper wrapper exists but reducer file cannot be resolved"
+    )
 
 
 def test_create_code_archive_writes_gzip_tar_with_relative_arcnames(

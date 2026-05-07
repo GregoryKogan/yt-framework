@@ -1,5 +1,4 @@
-"""
-Dependency Strategy Pattern
+"""Dependency Strategy Pattern.
 ============================
 
 Strategy pattern for building dependencies in deployment mode.
@@ -10,16 +9,14 @@ preparation logic, following SOLID principles.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Protocol, Tuple, List, Optional, Literal
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from omegaconf import DictConfig, ListConfig
 
 from yt_framework.operations.job_command import (
-    require_consistent_map_reduce_legs,
     map_reduce_leg_kind,
+    require_consistent_map_reduce_legs,
 )
 from yt_framework.operations.tar_command_wiring import (
     bootstrap_shell_run_wrapper,
@@ -32,24 +29,27 @@ from yt_framework.operations.tokenizer_artifact import (
     resolve_tokenizer_artifact_name,
 )
 
+if TYPE_CHECKING:
+    import logging
+    from pathlib import Path
+
 
 @dataclass
 class DependencyBuildResult:
     """Result of tar-dependency preparation for an operation."""
 
     script_path: str
-    dependencies: List[Tuple[str, str]]
-    command: Optional[str]
+    dependencies: list[tuple[str, str]]
+    command: str | None
     """Bootstrap command for single-leg map/vanilla (``bash -c '...'``)."""
-    mapper_command: Optional[str] = None
+    mapper_command: str | None = None
     """When set, map-reduce mapper leg should use this string (tar + wrapper)."""
-    reducer_command: Optional[str] = None
+    reducer_command: str | None = None
     """Map-reduce reducer or reduce-only leg string (tar + wrapper) when set."""
 
 
 class DependencyBuilder(Protocol):
-    """
-    Protocol for dependency building strategies.
+    """Protocol for dependency building strategies.
 
     Defines the interface for building dependencies in different deployment modes.
     Each concrete implementation handles a specific deployment strategy.
@@ -68,8 +68,7 @@ class DependencyBuilder(Protocol):
         mapper: Any = None,
         reducer: Any = None,
     ) -> DependencyBuildResult:
-        """
-        Build dependencies for an operation.
+        """Build dependencies for an operation.
 
         Optional ``mapper`` / ``reducer`` are used for map_reduce / reduce tar command
         bootstrap when ``tar_command_bootstrap`` is enabled in ``operation_config``.
@@ -77,8 +76,7 @@ class DependencyBuilder(Protocol):
 
 
 class TarArchiveDependencyBuilder:
-    """
-    Tar archive deployment strategy.
+    """Tar archive deployment strategy.
 
     Uploads code as a single tar.gz archive and generates wrapper scripts
     that extract the archive and execute the appropriate script.
@@ -115,8 +113,8 @@ class TarArchiveDependencyBuilder:
 
         tar_bootstrap_flag = bool(operation_config.get("tar_command_bootstrap", False))
 
-        mapper_command: Optional[str] = None
-        reducer_command: Optional[str] = None
+        mapper_command: str | None = None
+        reducer_command: str | None = None
 
         if operation_type == "map_reduce":
             if mapper is not None and reducer is not None:
@@ -129,8 +127,9 @@ class TarArchiveDependencyBuilder:
                     mapper_command = wrap_bootstrap_as_bash_c(inner_m)
                     reducer_command = wrap_bootstrap_as_bash_c(inner_r)
                     logger.info(
-                        "tar_command_bootstrap enabled: map-reduce legs use tar extract + "
-                        f"{w_m} / {w_r}"
+                        "tar_command_bootstrap enabled: map-reduce legs use tar extract + %s / %s",
+                        w_m,
+                        w_r,
                     )
             bootstrap_command = ""
         elif operation_type == "reduce":
@@ -139,7 +138,7 @@ class TarArchiveDependencyBuilder:
                 inner = bootstrap_shell_run_wrapper(archive_name, w, logger)
                 reducer_command = wrap_bootstrap_as_bash_c(inner)
                 logger.info(
-                    f"tar_command_bootstrap enabled: reduce leg uses tar extract + {w}"
+                    "tar_command_bootstrap enabled: reduce leg uses tar extract + %s", w
                 )
             bootstrap_command = ""
         else:
@@ -157,22 +156,22 @@ class TarArchiveDependencyBuilder:
             script_path = f"{build_folder}/stages/{stage_name}/src/vanilla.py"
 
         # Dependencies: tar archive and optional checkpoint / extra file_paths
-        dependencies: List[Tuple[str, str]] = []
+        dependencies: list[tuple[str, str]] = []
 
         # Add tar archive as dependency
         archive_yt_path = f"{build_folder}/{archive_name}"
         dependencies.append((archive_yt_path, archive_name))
-        logger.info(f"Added tar archive dependency: {archive_yt_path}")
+        logger.info("Added tar archive dependency: %s", archive_yt_path)
 
         # Add extra file_paths from operation_config (e.g. secrets, extra files)
         for item in operation_config.get("file_paths") or []:
             if isinstance(item, (list, tuple, ListConfig)) and len(item) >= 2:
                 yt_path, local_path = item[0], item[1]
                 dependencies.append((yt_path, local_path))
-                logger.info(f"Added file dependency: {yt_path}")
+                logger.info("Added file dependency: %s", yt_path)
             elif isinstance(item, str):
                 dependencies.append((item, item.split("/")[-1]))
-                logger.info(f"Added file dependency: {item}")
+                logger.info("Added file dependency: %s", item)
 
         # Add checkpoint if configured (for map and map_reduce operations with models)
         if effective_type in ("map", "map_reduce"):
@@ -187,7 +186,7 @@ class TarArchiveDependencyBuilder:
             if model_name and checkpoint_base:
                 checkpoint_file_path = f"{checkpoint_base}/{model_name}"
                 dependencies.append((checkpoint_file_path, model_name))
-                logger.info(f"Added checkpoint dependency: {checkpoint_file_path}")
+                logger.info("Added checkpoint dependency: %s", checkpoint_file_path)
 
         # Add tokenizer artifact if configured (mounted as a .tar.gz file)
         tokenizer_cfg = operation_config.get("tokenizer_artifact")
@@ -200,18 +199,18 @@ class TarArchiveDependencyBuilder:
                 archive_name = resolve_tokenizer_archive_name(artifact_name)
                 artifact_path = f"{tokenizer_cfg.artifact_base}/{archive_name}"
                 dependencies.append((artifact_path, archive_name))
-                logger.info(f"Added tokenizer artifact dependency: {artifact_path}")
+                logger.info("Added tokenizer artifact dependency: %s", artifact_path)
             else:
                 logger.warning(
                     "tokenizer_artifact configured but artifact_name cannot be resolved; "
                     "skipping dependency mount"
                 )
 
-        logger.info(f"Total dependencies: {len(dependencies)} files")
+        logger.info("Total dependencies: %s files", len(dependencies))
 
         if operation_type in ("map", "vanilla"):
             escaped_command = bootstrap_command.replace("'", "'\"'\"'")
-            command: Optional[str] = f"bash -c '{escaped_command}'"
+            command: str | None = f"bash -c '{escaped_command}'"
         else:
             command = None
 
@@ -230,8 +229,7 @@ class TarArchiveDependencyBuilder:
         archive_name: str,
         logger: logging.Logger,
     ) -> str:
-        """
-        Create bootstrap command for tar archive mode.
+        """Create bootstrap command for tar archive mode.
 
         The bootstrap command:
         1. Extracts tar.gz archive
@@ -245,15 +243,14 @@ class TarArchiveDependencyBuilder:
 
         Returns:
             Bash command string to execute
+
         """
-        logger.debug(f"Creating bootstrap command for {operation_type} operation")
+        logger.debug("Creating bootstrap command for %s operation", operation_type)
 
         # Unified wrapper script naming: operation_wrapper_{stage_name}_{type}.sh
         wrapper_name = f"operation_wrapper_{stage_name}_{operation_type}.sh"
 
-        bootstrap_command = f"""set -e
+        return f"""set -e
 tar -xzf {archive_name}
 ./{wrapper_name}
 """
-
-        return bootstrap_command

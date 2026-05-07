@@ -58,9 +58,9 @@ def test_discover_stages_imports_base_stage_subclass_from_stage_module(
     _write_minimal_stage_tree(tmp_path, "disc_ok")
     log = logging.getLogger("test.discovery")
     found = discover_stages(tmp_path, log)
-    assert (
-        len(found) == 1 and found[0].__name__ == "DiscoveredStage"
-    ), "expected one concrete BaseStage subclass from stages/disc_ok/stage.py"
+    assert len(found) == 1 and found[0].__name__ == "DiscoveredStage", (
+        "expected one concrete BaseStage subclass from stages/disc_ok/stage.py"
+    )
 
 
 def test_discover_stages_continues_when_stage_module_import_fails(

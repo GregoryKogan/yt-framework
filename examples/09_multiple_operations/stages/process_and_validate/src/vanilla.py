@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 
 import logging
+
 from omegaconf import OmegaConf
-from ytjobs.logging.logger import get_logger
+
 from ytjobs.config import get_config_path
+from ytjobs.logging.logger import get_logger
 
 
-def main():
+def main() -> None:
     logger = get_logger("validate", level=logging.INFO)
     config = OmegaConf.load(get_config_path())
 
@@ -16,15 +18,15 @@ def main():
     logger.info("=" * 50)
     logger.info("VALIDATION OPERATION STARTED")
     logger.info("=" * 50)
-    logger.info(f"Validating processed table: {output_table}")
+    logger.info("Validating processed table: %s", output_table)
 
     # Validate config values
     multiplier = config.job.multiplier
     prefix = config.job.prefix
 
     logger.info("Config validation:")
-    logger.info(f"  Multiplier: {multiplier}")
-    logger.info(f"  Prefix: {prefix}")
+    logger.info("  Multiplier: %s", multiplier)
+    logger.info("  Prefix: %s", prefix)
 
     logger.info("")
     logger.info("Simulating validation checks...")

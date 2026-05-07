@@ -9,7 +9,7 @@ For **how** to write and debug tests (Angry Tests–aligned pytest style and man
 
 ## Surfaces
 
-Treat as testing scope: `tests/**` for **pytest** (dev dependency in repo-root `pyproject.toml`). Complementary checks when automated coverage is thin or behavior is pipeline/integration-heavy: **dev mode** and **example pipelines** as described in `CONTRIBUTING.md` (Testing). Test code follows [standards.mdc](standards.mdc) for style and clarity (types, assertions, `black` on changed Python files).
+Treat as testing scope: `tests/**` for **pytest** (dev dependency in repo-root `pyproject.toml`). Complementary checks when automated coverage is thin or behavior is pipeline/integration-heavy: **dev mode** and **example pipelines** as described in `CONTRIBUTING.md` (Testing). Test code follows [standards.mdc](standards.mdc) for style and clarity (types, assertions, Ruff on changed Python files).
 
 ## When to add or update tests
 

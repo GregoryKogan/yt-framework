@@ -13,7 +13,8 @@ class RunVanillaStage(BaseStage):
         )
 
         if not success:
-            raise RuntimeError("Vanilla operation failed")
+            msg = "Vanilla operation failed"
+            raise RuntimeError(msg)
 
         self.logger.info("Vanilla operation completed successfully")
 

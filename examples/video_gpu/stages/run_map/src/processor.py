@@ -1,28 +1,28 @@
 import os
-import tempfile
-from typing import List, Dict, Any
-import torch.multiprocessing as mp
-from functools import partial
 import sys
+import tempfile
+from functools import partial
+from typing import Any
+
+import torch.multiprocessing as mp
 
 sys.path.insert(0, ".")
+import torch
 from stages.run_map.src.video_utils import (
+    encode_image,
     extract_frame,
     get_video_frame_count,
-    encode_image,
 )
-from ytjobs.s3.client import S3Client
-
 from ultralytics import YOLO  # pyright: ignore[reportPrivateImportUsage]
-import torch
+
+from ytjobs.s3.client import S3Client
 
 # Global model cache per process
 _MODEL_CACHE = {}
 
 
 def get_cached_model(model_name: str = "yolov8n-seg.pt"):
-    """
-    Get or create cached model for this process.
+    """Get or create cached model for this process.
 
     Model is loaded from mounted checkpoint file (not from internet).
     Checkpoint file is mounted by YT and available in the current directory.
@@ -37,6 +37,7 @@ def get_cached_model(model_name: str = "yolov8n-seg.pt"):
     Raises:
         FileNotFoundError: If checkpoint file not found
         RuntimeError: If checkpoint cannot be loaded
+
     """
     if model_name not in _MODEL_CACHE:
         # Get checkpoint file path from environment or use model_name
@@ -44,41 +45,26 @@ def get_cached_model(model_name: str = "yolov8n-seg.pt"):
 
         # Check if file exists (mounted files are in current directory)
         if not os.path.exists(checkpoint_file):
-            raise FileNotFoundError(
+            msg = (
                 f"Checkpoint file not found: {checkpoint_file}\n"
                 f"Current directory: {os.getcwd()}\n"
                 f"Files in directory: {os.listdir('.')}\n"
                 f"Please ensure checkpoint is mounted as a file in the job."
             )
+            raise FileNotFoundError(msg)
 
         # Determine device (GPU if available, else CPU)
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        device_id = torch.cuda.current_device() if torch.cuda.is_available() else None
+        torch.cuda.current_device() if torch.cuda.is_available() else None
 
         # Load model directly from mounted checkpoint file on specified device
-        print(
-            f"Loading YOLO model from mounted checkpoint file: {checkpoint_file}",
-            file=sys.stderr,
-        )
-        print(
-            f"Using device: {device}"
-            + (f" (GPU {device_id})" if device_id is not None else ""),
-            file=sys.stderr,
-        )
         model = YOLO(checkpoint_file)
 
         # Move model to GPU if available
         if torch.cuda.is_available():
             model.to(device)
-            print(
-                f"✓ Model {model_name} loaded and moved to GPU {device_id}",
-                file=sys.stderr,
-            )
         else:
-            print(
-                f"✓ Model {model_name} loaded on CPU (CUDA not available)",
-                file=sys.stderr,
-            )
+            pass
 
         _MODEL_CACHE[model_name] = model
 
@@ -86,8 +72,7 @@ def get_cached_model(model_name: str = "yolov8n-seg.pt"):
 
 
 def run_segmentation(frame_bytes: bytes, model_name: str = "yolov8n-seg.pt") -> bytes:
-    """
-    Run segmentation on a frame using cached model.
+    """Run segmentation on a frame using cached model.
 
     Model inference runs on GPU if available, otherwise CPU.
 
@@ -97,6 +82,7 @@ def run_segmentation(frame_bytes: bytes, model_name: str = "yolov8n-seg.pt") -> 
 
     Returns:
         Annotated image with segmentation masks as bytes
+
     """
     # Get cached model (loaded once per process, already on GPU if available)
     model = get_cached_model(model_name)
@@ -126,9 +112,8 @@ def process_single_video(
     output_prefix: str,
     img_format: str,
     model_name: str,
-) -> List[Dict[str, Any]]:
-    """
-    Process a single video with segmentation.
+) -> list[dict[str, Any]]:
+    """Process a single video with segmentation.
 
     This function is called by worker processes in the pool.
     Model is loaded once per worker and reused for all videos.
@@ -142,6 +127,7 @@ def process_single_video(
 
     Returns:
         List of result dictionaries
+
     """
     results = []
 
@@ -214,21 +200,21 @@ def process_single_video(
 
     except Exception as e:
         # Raise error with context about which video failed
-        raise RuntimeError(f"Failed to process video s3://{bucket}/{path}: {e}") from e
+        msg = f"Failed to process video s3://{bucket}/{path}: {e}"
+        raise RuntimeError(msg) from e
 
     return results
 
 
 def process_video_batch(
-    rows: List[object],
+    rows: list[object],
     output_bucket: str,
     output_prefix: str,
     img_format: str,
     num_workers: int = 5,
     model_name: str = "yolov8n-seg.pt",
 ):
-    """
-    Process multiple videos using multiprocessing pool for GPU efficiency.
+    """Process multiple videos using multiprocessing pool for GPU efficiency.
 
     Args:
         rows: List of dictionaries with bucket and path fields
@@ -240,15 +226,15 @@ def process_video_batch(
 
     Yields:
         Dictionary with processing results for each frame
+
     """
-    print("CUDA is available: ", torch.cuda.is_available(), file=sys.stderr)
     # Use parameters directly (already strings)
     out_bucket = output_bucket
     out_prefix = output_prefix
     img_ext = img_format
 
     # Rows are already dictionaries - convert to list for multiprocessing
-    row_dicts: List[Dict[str, str]] = [dict(row) for row in rows]  # type: ignore[arg-type]
+    row_dicts: list[dict[str, str]] = [dict(row) for row in rows]  # type: ignore[arg-type]
 
     # Create worker function with fixed parameters
     worker_func = partial(
@@ -269,11 +255,9 @@ def process_video_batch(
             all_results = pool.map(worker_func, row_dicts)
     except Exception as e:
         # Re-raise with context about batch processing failure
-        raise RuntimeError(
-            f"Batch processing failed with {num_workers} workers: {e}"
-        ) from e
+        msg = f"Batch processing failed with {num_workers} workers: {e}"
+        raise RuntimeError(msg) from e
 
     # Yield all results
     for video_results in all_results:
-        for result in video_results:
-            yield result
+        yield from video_results

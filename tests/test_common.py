@@ -39,13 +39,16 @@ def test_prepare_docker_auth_returns_none_when_image_missing() -> None:
 def test_extract_operation_resources_reads_top_level_keys() -> None:
     cfg = OmegaConf.create({"pool": "heavy", "memory_limit_gb": 16, "cpu_limit": 8})
     res = extract_operation_resources(cfg, _LOG)
-    assert res.pool == "heavy" and res.memory_gb == 16 and res.cpu_limit == 8
+    assert res.pool == "heavy"
+    assert res.memory_gb == 16
+    assert res.cpu_limit == 8
 
 
 def test_extract_operation_resources_reads_nested_resources_block() -> None:
     cfg = OmegaConf.create({"resources": {"pool": "nest", "job_count": 3}})
     res = extract_operation_resources(cfg, _LOG)
-    assert res.pool == "nest" and res.job_count == 3
+    assert res.pool == "nest"
+    assert res.job_count == 3
 
 
 def test_collect_passthrough_kwargs_skips_reserved_and_none() -> None:
@@ -94,10 +97,12 @@ class _ConfigThatRaisesOnAccess:
     """Stand-in config object that forces the generic fallback in _get_config_value_with_default."""
 
     def __contains__(self, _key: object) -> bool:
-        raise RuntimeError("config access failed")
+        msg = "config access failed"
+        raise RuntimeError(msg)
 
     def get(self, _key: str) -> None:
-        raise RuntimeError("config access failed")
+        msg = "config access failed"
+        raise RuntimeError(msg)
 
 
 def test_extract_max_failed_jobs_falls_back_to_default_on_config_access_error() -> None:

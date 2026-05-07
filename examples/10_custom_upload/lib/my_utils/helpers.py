@@ -9,5 +9,6 @@ def greet(name: str) -> str:
 
     Returns:
         Greeting string
+
     """
     return f"Hello, {name}!"

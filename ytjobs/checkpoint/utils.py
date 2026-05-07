@@ -1,21 +1,20 @@
-"""
-Checkpoint Utilities for YTsaurus
+"""Checkpoint Utilities for YTsaurus.
 ==================================
 
 Utilities for saving and loading checkpoints in YTsaurus Cypress file system.
 Works without internet access - uses YT's internal distributed file system.
 """
 
-import yt.wrapper as yt
-import os
 import json
 import logging
-from typing import Optional, Dict, Any
+import os
+from typing import Any
+
+import yt.wrapper as yt
 
 
-def get_checkpoint_path(checkpoint_name: str, base_path: Optional[str] = None) -> str:
-    """
-    Get full YT path for a checkpoint.
+def get_checkpoint_path(checkpoint_name: str, base_path: str | None = None) -> str:
+    """Get full YT path for a checkpoint.
 
     Args:
         checkpoint_name: Name of checkpoint file
@@ -23,6 +22,7 @@ def get_checkpoint_path(checkpoint_name: str, base_path: Optional[str] = None) -
 
     Returns:
         Full YT path to checkpoint
+
     """
     if base_path is None:
         # Default to user's checkpoints folder
@@ -36,12 +36,11 @@ def get_checkpoint_path(checkpoint_name: str, base_path: Optional[str] = None) -
 def save_checkpoint(
     data: bytes,
     checkpoint_name: str,
-    metadata: Optional[Dict[str, Any]] = None,
-    base_path: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
+    metadata: dict[str, Any] | None = None,
+    base_path: str | None = None,
+    logger: logging.Logger | None = None,
 ) -> str:
-    """
-    Save checkpoint to YTsaurus Cypress file system.
+    """Save checkpoint to YTsaurus Cypress file system.
 
     Args:
         data: Checkpoint data as bytes
@@ -52,6 +51,7 @@ def save_checkpoint(
 
     Returns:
         Full YT path to saved checkpoint
+
     """
     log = logger or logging.getLogger(__name__)
 
@@ -62,14 +62,14 @@ def save_checkpoint(
     try:
         yt.create("map_node", base_dir, recursive=True, ignore_existing=True)
     except Exception as e:
-        log.warning(f"Could not create checkpoint directory {base_dir}: {e}")
+        log.warning("Could not create checkpoint directory %s: %s", base_dir, e)
 
     # Save checkpoint
     try:
         yt.write_file(checkpoint_path, data, force_create=True, compute_md5=True)
-        log.info(f"Saved checkpoint: {checkpoint_path} ({len(data)} bytes)")
-    except Exception as e:
-        log.error(f"Failed to save checkpoint {checkpoint_path}: {e}")
+        log.info("Saved checkpoint: %s (%s bytes)", checkpoint_path, len(data))
+    except Exception:
+        log.exception("Failed to save checkpoint %s", checkpoint_path)
         raise
 
     # Save metadata if provided
@@ -83,20 +83,19 @@ def save_checkpoint(
                 force_create=True,
                 compute_md5=True,
             )
-            log.debug(f"Saved checkpoint metadata: {metadata_path}")
+            log.debug("Saved checkpoint metadata: %s", metadata_path)
         except Exception as e:
-            log.warning(f"Failed to save checkpoint metadata: {e}")
+            log.warning("Failed to save checkpoint metadata: %s", e)
 
     return checkpoint_path
 
 
 def load_checkpoint(
     checkpoint_name: str,
-    base_path: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
-) -> tuple[Optional[bytes], Optional[Dict[str, Any]]]:
-    """
-    Load checkpoint and metadata from YTsaurus Cypress.
+    base_path: str | None = None,
+    logger: logging.Logger | None = None,
+) -> tuple[bytes | None, dict[str, Any] | None]:
+    """Load checkpoint and metadata from YTsaurus Cypress.
 
     Args:
         checkpoint_name: Name of checkpoint file
@@ -105,19 +104,20 @@ def load_checkpoint(
 
     Returns:
         Tuple of (checkpoint_data, metadata_dict) or (None, None) if not found
+
     """
     log = logger or logging.getLogger(__name__)
 
     checkpoint_path = get_checkpoint_path(checkpoint_name, base_path)
 
     if not yt.exists(checkpoint_path):
-        log.debug(f"Checkpoint not found: {checkpoint_path}")
+        log.debug("Checkpoint not found: %s", checkpoint_path)
         return None, None
 
     try:
         # Load checkpoint data
         data = yt.read_file(checkpoint_path).read()
-        log.info(f"Loaded checkpoint: {checkpoint_path} ({len(data)} bytes)")
+        log.info("Loaded checkpoint: %s (%s bytes)", checkpoint_path, len(data))
 
         # Load metadata if exists
         metadata = None
@@ -126,24 +126,23 @@ def load_checkpoint(
             try:
                 metadata_json = yt.read_file(metadata_path).read().decode("utf-8")
                 metadata = json.loads(metadata_json)
-                log.debug(f"Loaded checkpoint metadata: {metadata_path}")
+                log.debug("Loaded checkpoint metadata: %s", metadata_path)
             except Exception as e:
-                log.warning(f"Failed to load checkpoint metadata: {e}")
+                log.warning("Failed to load checkpoint metadata: %s", e)
 
         return data, metadata
 
-    except Exception as e:
-        log.error(f"Failed to load checkpoint {checkpoint_path}: {e}")
+    except Exception:
+        log.exception("Failed to load checkpoint %s", checkpoint_path)
         return None, None
 
 
 def list_checkpoints(
-    base_path: Optional[str] = None,
-    pattern: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
+    base_path: str | None = None,
+    pattern: str | None = None,
+    logger: logging.Logger | None = None,
 ) -> list[str]:
-    """
-    List available checkpoints in YTsaurus.
+    """List available checkpoints in YTsaurus.
 
     Args:
         base_path: Base YT path for checkpoints
@@ -152,13 +151,14 @@ def list_checkpoints(
 
     Returns:
         List of checkpoint names (without .meta files)
+
     """
     log = logger or logging.getLogger(__name__)
 
     checkpoint_dir = get_checkpoint_path("", base_path).rstrip("/")
 
     if not yt.exists(checkpoint_dir):
-        log.debug(f"Checkpoint directory does not exist: {checkpoint_dir}")
+        log.debug("Checkpoint directory does not exist: %s", checkpoint_dir)
         return []
 
     try:
@@ -172,21 +172,20 @@ def list_checkpoints(
                 continue
             checkpoints.append(file)
 
-        log.debug(f"Found {len(checkpoints)} checkpoints in {checkpoint_dir}")
+        log.debug("Found %s checkpoints in %s", len(checkpoints), checkpoint_dir)
         return sorted(checkpoints)
 
-    except Exception as e:
-        log.error(f"Failed to list checkpoints in {checkpoint_dir}: {e}")
+    except Exception:
+        log.exception("Failed to list checkpoints in %s", checkpoint_dir)
         return []
 
 
 def delete_checkpoint(
     checkpoint_name: str,
-    base_path: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
+    base_path: str | None = None,
+    logger: logging.Logger | None = None,
 ) -> bool:
-    """
-    Delete checkpoint and its metadata from YTsaurus.
+    """Delete checkpoint and its metadata from YTsaurus.
 
     Args:
         checkpoint_name: Name of checkpoint file
@@ -195,6 +194,7 @@ def delete_checkpoint(
 
     Returns:
         True if deleted successfully, False otherwise
+
     """
     log = logger or logging.getLogger(__name__)
 
@@ -203,29 +203,28 @@ def delete_checkpoint(
     try:
         if yt.exists(checkpoint_path):
             yt.remove(checkpoint_path, force=True)
-            log.info(f"Deleted checkpoint: {checkpoint_path}")
+            log.info("Deleted checkpoint: %s", checkpoint_path)
 
         # Delete metadata if exists
         metadata_path = f"{checkpoint_path}.meta"
         if yt.exists(metadata_path):
             yt.remove(metadata_path, force=True)
-            log.debug(f"Deleted checkpoint metadata: {metadata_path}")
+            log.debug("Deleted checkpoint metadata: %s", metadata_path)
 
         return True
 
-    except Exception as e:
-        log.error(f"Failed to delete checkpoint {checkpoint_path}: {e}")
+    except Exception:
+        log.exception("Failed to delete checkpoint %s", checkpoint_path)
         return False
 
 
 def save_processing_state(
-    state: Dict[str, Any],
+    state: dict[str, Any],
     state_name: str = "processing_state",
-    base_path: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
+    base_path: str | None = None,
+    logger: logging.Logger | None = None,
 ) -> str:
-    """
-    Save processing state (e.g., processed video list, iteration count) to checkpoint.
+    """Save processing state (e.g., processed video list, iteration count) to checkpoint.
 
     Convenience function for saving JSON-serializable state dictionaries.
 
@@ -237,6 +236,7 @@ def save_processing_state(
 
     Returns:
         Full YT path to saved checkpoint
+
     """
     log = logger or logging.getLogger(__name__)
 
@@ -254,11 +254,10 @@ def save_processing_state(
 
 def load_processing_state(
     state_name: str = "processing_state",
-    base_path: Optional[str] = None,
-    logger: Optional[logging.Logger] = None,
-) -> Optional[Dict[str, Any]]:
-    """
-    Load processing state from checkpoint.
+    base_path: str | None = None,
+    logger: logging.Logger | None = None,
+) -> dict[str, Any] | None:
+    """Load processing state from checkpoint.
 
     Convenience function for loading JSON-serializable state dictionaries.
 
@@ -269,19 +268,20 @@ def load_processing_state(
 
     Returns:
         State dictionary or None if not found
+
     """
     log = logger or logging.getLogger(__name__)
 
     checkpoint_name = f"{state_name}.json"
-    data, metadata = load_checkpoint(checkpoint_name, base_path, log)
+    data, _metadata = load_checkpoint(checkpoint_name, base_path, log)
 
     if data is None:
         return None
 
     try:
         state = json.loads(data.decode("utf-8"))
-        log.debug(f"Loaded processing state: {state_name}")
+        log.debug("Loaded processing state: %s", state_name)
         return state
-    except Exception as e:
-        log.error(f"Failed to parse processing state {state_name}: {e}")
+    except Exception:
+        log.exception("Failed to parse processing state %s", state_name)
         return None

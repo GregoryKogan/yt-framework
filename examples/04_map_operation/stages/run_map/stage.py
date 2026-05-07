@@ -13,11 +13,12 @@ class RunMapStage(BaseStage):
         )
 
         if not success:
-            raise RuntimeError("Map operation failed")
+            msg = "Map operation failed"
+            raise RuntimeError(msg)
 
         row_count = self.deps.yt_client.row_count(
             self.config.client.operations.map.output_table
         )
-        self.logger.info(f"✓ Map operation completed: {row_count} output rows")
+        self.logger.info("✓ Map operation completed: %s output rows", row_count)
 
         return debug

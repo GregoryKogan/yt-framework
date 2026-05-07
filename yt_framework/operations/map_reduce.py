@@ -5,21 +5,22 @@ from `configs/secrets.env` like other operations.
 """
 
 import warnings
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from omegaconf import DictConfig, OmegaConf
 
 from yt_framework.utils.logging import log_header, log_success
-from .dependency_strategy import TarArchiveDependencyBuilder
-from .job_command import require_consistent_map_reduce_legs
+
 from .common import (
-    extract_operation_resources,
     build_operation_environment,
+    collect_passthrough_kwargs,
     extract_docker_auth_from_operation_config,
     extract_max_failed_jobs,
-    collect_passthrough_kwargs,
+    extract_operation_resources,
     extract_secure_env_client_kwargs,
 )
+from .dependency_strategy import TarArchiveDependencyBuilder
+from .job_command import require_consistent_map_reduce_legs
 
 if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
@@ -30,12 +31,11 @@ def run_map_reduce(
     operation_config: DictConfig,
     mapper: Any = None,
     reducer: Any = None,
-    output_schema: Optional[Any] = None,
+    output_schema: Any | None = None,
     map_job: Any = None,
     reduce_job: Any = None,
 ) -> bool:
-    """
-    Run a YT map-reduce operation and wait for completion.
+    """Run a YT map-reduce operation and wait for completion.
 
     Pass mapper and reducer either both as ``TypedJob`` instances or both as
     command strings (JSON stdin/stdout). Mixing kinds raises ``ValueError``.
@@ -56,6 +56,7 @@ def run_map_reduce(
 
     Returns:
         True if the operation completed successfully.
+
     """
     if mapper is not None and map_job is None:
         warnings.warn(
@@ -80,10 +81,11 @@ def run_map_reduce(
     output_table = operation_config.get("output_table")
     reduce_by = list(operation_config.get("reduce_by") or [])
     if not input_table or not output_table or not reduce_by:
-        raise ValueError(
+        msg = (
             "operation_config must set input_table, output_table, and reduce_by; "
             "expected at client.operations.map_reduce.{input_table,output_table,reduce_by}"
         )
+        raise ValueError(msg)
 
     env = build_operation_environment(
         context=context,
@@ -95,13 +97,11 @@ def run_map_reduce(
     resources = extract_operation_resources(operation_config, logger)
 
     if mapper is not None and map_job is not None and mapper != map_job:
-        raise ValueError(
-            "Both 'mapper' and 'map_job' are set with different values; use only one"
-        )
+        msg = "Both 'mapper' and 'map_job' are set with different values; use only one"
+        raise ValueError(msg)
     if reducer is not None and reduce_job is not None and reducer != reduce_job:
-        raise ValueError(
-            "Both 'reducer' and 'reduce_job' are set with different values; use only one"
-        )
+        msg = "Both 'reducer' and 'reduce_job' are set with different values; use only one"
+        raise ValueError(msg)
     mapper = map_job if map_job is not None else mapper
     reducer = reduce_job if reduce_job is not None else reducer
 
@@ -127,10 +127,11 @@ def run_map_reduce(
             "Using tar bootstrap commands for map-reduce mapper and reducer legs"
         )
     elif dep.mapper_command is not None or dep.reducer_command is not None:
-        raise RuntimeError(
+        msg = (
             "Internal error: partial map-reduce tar bootstrap (only one leg set); "
             "expected both or neither."
         )
+        raise RuntimeError(msg)
 
     docker_auth = extract_docker_auth_from_operation_config(operation_config, env)
 
@@ -144,7 +145,7 @@ def run_map_reduce(
     od = operation_config.get("operation_description")
     if od:
         if isinstance(od, str):
-            logger.info(f"Operation label: {od}")
+            logger.info("Operation label: %s", od)
             spec_kwargs["title"] = od
         else:
             spec_kwargs["operation_description"] = OmegaConf.to_container(
@@ -186,7 +187,7 @@ def run_map_reduce(
         files=dependencies,
         resources=resources,
         env=env,
-        sort_by=sort_by if sort_by else None,
+        sort_by=sort_by or None,
         output_schema=output_schema,
         max_failed_jobs=max_failed_jobs,
         docker_auth=docker_auth,
@@ -206,11 +207,10 @@ def run_reduce(
     context: "StageContext",
     operation_config: DictConfig,
     reducer: Any = None,
-    output_schema: Optional[Any] = None,
+    output_schema: Any | None = None,
     job: Any = None,
 ) -> bool:
-    """
-    Run a YT reduce-only operation and wait for completion.
+    """Run a YT reduce-only operation and wait for completion.
 
     Pass ``reducer`` as a ``TypedJob`` or a command string. With
     ``operation_config.tar_command_bootstrap: true``, string reducers get the same
@@ -225,6 +225,7 @@ def run_reduce(
 
     Returns:
         True if the operation completed successfully.
+
     """
     logger = context.logger
     log_header(
@@ -237,10 +238,11 @@ def run_reduce(
     output_table = operation_config.get("output_table")
     reduce_by = list(operation_config.get("reduce_by") or [])
     if not input_table or not output_table or not reduce_by:
-        raise ValueError(
+        msg = (
             "operation_config must set input_table, output_table, and reduce_by; "
             "expected at client.operations.reduce.{input_table,output_table,reduce_by}"
         )
+        raise ValueError(msg)
 
     env = build_operation_environment(
         context=context,
@@ -252,9 +254,8 @@ def run_reduce(
     resources = extract_operation_resources(operation_config, logger)
 
     if reducer is not None and job is not None and reducer != job:
-        raise ValueError(
-            "Both 'reducer' and 'job' are set with different values; use only one"
-        )
+        msg = "Both 'reducer' and 'job' are set with different values; use only one"
+        raise ValueError(msg)
     reducer = job if job is not None else reducer
 
     builder = TarArchiveDependencyBuilder()
@@ -281,7 +282,7 @@ def run_reduce(
     rod = operation_config.get("operation_description")
     if rod:
         if isinstance(rod, str):
-            logger.info(f"Operation label: {rod}")
+            logger.info("Operation label: %s", rod)
             reduce_kw["title"] = rod
         else:
             reduce_kw["operation_description"] = OmegaConf.to_container(

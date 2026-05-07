@@ -11,11 +11,12 @@ TypedJob legs historically rely on stage-side `_ensure_stage_on_path()` helpers.
 This base class centralizes that behavior so stage code stays simple.
 """
 
+import contextlib
 import os
 import sys
 import tarfile
 import threading
-from typing import Any, Optional
+from typing import Any
 
 import yt.wrapper as yt
 
@@ -23,7 +24,7 @@ _BOOTSTRAPPED_LOCK = threading.Lock()
 _BOOTSTRAPPED_KEYS: set[str] = set()
 
 
-def _find_source_tarball_root() -> Optional[str]:
+def _find_source_tarball_root() -> str | None:
     """Return sandbox root that contains `source.tar.gz` (or None)."""
     seen: set[str] = set()
     candidates: list[str] = [os.getcwd()]
@@ -124,8 +125,7 @@ def _bootstrap_once(stage_name: str) -> None:
 
 
 class StageBootstrapTypedJob(yt.TypedJob):
-    """
-    Base class for TypedJob legs with worker-side bootstrap.
+    """Base class for TypedJob legs with worker-side bootstrap.
 
     On unpickle, extracts ``source.tar.gz`` when needed, prepends the archive root
     and ``stages/<stage>/src`` to ``sys.path``, and sets ``JOB_CONFIG_PATH`` when
@@ -148,7 +148,5 @@ class StageBootstrapTypedJob(yt.TypedJob):
             self.__dict__.update(state)
         else:
             # Be permissive: some serializers may pass non-dict state.
-            try:
+            with contextlib.suppress(Exception):
                 self.__dict__.update(state.__dict__)
-            except Exception:
-                pass

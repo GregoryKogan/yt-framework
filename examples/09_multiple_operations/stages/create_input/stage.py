@@ -17,5 +17,5 @@ class CreateInputStage(BaseStage):
             rows=rows,
         )
 
-        self.logger.info(f"✓ Created input table: {len(rows)} rows")
+        self.logger.info("✓ Created input table: %s rows", len(rows))
         return debug

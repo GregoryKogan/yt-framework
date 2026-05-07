@@ -2,7 +2,6 @@
 
 import logging
 import sys
-from typing import Optional
 
 
 class ColoredFormatter(logging.Formatter):
@@ -34,6 +33,7 @@ class ColoredFormatter(logging.Formatter):
 
         Returns:
             str: Formatted log message with ANSI color codes and icons.
+
         """
         # Add color
         levelname = record.levelname
@@ -41,20 +41,16 @@ class ColoredFormatter(logging.Formatter):
             icon = self.ICONS.get(levelname, "")
             icon_space = f"{icon} " if icon else ""
             record.levelname = (
-                f"{self.COLORS[levelname]}"
-                f"{icon_space}"
-                f"{levelname}"
-                f"{self.RESET}"
+                f"{self.COLORS[levelname]}{icon_space}{levelname}{self.RESET}"
             )
 
         return super().format(record)
 
 
 def setup_logging(
-    level: int = logging.INFO, name: Optional[str] = None, use_colors: bool = True
+    level: int = logging.INFO, name: str | None = None, use_colors: bool = True
 ) -> logging.Logger:
-    """
-    Setup logging with consistent formatting.
+    """Setup logging with consistent formatting.
 
     Args:
         level: Logging level (default: INFO)
@@ -63,6 +59,7 @@ def setup_logging(
 
     Returns:
         Configured logger instance
+
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -95,50 +92,47 @@ def setup_logging(
     return logger
 
 
-def log_header(
-    logger: logging.Logger, title: str, context: Optional[str] = None
-) -> None:
-    """
-    Log a compact section header in format: [Title] context.
+def log_header(logger: logging.Logger, title: str, context: str | None = None) -> None:
+    """Log a compact section header in format: [Title] context.
 
     Args:
         logger: Logger instance
         title: Section title (will be wrapped in brackets)
         context: Optional additional context information
+
     """
     if context:
-        logger.info(f"[{title}] {context}")
+        logger.info("[%s] %s", title, context)
     else:
-        logger.info(f"[{title}]")
+        logger.info("[%s]", title)
 
 
 def log_operation(logger: logging.Logger, message: str) -> None:
-    """
-    Log an operation start message with → prefix.
+    """Log an operation start message with → prefix.
 
     Args:
         logger: Logger instance
         message: Operation description
+
     """
-    logger.info(f"  → {message}")
+    logger.info("  → %s", message)
 
 
 def log_success(logger: logging.Logger, message: str) -> None:
-    """
-    Log a success/completion message with ✓ prefix.
+    """Log a success/completion message with ✓ prefix.
 
     Args:
         logger: Logger instance
         message: Success message
+
     """
-    logger.info(f"  ✓ {message}")
+    logger.info("  ✓ %s", message)
 
 
 def log_config(
     logger: logging.Logger, config_dict: dict, title: str = "Configuration"
 ) -> None:
-    """
-    Log configuration in a readable format.
+    """Log configuration in a readable format.
 
     Automatically masks sensitive values (keys containing 'secret' or 'key')
     by showing only the last 4 characters.
@@ -157,10 +151,11 @@ def log_config(
         [Configuration]
             api_key: ***2345
             mode: dev
+
     """
     log_header(logger, title)
     for key, value in config_dict.items():
         # Mask sensitive data
         if "secret" in key.lower() or "key" in key.lower():
             value = "***" + str(value)[-4:] if value else "(not set)"
-        logger.info(f"    {key}: {value}")
+        logger.info("    %s: %s", key, value)

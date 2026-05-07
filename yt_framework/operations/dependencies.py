@@ -2,7 +2,6 @@
 
 import logging
 from pathlib import Path
-from typing import List, Tuple, Optional
 
 
 def _get_ytjobs_dir() -> Path:
@@ -16,9 +15,8 @@ def build_stage_dependencies(
     build_folder: str,
     stage_dir: Path,
     logger: logging.Logger,
-) -> List[Tuple[str, str]]:
-    """
-    Build dependency list for a single stage.
+) -> list[tuple[str, str]]:
+    """Build dependency list for a single stage.
 
     Includes:
     - config.yaml (if exists locally)
@@ -31,9 +29,10 @@ def build_stage_dependencies(
 
     Returns:
         List of (yt_path, local_path) tuples
+
     """
     stage_dir_name = stage_dir.name
-    dependency_files: List[Tuple[str, str]] = []
+    dependency_files: list[tuple[str, str]] = []
 
     # Add config.yaml if it exists locally
     config_local_path = stage_dir / "config.yaml"
@@ -42,7 +41,7 @@ def build_stage_dependencies(
         # Mount config.yaml at stages/{stage_dir_name}/config.yaml to match directory structure
         config_local_name = f"stages/{stage_dir_name}/config.yaml"
         dependency_files.append((config_yt_path, config_local_name))
-        logger.debug(f"  Added config: {config_local_name}")
+        logger.debug("  Added config: %s", config_local_name)
 
     # Add all Python files from src/ directory
     src_dir = stage_dir / "src"
@@ -54,18 +53,17 @@ def build_stage_dependencies(
             )
             local_path = f"stages/{stage_dir_name}/src/{rel_path}".replace("\\", "/")
             dependency_files.append((yt_path, local_path))
-            logger.debug(f"  Added stage file: {local_path}")
+            logger.debug("  Added stage file: %s", local_path)
 
-    logger.info(f"Stage dependencies: {len(dependency_files)} files")
+    logger.info("Stage dependencies: %s files", len(dependency_files))
     return dependency_files
 
 
 def build_ytjobs_dependencies(
     build_folder: str,
     logger: logging.Logger,
-) -> List[Tuple[str, str]]:
-    """
-    Build dependency list for ytjobs package.
+) -> list[tuple[str, str]]:
+    """Build dependency list for ytjobs package.
 
     Includes all .py files from ytjobs/ directory.
 
@@ -75,9 +73,10 @@ def build_ytjobs_dependencies(
 
     Returns:
         List of (yt_path, local_path) tuples
+
     """
     ytjobs_dir = _get_ytjobs_dir()
-    dependency_files: List[Tuple[str, str]] = []
+    dependency_files: list[tuple[str, str]] = []
 
     for file in ytjobs_dir.rglob("*.py"):
         rel_path = file.relative_to(ytjobs_dir)
@@ -85,18 +84,17 @@ def build_ytjobs_dependencies(
         local_path = f"ytjobs/{rel_path}".replace("\\", "/")
         dependency_files.append((yt_path, local_path))
 
-    logger.info(f"Ytjobs dependencies: {len(dependency_files)} files")
+    logger.info("Ytjobs dependencies: %s files", len(dependency_files))
     return dependency_files
 
 
 def add_checkpoint(
-    dependencies: List[Tuple[str, str]],
-    model_name: Optional[str],
-    checkpoint_base: Optional[str],
+    dependencies: list[tuple[str, str]],
+    model_name: str | None,
+    checkpoint_base: str | None,
     logger: logging.Logger,
-) -> List[Tuple[str, str]]:
-    """
-    Add checkpoint file to dependencies if configured.
+) -> list[tuple[str, str]]:
+    """Add checkpoint file to dependencies if configured.
 
     Args:
         dependencies: List of (yt_path, local_path) tuples
@@ -106,19 +104,20 @@ def add_checkpoint(
 
     Returns:
         Updated dependency list (new list with checkpoint added, or same list)
+
     """
     if model_name and checkpoint_base:
         checkpoint_file_path = f"{checkpoint_base}/{model_name}"
         # Create new list to avoid mutating input
-        updated_files = dependencies + [(checkpoint_file_path, model_name)]
+        updated_files = [*dependencies, (checkpoint_file_path, model_name)]
         logger.info(
-            f"✓ Checkpoint will be mounted: {checkpoint_file_path} → {model_name}"
+            "✓ Checkpoint will be mounted: %s → %s", checkpoint_file_path, model_name
         )
         return updated_files
-    elif model_name:
+    if model_name:
         logger.warning(
-            f"model_name is set ({model_name}) but checkpoint_base is not configured. "
-            f"Checkpoint will not be mounted - model may download from internet."
+            "model_name is set (%s) but checkpoint_base is not configured. Checkpoint will not be mounted - model may download from internet.",
+            model_name,
         )
     elif checkpoint_base:
         logger.debug(
@@ -131,12 +130,11 @@ def add_checkpoint(
 def build_vanilla_dependencies(
     build_folder: str,
     stage_dir: Path,
-    model_name: Optional[str],
-    checkpoint_base: Optional[str],
+    model_name: str | None,
+    checkpoint_base: str | None,
     logger: logging.Logger,
-) -> Tuple[str, List[Tuple[str, str]]]:
-    """
-    Build complete dependency list for a vanilla operation.
+) -> tuple[str, list[tuple[str, str]]]:
+    """Build complete dependency list for a vanilla operation.
 
     Combines:
     - Stage files (config + src/)
@@ -153,6 +151,7 @@ def build_vanilla_dependencies(
         Tuple of (script_path, dependency_files)
         - script_path: Path to vanilla.py in YT
         - dependency_files: Complete list of dependencies
+
     """
     stage_dir_name = stage_dir.name
     script_path = f"{build_folder}/stages/{stage_dir_name}/src/vanilla.py"
@@ -178,19 +177,18 @@ def build_vanilla_dependencies(
         logger=logger,
     )
 
-    logger.info(f"Total dependencies: {len(all_deps)} files")
+    logger.info("Total dependencies: %s files", len(all_deps))
     return script_path, all_deps
 
 
 def build_map_dependencies(
     build_folder: str,
     stage_dir: Path,
-    model_name: Optional[str],
-    checkpoint_base: Optional[str],
+    model_name: str | None,
+    checkpoint_base: str | None,
     logger: logging.Logger,
-) -> Tuple[str, List[Tuple[str, str]]]:
-    """
-    Build complete dependency list for a map operation.
+) -> tuple[str, list[tuple[str, str]]]:
+    """Build complete dependency list for a map operation.
 
     Combines:
     - Stage files (config + src/)
@@ -208,6 +206,7 @@ def build_map_dependencies(
         Tuple of (mapper_path, dependency_files)
         - mapper_path: Path to mapper.py in YT
         - dependency_files: Complete list of dependencies
+
     """
     stage_dir_name = stage_dir.name
     mapper_path = f"{build_folder}/stages/{stage_dir_name}/src/mapper.py"
@@ -236,5 +235,5 @@ def build_map_dependencies(
         logger=logger,
     )
 
-    logger.info(f"Total dependencies: {len(all_deps)} files")
+    logger.info("Total dependencies: %s files", len(all_deps))
     return mapper_path, all_deps

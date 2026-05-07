@@ -89,7 +89,8 @@ def _write_stage_module(pipeline_root: Path, stage_name: str) -> type:
     stage_py = stage_dir / "stage.py"
     mod_name = f"_dyn_stage_{stage_name}"
     spec = importlib.util.spec_from_file_location(mod_name, stage_py)
-    assert spec is not None and spec.loader is not None
+    assert spec is not None
+    assert spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules[mod_name] = mod
     spec.loader.exec_module(mod)
@@ -277,7 +278,7 @@ def test_run_raises_for_unknown_enabled_stage_name(tmp_path: Path) -> None:
 
 @patch("yt_framework.core.pipeline.upload_all_code")
 def test_run_executes_registered_stage_in_order(
-    _mock_upload: object,
+    mock_upload: object,
     tmp_path: Path,
 ) -> None:
     _touch_configs_secrets(tmp_path)
@@ -296,6 +297,7 @@ def test_run_executes_registered_stage_in_order(
     p = _P(cfg, tmp_path)
     p.run()
     assert (tmp_path / "stage_ran.txt").read_text(encoding="utf-8") == "step_a"
+    assert mock_upload is not None
 
 
 def _write_packaged_stage(pipeline_root: Path, folder_name: str) -> None:

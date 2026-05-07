@@ -1,9 +1,6 @@
-"""
-Max row weight helpers for YT operations and YQL queries.
-"""
+"""Max row weight helpers for YT operations and YQL queries."""
 
 import re
-from typing import Optional
 
 # Cluster-side ceiling matches DEFAULT (explicit overrides must stay within this cap).
 MAX_ALLOWED_ROW_WEIGHT = "128M"
@@ -34,19 +31,23 @@ def parse_max_row_weight_to_bytes(value: str) -> int:
 
     Raises:
         ValueError: If the format is not recognized.
+
     """
     s = value.strip()
     if not s:
-        raise ValueError("max_row_weight must be non-empty")
+        msg = "max_row_weight must be non-empty"
+        raise ValueError(msg)
     last = s[-1].lower()
     if last in _SUFFIX_MULT_KIB:
         num_part = s[:-1].strip()
         if not num_part.isdigit():
-            raise ValueError(f"invalid max_row_weight numeric part in {value!r}")
+            msg = f"invalid max_row_weight numeric part in {value!r}"
+            raise ValueError(msg)
         return int(num_part) * _SUFFIX_MULT_KIB[last]
     if s.isdigit():
         return int(s)
-    raise ValueError(f"unrecognized max_row_weight format: {value!r}")
+    msg = f"unrecognized max_row_weight format: {value!r}"
+    raise ValueError(msg)
 
 
 MAX_ALLOWED_BYTES = parse_max_row_weight_to_bytes(MAX_ALLOWED_ROW_WEIGHT)
@@ -61,7 +62,7 @@ def _canonical_max_row_weight_string(raw: str) -> str:
     return str(int(s))
 
 
-def validate_max_row_weight(value: Optional[str]) -> str:
+def validate_max_row_weight(value: str | None) -> str:
     """Validate max row weight against the cluster maximum and return canonical form.
 
     Args:
@@ -72,34 +73,37 @@ def validate_max_row_weight(value: Optional[str]) -> str:
 
     Raises:
         ValueError: If the value exceeds ``MAX_ALLOWED_ROW_WEIGHT`` or is malformed.
+
     """
     if value is None:
         return DEFAULT_MAX_ROW_WEIGHT
     resolved = value.strip()
     if not resolved:
-        raise ValueError("max_row_weight override must be non-empty")
+        msg = "max_row_weight override must be non-empty"
+        raise ValueError(msg)
     n = parse_max_row_weight_to_bytes(resolved)
     if n > MAX_ALLOWED_BYTES:
-        raise ValueError(
+        msg = (
             f"max_row_weight {value!r} exceeds cluster maximum "
             f"{MAX_ALLOWED_ROW_WEIGHT} ({MAX_ALLOWED_BYTES} bytes)"
         )
+        raise ValueError(msg)
     return _canonical_max_row_weight_string(resolved)
 
 
-def resolve_max_row_weight(max_row_weight: Optional[str] = None) -> str:
+def resolve_max_row_weight(max_row_weight: str | None = None) -> str:
     """Return explicit row weight value or project default (validated)."""
     return validate_max_row_weight(max_row_weight)
 
 
-def build_max_row_weight_pragma(max_row_weight: Optional[str] = None) -> str:
+def build_max_row_weight_pragma(max_row_weight: str | None = None) -> str:
     """Build YQL pragma for max row weight."""
     return f'PRAGMA yt.MaxRowWeight = "{resolve_max_row_weight(max_row_weight)}";'
 
 
 def ensure_max_row_weight_pragma(
     query: str,
-    max_row_weight: Optional[str] = None,
+    max_row_weight: str | None = None,
 ) -> str:
     """Ensure query has a single max-row-weight pragma.
 

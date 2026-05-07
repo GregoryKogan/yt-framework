@@ -10,8 +10,8 @@ class JoinDataStage(BaseStage):
         users_table = debug.get("users_table", self.config.client.users_table)
         orders_table = debug.get("orders_table", self.config.client.orders_table)
 
-        self.logger.info(f"Users table: {users_table}")
-        self.logger.info(f"Orders table: {orders_table}")
+        self.logger.info("Users table: %s", users_table)
+        self.logger.info("Orders table: %s", orders_table)
 
         self.deps.yt_client.join_tables(
             left_table=orders_table,
@@ -31,7 +31,7 @@ class JoinDataStage(BaseStage):
 
         row_count = self.deps.yt_client.row_count(self.config.client.output_table)
         self.logger.info(
-            f"Joined table has {row_count} rows: {self.config.client.output_table}"
+            "Joined table has %s rows: %s", row_count, self.config.client.output_table
         )
 
         debug["final_table"] = self.config.client.output_table

@@ -1,9 +1,13 @@
-# Configuration file for the Sphinx documentation builder.
-import os
+"""Sphinx configuration for YT Framework documentation."""
+
+from __future__ import annotations
+
 import sys
+from pathlib import Path
 
 # Add project root to path for autodoc
-sys.path.insert(0, os.path.abspath(".."))
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
 
 import yt_framework
 
@@ -68,7 +72,7 @@ html_title = "YT Framework"
 html_logo = None  # Add logo path if you create one
 
 # Add any paths that contain custom static files
-html_static_path = []
+html_static_path: list[str] = []
 
 # -- Extension configuration -------------------------------------------------
 # Napoleon settings for docstrings

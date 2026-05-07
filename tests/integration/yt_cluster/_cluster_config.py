@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import uuid
 from pathlib import Path
-from typing import Dict, Final
+from typing import Final
 
 from yt_framework.utils.env import load_env_file
 from yt_framework.yt.client_base import OperationResources
@@ -15,7 +15,7 @@ _TESTS_DIR: Final[Path] = Path(__file__).resolve().parents[2]
 _REPO_ROOT: Final[Path] = _TESTS_DIR.parent
 
 
-def _merge_os_overrides(cfg: Dict[str, str]) -> Dict[str, str]:
+def _merge_os_overrides(cfg: dict[str, str]) -> dict[str, str]:
     """Process environment wins over file-loaded values for known keys."""
     out = dict(cfg)
     keys = (
@@ -34,9 +34,8 @@ def _merge_os_overrides(cfg: Dict[str, str]) -> Dict[str, str]:
     return out
 
 
-def load_cluster_test_secrets() -> Dict[str, str]:
-    """
-    Load cluster test credentials and knobs.
+def load_cluster_test_secrets() -> dict[str, str]:
+    """Load cluster test credentials and knobs.
 
     Priority:
     1. File at YT_FRAMEWORK_CLUSTER_TEST_ENV (if set).
@@ -63,7 +62,7 @@ def new_session_run_id() -> str:
     return uuid.uuid4().hex
 
 
-def secrets_dict_for_yt_client(loaded: Dict[str, str]) -> Dict[str, str]:
+def secrets_dict_for_yt_client(loaded: dict[str, str]) -> dict[str, str]:
     """Subset passed to ``create_yt_client(..., secrets=...)``."""
     return {
         "YT_PROXY": loaded["YT_PROXY"].strip(),
@@ -71,7 +70,7 @@ def secrets_dict_for_yt_client(loaded: Dict[str, str]) -> Dict[str, str]:
     }
 
 
-def operation_resources_from_env(loaded: Dict[str, str]) -> OperationResources:
+def operation_resources_from_env(loaded: dict[str, str]) -> OperationResources:
     """Minimal OperationResources; docker_image stays None (cluster default image)."""
 
     def _opt_int(key: str, default: int) -> int:
@@ -98,11 +97,11 @@ def operation_resources_from_env(loaded: Dict[str, str]) -> OperationResources:
 
 def configure_global_yt_for_checkpoint(proxy: str, token: str) -> None:
     """Point ``yt.wrapper`` global client at the same cell (for ``ytjobs.checkpoint``)."""
+    import contextlib
+
     import yt.wrapper as yt  # pyright: ignore[reportMissingImports]
 
     yt.config.set_proxy(proxy)
     yt.config["token"] = token
-    try:
+    with contextlib.suppress(Exception):
         yt.config["proxy"]["enable_proxy_discovery"] = False  # type: ignore[index]
-    except Exception:
-        pass

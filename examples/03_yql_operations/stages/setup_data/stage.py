@@ -12,7 +12,7 @@ class SetupDataStage(BaseStage):
 
         return debug
 
-    def create_users_table(self):
+    def create_users_table(self) -> None:
         users = [
             {"user_id": 1, "name": "Alice", "age": 30, "city": "Moscow"},
             {"user_id": 2, "name": "Bob", "age": 25, "city": "SPB"},
@@ -20,9 +20,9 @@ class SetupDataStage(BaseStage):
             {"user_id": 4, "name": "Diana", "age": 28, "city": "Kazan"},
         ]
         self.deps.yt_client.write_table(self.config.client.users_table, users)
-        self.logger.info(f"Created users table: {self.config.client.users_table}")
+        self.logger.info("Created users table: %s", self.config.client.users_table)
 
-    def create_orders_table(self):
+    def create_orders_table(self) -> None:
         orders = [
             {"order_id": 1, "user_id": 1, "product": "Laptop", "amount": 1000},
             {"order_id": 2, "user_id": 1, "product": "Mouse", "amount": 50},
@@ -31,9 +31,9 @@ class SetupDataStage(BaseStage):
             {"order_id": 5, "user_id": 3, "product": "Laptop", "amount": 1200},
         ]
         self.deps.yt_client.write_table(self.config.client.orders_table, orders)
-        self.logger.info(f"Created orders table: {self.config.client.orders_table}")
+        self.logger.info("Created orders table: %s", self.config.client.orders_table)
 
-    def create_archive_orders_table(self):
+    def create_archive_orders_table(self) -> None:
         archive_orders = [
             {"order_id": 100, "user_id": 1, "product": "Phone", "amount": 800},
             {"order_id": 101, "user_id": 4, "product": "Tablet", "amount": 600},
@@ -42,5 +42,5 @@ class SetupDataStage(BaseStage):
             self.config.client.archive_orders_table, archive_orders
         )
         self.logger.info(
-            f"Created archive orders table: {self.config.client.archive_orders_table}"
+            "Created archive orders table: %s", self.config.client.archive_orders_table
         )

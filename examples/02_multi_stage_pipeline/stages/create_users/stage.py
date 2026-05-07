@@ -17,7 +17,7 @@ class CreateUsersStage(BaseStage):
             rows=users,
         )
 
-        self.logger.info(f"Created users table: {self.config.client.output_table}")
+        self.logger.info("Created users table: %s", self.config.client.output_table)
 
         # Pass table path to next stages via debug context
         debug["users_table"] = self.config.client.output_table

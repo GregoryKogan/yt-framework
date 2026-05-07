@@ -55,5 +55,5 @@ Proof of done: cite pytest output per [testing.mdc](testing.mdc).
 ## Project conventions
 
 - Run pytest through **`conda run -n yt-framework --`** when verifying locally ([conda-environment.mdc](conda-environment.mdc)).
-- Test code: type hints and Black like production ([standards.mdc](standards.mdc)).
+- Test code: type hints and Ruff formatting like production ([standards.mdc](standards.mdc)).
 - For breadth of coverage and repo status, see [.cursor/artifacts/project-details/testing-readiness-report.md](../artifacts/project-details/testing-readiness-report.md).

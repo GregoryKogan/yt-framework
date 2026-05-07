@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-GPU Mapper - Batch Processing with Multiprocessing
+"""GPU Mapper - Batch Processing with Multiprocessing.
 ===================================================
 
 Optimized for GPU nodes with batch processing.
@@ -8,9 +7,10 @@ Reads configuration from config.yaml file in YT sandbox.
 """
 
 from omegaconf import OmegaConf
-from ytjobs.mapper import BatchMapper
-from ytjobs.logging.silencer import redirect_stdout_to_stderr
+
 from ytjobs.config import get_config_path
+from ytjobs.logging.silencer import redirect_stdout_to_stderr
+from ytjobs.mapper import BatchMapper
 
 with redirect_stdout_to_stderr():
     from stages.run_map.src.processor import process_video_batch
@@ -18,9 +18,8 @@ with redirect_stdout_to_stderr():
 config = OmegaConf.load(get_config_path())
 
 
-def main():
-    """
-    Main mapper function with batch processing.
+def main() -> None:
+    """Main mapper function with batch processing.
 
     Uses BatchMapper to handle stdin/stdout boilerplate.
     """

@@ -1,12 +1,15 @@
-from functools import wraps
-from contextlib import contextmanager
-import sys
 import os
+import sys
+from collections.abc import Callable
+from contextlib import contextmanager
+from functools import wraps
+from typing import Any, TypeVar, cast
+
+_F = TypeVar("_F", bound=Callable[..., Any])
 
 
 def manage_output(mode="redirect"):
-    """
-    Decorator factory that either suppresses output or redirects stdout to stderr.
+    """Decorator factory that either suppresses output or redirects stdout to stderr.
 
     Args:
         mode: ``"suppress"`` for full silence, ``"redirect"`` to send stdout to stderr
@@ -14,11 +17,12 @@ def manage_output(mode="redirect"):
 
     Returns:
         A decorator, e.g. ``@manage_output(mode="redirect")`` above a function.
+
     """
 
-    def decorator(func):
+    def decorator(func: _F) -> _F:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             if mode == "suppress":
                 with suppress_all_output():
                     return func(*args, **kwargs)
@@ -26,19 +30,17 @@ def manage_output(mode="redirect"):
                 with redirect_stdout_to_stderr():
                     return func(*args, **kwargs)
             else:
-                raise ValueError(
-                    f"Invalid mode: {mode}. Must be 'suppress' or 'redirect'"
-                )
+                msg = f"Invalid mode: {mode}. Must be 'suppress' or 'redirect'"
+                raise ValueError(msg)
 
-        return wrapper
+        return cast("_F", wrapper)
 
     return decorator
 
 
 @contextmanager
 def redirect_stdout_to_stderr():
-    """
-    Context manager that redirects stdout to stderr.
+    """Context manager that redirects stdout to stderr.
 
     This is useful for YTsaurus mappers where you need clean JSON on stdout,
     but processing functions might print debug messages.
@@ -58,8 +60,7 @@ def redirect_stdout_to_stderr():
 
 @contextmanager
 def suppress_all_output():
-    """
-    Context manager that suppresses ALL output: stdout, stderr, and warnings.
+    """Context manager that suppresses ALL output: stdout, stderr, and warnings.
 
     This is useful when you need complete silence from noisy libraries
     like OpenCV, Ultralytics YOLO, TensorFlow, Ceres Solver, etc.

@@ -5,12 +5,13 @@ import logging
 import shutil
 import tarfile
 from pathlib import Path
-from typing import Dict, List, Optional, Literal, Tuple
+from typing import Literal
+
+from omegaconf import OmegaConf
 
 from yt_framework.utils import log_header, log_success
-from yt_framework.yt.client_base import BaseYTClient
-from omegaconf import OmegaConf
 from yt_framework.utils.ignore import YTIgnoreMatcher
+from yt_framework.yt.client_base import BaseYTClient
 
 # Marker for the implicit ytjobs framework package in target conflict checks
 _IMPLICIT_YTJOBS_SOURCE = "implicit (framework)"
@@ -30,8 +31,7 @@ def _copy_ytjobs_to_build_dir(
     build_dir: Path,
     logger: logging.Logger,
 ) -> int:
-    """
-    Copy ytjobs package to local build directory.
+    """Copy ytjobs package to local build directory.
 
     Respects .ytignore patterns if present in the ytjobs directory.
 
@@ -41,12 +41,13 @@ def _copy_ytjobs_to_build_dir(
 
     Returns:
         Number of files copied
+
     """
     ytjobs_dir = _get_ytjobs_dir()
     target_dir = build_dir / "ytjobs"
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Copying ytjobs package to {target_dir}...")
+    logger.info("Copying ytjobs package to %s...", target_dir)
 
     # Initialize .ytignore matcher for ytjobs directory
     ignore_matcher = YTIgnoreMatcher(ytjobs_dir)
@@ -59,7 +60,8 @@ def _copy_ytjobs_to_build_dir(
             # Check if file should be ignored
             if ignore_matcher.should_ignore(source_file):
                 logger.debug(
-                    f"Ignoring file (matched .ytignore): {source_file.relative_to(ytjobs_dir)}"
+                    "Ignoring file (matched .ytignore): %s",
+                    source_file.relative_to(ytjobs_dir),
                 )
                 ignored_count += 1
                 continue
@@ -72,13 +74,11 @@ def _copy_ytjobs_to_build_dir(
 
     log_success(logger, f"Copied {file_count} ytjobs files")
     if ignored_count > 0:
-        logger.debug(f"  Ignored {ignored_count} files (matched .ytignore patterns)")
+        logger.debug("  Ignored %s files (matched .ytignore patterns)", ignored_count)
     return file_count
 
 
-def _resolve_upload_target(
-    source: str, target: Optional[str], pipeline_dir: Path
-) -> str:
+def _resolve_upload_target(source: str, target: str | None, pipeline_dir: Path) -> str:
     """Resolve target name for upload_paths entry.
 
     Args:
@@ -88,6 +88,7 @@ def _resolve_upload_target(
 
     Returns:
         Target name (from config or derived from source basename)
+
     """
     if target is not None and str(target).strip():
         return str(target).strip()
@@ -95,8 +96,8 @@ def _resolve_upload_target(
 
 
 def _validate_upload_config(
-    upload_modules: Optional[List[str]],
-    upload_paths: Optional[List[Dict[str, str]]],
+    upload_modules: list[str] | None,
+    upload_paths: list[dict[str, str]] | None,
     pipeline_dir: Path,
 ) -> None:
     """Validate upload config for reserved targets and conflicts.
@@ -108,10 +109,11 @@ def _validate_upload_config(
 
     Raises:
         ValueError: If reserved target used or target conflict detected
+
     """
     reserved = {"stages", "ytjobs"}
 
-    targets: List[Tuple[str, str]] = []  # (target, source_description)
+    targets: list[tuple[str, str]] = []  # (target, source_description)
 
     # ytjobs is implicit
     targets.append(("ytjobs", _IMPLICIT_YTJOBS_SOURCE))
@@ -125,14 +127,16 @@ def _validate_upload_config(
     pipeline_dir_resolved = pipeline_dir.resolve()
     for i, entry in enumerate(upload_paths or []):
         if "source" not in entry:
-            raise ValueError("upload_paths entry missing required 'source' key.")
+            msg = "upload_paths entry missing required 'source' key."
+            raise ValueError(msg)
         source = entry.get("source", "")
         resolved_path = (pipeline_dir / source).resolve()
         if not resolved_path.is_relative_to(pipeline_dir_resolved):
-            raise ValueError(
+            msg = (
                 f"upload_paths[{i}] source must be within pipeline directory: "
                 f"{resolved_path} (pipeline: {pipeline_dir_resolved})."
             )
+            raise ValueError(msg)
         target = entry.get("target")
         resolved_target = _resolve_upload_target(source, target, pipeline_dir)
         targets.append((resolved_target, f"upload_paths[{source}]"))
@@ -140,19 +144,19 @@ def _validate_upload_config(
     # Check reserved
     for target, source_desc in targets:
         if target in reserved and source_desc != _IMPLICIT_YTJOBS_SOURCE:
-            raise ValueError(
+            msg = (
                 f"Reserved target name '{target}' cannot be used. "
                 f"Reserved names: stages, ytjobs."
             )
+            raise ValueError(msg)
 
     # Check conflicts
-    seen: Dict[str, str] = {}
+    seen: dict[str, str] = {}
     for target, source_desc in targets:
         if target in seen and seen[target] != source_desc:
             sources = f"{seen[target]}, {source_desc}"
-            raise ValueError(
-                f"Upload target conflict: '{target}' is used by multiple sources: {sources}."
-            )
+            msg = f"Upload target conflict: '{target}' is used by multiple sources: {sources}."
+            raise ValueError(msg)
         seen[target] = source_desc
 
 
@@ -177,39 +181,40 @@ def _copy_module_to_build_dir(
 
     Raises:
         ValueError: If module cannot be imported or has unsupported layout
+
     """
-    top_level = module_name.split(".")[0]
+    top_level = module_name.split(".", maxsplit=1)[0]
     try:
         module = importlib.import_module(top_level)
     except ImportError as e:
-        raise ValueError(
-            f"Failed to import module '{module_name}' (top-level: {top_level}): {e}."
-        ) from e
+        msg = f"Failed to import module '{module_name}' (top-level: {top_level}): {e}."
+        raise ValueError(msg) from e
 
     if getattr(module, "__file__", None) is None:
-        raise ValueError(
+        msg = (
             f"Module '{module_name}' has no __file__ (namespace or non-file package). "
             "Only file-based packages are supported."
         )
+        raise ValueError(msg)
 
     # Use __path__ for packages; reject single-file modules (which would copy
     # the entire containing directory, e.g. site-packages)
     if hasattr(module, "__path__"):
         source_dir = Path(module.__path__[0]).resolve()
         if not source_dir.is_dir():
-            raise ValueError(
-                f"Module '{module_name}' has invalid __path__: {source_dir} is not a directory."
-            )
+            msg = f"Module '{module_name}' has invalid __path__: {source_dir} is not a directory."
+            raise ValueError(msg)
     else:
-        raise ValueError(
+        msg = (
             f"Module '{module_name}' is a single-file module, not a package. "
             "upload_modules supports only packages (directories with __init__.py). "
             "Single-file modules would copy the entire containing directory."
         )
+        raise ValueError(msg)
 
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Copying module {module_name} to {target_dir}...")
+    logger.info("Copying module %s to %s...", module_name, target_dir)
 
     ignore_matcher = YTIgnoreMatcher(source_dir)
     file_count = 0
@@ -219,7 +224,8 @@ def _copy_module_to_build_dir(
         if source_file.is_file():
             if ignore_matcher.should_ignore(source_file):
                 logger.debug(
-                    f"Ignoring file (matched .ytignore): {source_file.relative_to(source_dir)}"
+                    "Ignoring file (matched .ytignore): %s",
+                    source_file.relative_to(source_dir),
                 )
                 ignored_count += 1
                 continue
@@ -232,7 +238,7 @@ def _copy_module_to_build_dir(
 
     log_success(logger, f"Copied {file_count} {module_name} files")
     if ignored_count > 0:
-        logger.debug(f"  Ignored {ignored_count} files (matched .ytignore patterns)")
+        logger.debug("  Ignored %s files (matched .ytignore patterns)", ignored_count)
     return file_count
 
 
@@ -260,26 +266,30 @@ def _copy_path_to_build_dir(
     Raises:
         ValueError: If source path escapes pipeline directory or is not a directory
         FileNotFoundError: If source does not exist
+
     """
     pipeline_dir_resolved = pipeline_dir.resolve()
     resolved = (pipeline_dir / source_path).resolve()
 
     if not resolved.is_relative_to(pipeline_dir_resolved):
-        raise ValueError(
+        msg = (
             f"Upload path source must be within pipeline directory: {resolved} "
             f"(pipeline: {pipeline_dir_resolved}). Paths like '../foo' are not allowed."
         )
+        raise ValueError(msg)
 
     if not resolved.exists():
-        raise FileNotFoundError(f"Upload path source does not exist: {resolved}.")
+        msg = f"Upload path source does not exist: {resolved}."
+        raise FileNotFoundError(msg)
 
     if not resolved.is_dir():
-        raise ValueError(f"Upload path source must be a directory: {resolved}.")
+        msg = f"Upload path source must be a directory: {resolved}."
+        raise ValueError(msg)
 
     target_dir = build_dir / target_name
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Copying {resolved} to {target_dir}...")
+    logger.info("Copying %s to %s...", resolved, target_dir)
 
     ignore_matcher = YTIgnoreMatcher(resolved)
     file_count = 0
@@ -289,7 +299,8 @@ def _copy_path_to_build_dir(
         if source_file.is_file():
             if ignore_matcher.should_ignore(source_file):
                 logger.debug(
-                    f"Ignoring file (matched .ytignore): {source_file.relative_to(resolved)}"
+                    "Ignoring file (matched .ytignore): %s",
+                    source_file.relative_to(resolved),
                 )
                 ignored_count += 1
                 continue
@@ -302,7 +313,7 @@ def _copy_path_to_build_dir(
 
     log_success(logger, f"Copied {file_count} files from {source_path}")
     if ignored_count > 0:
-        logger.debug(f"  Ignored {ignored_count} files (matched .ytignore patterns)")
+        logger.debug("  Ignored %s files (matched .ytignore patterns)", ignored_count)
     return file_count
 
 
@@ -311,8 +322,7 @@ def _copy_stage_to_build_dir(
     stage_dir: Path,
     logger: logging.Logger,
 ) -> int:
-    """
-    Copy a single stage's code and config to local build directory.
+    """Copy a single stage's code and config to local build directory.
 
     Respects .ytignore patterns if present in the stage directory.
 
@@ -323,6 +333,7 @@ def _copy_stage_to_build_dir(
 
     Returns:
         Number of files copied
+
     """
     stage_name = stage_dir.name
     file_count = 0
@@ -347,13 +358,13 @@ def _copy_stage_to_build_dir(
                     target_config.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(config_path, target_config)
                     file_count += 1
-                    logger.debug(f"  Copied config: {stage_name}/config.yaml")
+                    logger.debug("  Copied config: %s/config.yaml", stage_name)
             except Exception:
                 # If config parsing fails, skip it
                 pass
         else:
             logger.debug(
-                f"  Ignoring config: {stage_name}/config.yaml (matched .ytignore)"
+                "  Ignoring config: %s/config.yaml (matched .ytignore)", stage_name
             )
             ignored_count += 1
 
@@ -368,7 +379,8 @@ def _copy_stage_to_build_dir(
                 # Check if file should be ignored
                 if ignore_matcher.should_ignore(source_file):
                     logger.debug(
-                        f"  Ignoring file: {source_file.relative_to(stage_dir)} (matched .ytignore)"
+                        "  Ignoring file: %s (matched .ytignore)",
+                        source_file.relative_to(stage_dir),
                     )
                     ignored_count += 1
                     continue
@@ -379,10 +391,12 @@ def _copy_stage_to_build_dir(
                 shutil.copy2(source_file, target_file)
                 file_count += 1
 
-        logger.debug(f"  Copied {file_count} files from {stage_name}/src/")
+        logger.debug("  Copied %s files from %s/src/", file_count, stage_name)
         if ignored_count > 0:
             logger.debug(
-                f"  Ignored {ignored_count} files from {stage_name}/ (matched .ytignore patterns)"
+                "  Ignored %s files from %s/ (matched .ytignore patterns)",
+                ignored_count,
+                stage_name,
             )
 
     return file_count
@@ -427,10 +441,10 @@ def _write_wrapper_file(
     wrapper_path = build_dir / filename
     wrapper_path.write_text(body)
     wrapper_path.chmod(0o755)
-    logger.debug(f"Created wrapper script: {wrapper_path}")
+    logger.debug("Created wrapper script: %s", wrapper_path)
 
 
-def _load_stage_job_section(stage_dir: Path, logger: logging.Logger) -> Dict:
+def _load_stage_job_section(stage_dir: Path, logger: logging.Logger) -> dict:
     """Return ``job`` dict from stage ``config.yaml`` if present."""
     cfg_path = stage_dir / "config.yaml"
     if not cfg_path.is_file():
@@ -449,9 +463,8 @@ def _load_stage_job_section(stage_dir: Path, logger: logging.Logger) -> Dict:
 def _resolve_map_reduce_command_scripts(
     stage_dir: Path,
     logger: logging.Logger,
-) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Resolve mapper/reducer Python entrypoints under stages/<name>/src/ for map-reduce
+) -> tuple[str | None, str | None]:
+    """Resolve mapper/reducer Python entrypoints under stages/<name>/src/ for map-reduce
     command mode wrappers. Uses ``job.map_reduce_command`` when set.
     """
     job = _load_stage_job_section(stage_dir, logger)
@@ -484,7 +497,7 @@ def _resolve_map_reduce_command_scripts(
 
 def _resolve_reduce_command_script(
     stage_dir: Path, logger: logging.Logger
-) -> Optional[str]:
+) -> str | None:
     """Reducer entrypoint for reduce-only command mode (``job.reduce_command``)."""
     job = _load_stage_job_section(stage_dir, logger)
     rc = job.get("reduce_command") or {}
@@ -518,8 +531,7 @@ def _create_unified_wrapper_script(
     build_dir: Path,
     logger: logging.Logger,
 ) -> None:
-    """
-    Create unified wrapper script for map or vanilla operations.
+    """Create unified wrapper script for map or vanilla operations.
 
     The wrapper script:
     1. Extracts tar.gz archive
@@ -536,6 +548,7 @@ def _create_unified_wrapper_script(
 
     Returns:
         None
+
     """
     if operation_type == "map":
         script_path = f"stages/{stage_name}/src/mapper.py"
@@ -618,8 +631,7 @@ def _create_wrappers_for_stage(
     build_dir: Path,
     logger: logging.Logger,
 ) -> None:
-    """
-    Create wrapper scripts for a stage based on what operation types it has.
+    """Create wrapper scripts for a stage based on what operation types it has.
 
     Args:
         stage_name: Name of the stage
@@ -629,6 +641,7 @@ def _create_wrappers_for_stage(
 
     Returns:
         None
+
     """
     src_dir = stage_dir / "src"
 
@@ -678,11 +691,10 @@ def build_code_locally(
     pipeline_dir: Path,
     logger: logging.Logger,
     create_wrappers: bool = False,
-    upload_modules: Optional[List[str]] = None,
-    upload_paths: Optional[List[Dict[str, str]]] = None,
+    upload_modules: list[str] | None = None,
+    upload_paths: list[dict[str, str]] | None = None,
 ) -> int:
-    """
-    Build all code in a local build directory.
+    """Build all code in a local build directory.
 
     Copies ytjobs package, optional custom modules/paths, and all stages' code
     to the build directory, preserving the same structure as would be uploaded to YT.
@@ -697,6 +709,7 @@ def build_code_locally(
 
     Returns:
         Total number of files copied
+
     """
     log_header(logger, "Code Build", f"Build directory: {build_dir}")
 
@@ -769,7 +782,7 @@ def build_code_locally(
                 build_dir=build_dir,
                 logger=logger,
             )
-        logger.debug(f"Created wrapper scripts for {len(stage_dirs_list)} stages")
+        logger.debug("Created wrapper scripts for %s stages", len(stage_dirs_list))
 
     total_files = ytjobs_files + module_files + path_files + stage_files
     log_success(logger, f"Code build completed: {total_files} total files")
@@ -781,8 +794,7 @@ def create_code_archive(
     archive_path: Path,
     logger: logging.Logger,
 ) -> None:
-    """
-    Create a tar.gz archive from the build directory.
+    """Create a tar.gz archive from the build directory.
 
     Args:
         build_dir: Local build directory path
@@ -791,6 +803,7 @@ def create_code_archive(
 
     Returns:
         None
+
     """
     log_header(logger, "Code Archive", f"Creating archive: {archive_path}")
 
@@ -814,8 +827,7 @@ def upload_code_archive(
     build_folder: str,
     logger: logging.Logger,
 ) -> None:
-    """
-    Upload code archive to YT.
+    """Upload code archive to YT.
 
     Args:
         yt_client: YT client instance
@@ -825,9 +837,10 @@ def upload_code_archive(
 
     Returns:
         None
+
     """
     log_header(logger, "Uploading Code Archive to YT")
-    logger.info(f"Build folder: {build_folder}")
+    logger.info("Build folder: %s", build_folder)
 
     archive_name = archive_path.name
     archive_yt_path = f"{build_folder}/{archive_name}"
@@ -845,8 +858,7 @@ def _resolve_build_code_dir(
     pipeline_dir: Path,
     logger: logging.Logger,
 ) -> Path:
-    """
-    Resolve build code directory path.
+    """Resolve build code directory path.
 
     Args:
         pipeline_dir: Path to pipeline directory
@@ -854,9 +866,10 @@ def _resolve_build_code_dir(
 
     Returns:
         Resolved build code directory path
+
     """
     build_code_dir = pipeline_dir / _BUILD_CODE_DIR
-    logger.debug(f"Using build directory: {build_code_dir}")
+    logger.debug("Using build directory: %s", build_code_dir)
 
     # Ensure build directory exists
     if build_code_dir.exists():
@@ -870,11 +883,10 @@ def upload_all_code(
     build_folder: str,
     pipeline_dir: Path,
     logger: logging.Logger,
-    upload_modules: Optional[List[str]] = None,
-    upload_paths: Optional[List[Dict[str, str]]] = None,
+    upload_modules: list[str] | None = None,
+    upload_paths: list[dict[str, str]] | None = None,
 ) -> None:
-    """
-    Upload all code to YT: ytjobs package, optional custom modules/paths, and stages.
+    """Upload all code to YT: ytjobs package, optional custom modules/paths, and stages.
 
     Builds code locally, creates tar archive, and uploads it to YT.
 
@@ -888,6 +900,7 @@ def upload_all_code(
 
     Returns:
         None
+
     """
     log_header(
         logger, "Code Upload", f"Tar archive mode | Build folder: {build_folder}"

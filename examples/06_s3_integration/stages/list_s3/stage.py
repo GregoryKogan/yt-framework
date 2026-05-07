@@ -6,7 +6,7 @@ from ytjobs.s3.client import S3Client
 
 
 class ListS3Stage(BaseStage):
-    def __init__(self, deps, logger):
+    def __init__(self, deps, logger) -> None:
         super().__init__(deps, logger)
 
         self.s3_client = S3Client.create(
@@ -32,7 +32,7 @@ class ListS3Stage(BaseStage):
             self.logger.warning("No files found in S3")
             return debug
 
-        self.logger.info(f"Found {len(paths)} files")
+        self.logger.info("Found %s files", len(paths))
 
         save_s3_paths_to_table(
             yt_client=self.deps.yt_client,
@@ -43,7 +43,7 @@ class ListS3Stage(BaseStage):
         )
 
         self.logger.info(
-            f"Saved {len(paths)} paths to {self.config.client.output_table}"
+            "Saved %s paths to %s", len(paths), self.config.client.output_table
         )
 
         return debug

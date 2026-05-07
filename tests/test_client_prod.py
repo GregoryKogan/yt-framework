@@ -2,11 +2,10 @@
 
 import logging
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any
 from unittest.mock import MagicMock, call
 
 import pytest
-
 from yt.wrapper import TypedJob  # pyright: ignore[reportMissingImports]
 from yt.wrapper import schema as yt_schema  # pyright: ignore[reportMissingImports]
 
@@ -44,7 +43,7 @@ def test_yt_prod_client_raises_when_yt_token_missing() -> None:
 
 class _FakeSpecBuilder:
     def __init__(self) -> None:
-        self.calls: List[Tuple[str, Any]] = []
+        self.calls: list[tuple[str, Any]] = []
 
     def title(self, value: str) -> "_FakeSpecBuilder":
         self.calls.append(("title", value))
@@ -57,7 +56,9 @@ def test_apply_spec_options_splits_run_operation_kwargs_from_builder_chain() -> 
         b,
         {"title": "my_job", "sync": True},
     )
-    assert b2 is b and run_op == {"sync": True} and b.calls == [("title", "my_job")]
+    assert b2 is b
+    assert run_op == {"sync": True}
+    assert b.calls == [("title", "my_job")]
 
 
 def test_apply_spec_options_raises_value_error_on_unknown_operation_kwarg() -> None:
@@ -141,24 +142,28 @@ def _stub_split_run_operation_kwargs(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_apply_command_leg_format_sets_json_format_for_string_command() -> None:
     b = _LegBuilderWithFormat()
     assert _apply_command_leg_format(b, "python3 mapper.py") is b
-    assert len(b.format_specs) == 1 and b.format_specs[0].encode_utf8 is False
+    assert len(b.format_specs) == 1
+    assert b.format_specs[0].encode_utf8 is False
 
 
 def test_apply_command_leg_format_skips_format_for_typed_job_leg() -> None:
     b = _LegBuilderWithFormat()
-    assert _apply_command_leg_format(b, TypedJob()) is b and b.format_specs == []
+    assert _apply_command_leg_format(b, TypedJob()) is b
+    assert b.format_specs == []
 
 
 def test_apply_max_row_weight_to_spec_builder_writes_bytes_to_table_writer() -> None:
     b = _BuilderWithTableWriter()
     out = _apply_max_row_weight_to_spec_builder(b, "128M")
-    assert out is b and b.payload == {"max_row_weight": 134217728}
+    assert out is b
+    assert b.payload == {"max_row_weight": 134217728}
 
 
 def test_apply_max_row_weight_to_spec_builder_uses_job_io_fallback_with_bytes() -> None:
     b = _BuilderWithJobIo()
     out = _apply_max_row_weight_to_spec_builder(b, "64M")
-    assert out is b and b.payload == {"table_writer": {"max_row_weight": 67108864}}
+    assert out is b
+    assert b.payload == {"table_writer": {"max_row_weight": 67108864}}
 
 
 def test_apply_max_row_weight_to_spec_builder_prefers_table_writer_over_job_io() -> (
@@ -166,11 +171,9 @@ def test_apply_max_row_weight_to_spec_builder_prefers_table_writer_over_job_io()
 ):
     b = _BuilderWithTableWriterAndJobIo()
     out = _apply_max_row_weight_to_spec_builder(b, "64M")
-    assert (
-        out is b
-        and b.table_writer_payload == {"max_row_weight": 67108864}
-        and b.job_io_payload is None
-    )
+    assert out is b
+    assert b.table_writer_payload == {"max_row_weight": 67108864}
+    assert b.job_io_payload is None
 
 
 def test_yt_prod_client_run_map_configures_pool_tree_docker_and_secure_vault(
@@ -462,7 +465,7 @@ def test_yt_prod_client_run_map_sets_output_table_path_append_when_requested(
         getattr(mapper, name).return_value = mapper
     mapper.end_mapper.return_value = spec
 
-    captured: List[Any] = []
+    captured: list[Any] = []
 
     def _otp(paths: Any) -> Any:
         captured[:] = list(paths)
@@ -489,7 +492,8 @@ def test_yt_prod_client_run_map_sets_output_table_path_append_when_requested(
         {},
         append=True,
     )
-    assert len(captured) == 1 and captured[0].append is True
+    assert len(captured) == 1
+    assert captured[0].append is True
 
 
 def _prod_client_with_stub_run_operation(monkeypatch: pytest.MonkeyPatch) -> Any:
@@ -1017,13 +1021,12 @@ def test_yt_prod_client_run_sort_calls_client_run_sort_with_sort_columns(
     args, kwargs = fake_inner.run_sort.call_args
     assert args[0] == "//tmp/sorted"
     cols = kwargs["sort_by"]
-    assert (
-        len(cols) == 2
-        and all(isinstance(c, yt_schema.SortColumn) for c in cols)
-        and [c.name for c in cols] == ["a", "b"]
-    )
+    assert len(cols) == 2
+    assert all(isinstance(c, yt_schema.SortColumn) for c in cols)
+    assert [c.name for c in cols] == ["a", "b"]
     spec = kwargs.get("spec") or {}
-    assert spec.get("pool") == "pool1" and spec.get("pool_tree") == "tree1"
+    assert spec.get("pool") == "pool1"
+    assert spec.get("pool_tree") == "tree1"
 
 
 def test_yt_prod_client_write_table_creates_and_writes_via_stub_client(
@@ -1323,7 +1326,8 @@ def test_yt_prod_client_upload_file_calls_write_file_with_local_bytes(
     fake_inner.write_file.assert_called_once()
     args, kwargs = fake_inner.write_file.call_args
     assert args[0] == "//yt/cluster/blob.bin"
-    assert kwargs.get("force_create") is True and kwargs.get("compute_md5") is True
+    assert kwargs.get("force_create") is True
+    assert kwargs.get("compute_md5") is True
 
 
 def test_yt_prod_client_upload_file_create_parent_dir_calls_create_for_parent(
@@ -1374,9 +1378,9 @@ def test_yt_prod_client_join_tables_runs_yql_when_not_dry_run(
     client.join_tables("//left/t", "//right/t", "//out/t", "id", dry_run=False)
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
-    assert (
-        "//left/t" in q and "//right/t" in q and "//out/t" in q
-    ), "join_tables should execute built YQL referencing all three paths"
+    assert "//left/t" in q and "//right/t" in q and "//out/t" in q, (
+        "join_tables should execute built YQL referencing all three paths"
+    )
 
 
 def test_yt_prod_client_filter_table_runs_yql_using_resolved_columns(
@@ -1393,9 +1397,9 @@ def test_yt_prod_client_filter_table_runs_yql_using_resolved_columns(
     )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
-    assert (
-        "WHERE" in q and "//tmp/in_tbl" in q
-    ), "filter_table should run YQL with WHERE after _get_table_columns"
+    assert "WHERE" in q and "//tmp/in_tbl" in q, (
+        "filter_table should run YQL with WHERE after _get_table_columns"
+    )
 
 
 def test_yt_prod_client_union_tables_runs_yql_when_not_dry_run(
@@ -1407,7 +1411,9 @@ def test_yt_prod_client_union_tables_runs_yql_when_not_dry_run(
     client.union_tables(["//tmp/a", "//tmp/b"], "//tmp/u_out", dry_run=False)
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
-    assert "//tmp/a" in q and "//tmp/b" in q and "//tmp/u_out" in q
+    assert "//tmp/a" in q
+    assert "//tmp/b" in q
+    assert "//tmp/u_out" in q
 
 
 def test_yt_prod_client_select_columns_runs_yql_when_not_dry_run(
@@ -1423,7 +1429,8 @@ def test_yt_prod_client_select_columns_runs_yql_when_not_dry_run(
     )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
-    assert "//tmp/s_in" in q and "//tmp/s_out" in q
+    assert "//tmp/s_in" in q
+    assert "//tmp/s_out" in q
 
 
 def test_yt_prod_client_group_by_aggregate_runs_yql_when_not_dry_run(
@@ -1440,7 +1447,8 @@ def test_yt_prod_client_group_by_aggregate_runs_yql_when_not_dry_run(
     )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
-    assert "//tmp/g_in" in q and "//tmp/g_out" in q
+    assert "//tmp/g_in" in q
+    assert "//tmp/g_out" in q
 
 
 def test_yt_prod_client_distinct_runs_yql_when_not_dry_run(
@@ -1451,7 +1459,8 @@ def test_yt_prod_client_distinct_runs_yql_when_not_dry_run(
     client.distinct("//tmp/d_in", "//tmp/d_out", columns=["k"], dry_run=False)
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
-    assert "//tmp/d_in" in q and "//tmp/d_out" in q
+    assert "//tmp/d_in" in q
+    assert "//tmp/d_out" in q
 
 
 def test_yt_prod_client_sort_table_runs_yql_using_resolved_columns(
@@ -1468,7 +1477,8 @@ def test_yt_prod_client_sort_table_runs_yql_using_resolved_columns(
     )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
-    assert "//tmp/sort_in" in q and "//tmp/sort_out" in q
+    assert "//tmp/sort_in" in q
+    assert "//tmp/sort_out" in q
 
 
 def test_yt_prod_client_limit_table_runs_yql_using_resolved_columns(
@@ -1480,7 +1490,9 @@ def test_yt_prod_client_limit_table_runs_yql_using_resolved_columns(
     client.limit_table("//tmp/l_in", "//tmp/l_out", limit=10, dry_run=False)
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
-    assert "//tmp/l_in" in q and "//tmp/l_out" in q and "LIMIT" in q.upper()
+    assert "//tmp/l_in" in q
+    assert "//tmp/l_out" in q
+    assert "LIMIT" in q.upper()
 
 
 def test_yt_prod_client_get_table_columns_uses_yql_schema_inference_on_decode_error(
@@ -1500,7 +1512,8 @@ def test_yt_prod_client_get_table_columns_uses_yql_schema_inference_on_decode_er
     assert client._get_table_columns("//tmp/binaryish") == ["inferred_col"]
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
-    assert "PRAGMA yt.InferSchema" in q and "//tmp/binaryish" in q
+    assert "PRAGMA yt.InferSchema" in q
+    assert "//tmp/binaryish" in q
     removed = [c.args[0] for c in fake_inner.remove.call_args_list]
     assert any("temp_schema_" in str(p) for p in removed)
 
@@ -1539,7 +1552,6 @@ def test_yt_prod_client_get_table_columns_returns_inferred_columns_when_temp_rem
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Temp-table cleanup swallows remove errors so callers still get inferred columns."""
-
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
 
     def _get_side_effect(path: str, attributes: Any = None) -> dict[str, Any]:
@@ -1559,7 +1571,6 @@ def test_yt_prod_client_get_table_columns_raises_binary_help_when_temp_remove_ra
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Cleanup after failed inference swallows remove errors; binary helper ValueError still raises."""
-
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
 
     def _get_side_effect(path: str, attributes: Any = None) -> dict[str, Any]:
@@ -1595,7 +1606,8 @@ def test_yt_prod_client_init_warns_when_proxy_discovery_config_unusable(
 ) -> None:
     class _BadCfg:
         def __contains__(self, _item: object) -> bool:
-            raise RuntimeError("config unreadable")
+            msg = "config unreadable"
+            raise RuntimeError(msg)
 
     fake_inner = MagicMock()
     fake_inner.config = _BadCfg()
@@ -1686,9 +1698,9 @@ def test_yt_prod_client_join_tables_dry_run_returns_query_without_run_yql(
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     q = client.join_tables("//l", "//r", "//o", "id", dry_run=True)
-    assert (
-        isinstance(q, str) and "JOIN" in q.upper() and not fake_inner.run_query.called
-    )
+    assert isinstance(q, str)
+    assert "JOIN" in q.upper()
+    assert not fake_inner.run_query.called
 
 
 def test_yt_prod_client_filter_table_dry_run_returns_query_without_run_yql(
@@ -1697,7 +1709,8 @@ def test_yt_prod_client_filter_table_dry_run_returns_query_without_run_yql(
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "status"}]}
     q = client.filter_table("//i", "//o", "status = 1", dry_run=True)
-    assert "WHERE" in q and not fake_inner.run_query.called
+    assert "WHERE" in q
+    assert not fake_inner.run_query.called
 
 
 def test_yt_prod_client_select_columns_dry_run_returns_query_without_run_yql(
@@ -1705,7 +1718,9 @@ def test_yt_prod_client_select_columns_dry_run_returns_query_without_run_yql(
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     q = client.select_columns("//i", "//o", ["a", "b"], dry_run=True)
-    assert "//i" in q and "//o" in q and not fake_inner.run_query.called
+    assert "//i" in q
+    assert "//o" in q
+    assert not fake_inner.run_query.called
 
 
 def test_yt_prod_client_group_by_aggregate_dry_run_returns_query_without_run_yql(
@@ -1713,7 +1728,8 @@ def test_yt_prod_client_group_by_aggregate_dry_run_returns_query_without_run_yql
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     q = client.group_by_aggregate("//i", "//o", "g", {"n": "count"}, dry_run=True)
-    assert "GROUP BY" in q.upper() and not fake_inner.run_query.called
+    assert "GROUP BY" in q.upper()
+    assert not fake_inner.run_query.called
 
 
 def test_yt_prod_client_union_tables_dry_run_returns_query_without_run_yql(
@@ -1722,7 +1738,8 @@ def test_yt_prod_client_union_tables_dry_run_returns_query_without_run_yql(
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "id"}]}
     q = client.union_tables(["//a", "//b"], "//u", dry_run=True)
-    assert "UNION" in q.upper() and not fake_inner.run_query.called
+    assert "UNION" in q.upper()
+    assert not fake_inner.run_query.called
 
 
 def test_yt_prod_client_distinct_dry_run_returns_query_without_run_yql(
@@ -1730,7 +1747,8 @@ def test_yt_prod_client_distinct_dry_run_returns_query_without_run_yql(
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     q = client.distinct("//d_in", "//d_out", columns=["k"], dry_run=True)
-    assert "//d_in" in q and not fake_inner.run_query.called
+    assert "//d_in" in q
+    assert not fake_inner.run_query.called
 
 
 def test_yt_prod_client_sort_table_dry_run_returns_query_without_run_yql(
@@ -1739,7 +1757,8 @@ def test_yt_prod_client_sort_table_dry_run_returns_query_without_run_yql(
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "ts"}]}
     q = client.sort_table("//s_in", "//s_out", order_by="ts", dry_run=True)
-    assert "//s_in" in q and not fake_inner.run_query.called
+    assert "//s_in" in q
+    assert not fake_inner.run_query.called
 
 
 def test_yt_prod_client_limit_table_dry_run_returns_query_without_run_yql(
@@ -1748,7 +1767,8 @@ def test_yt_prod_client_limit_table_dry_run_returns_query_without_run_yql(
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "id"}]}
     q = client.limit_table("//l_in", "//l_out", limit=3, dry_run=True)
-    assert "LIMIT" in q.upper() and not fake_inner.run_query.called
+    assert "LIMIT" in q.upper()
+    assert not fake_inner.run_query.called
 
 
 @pytest.mark.parametrize(
@@ -1825,7 +1845,7 @@ def test_yt_prod_client_upload_directory_skips_ytignored_files_and_logs_count(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    client, _fake_inner = _prod_client_with_fake_inner(monkeypatch)
     root = tmp_path / "udir"
     root.mkdir()
     (root / ".ytignore").write_text("skipme.txt\n", encoding="utf-8")
@@ -1833,7 +1853,8 @@ def test_yt_prod_client_upload_directory_skips_ytignored_files_and_logs_count(
     (root / "skipme.txt").write_text("b", encoding="utf-8")
     caplog.set_level(logging.INFO)
     out = sorted(client.upload_directory(root, "//yt/out"))
-    assert out == ["//yt/out/keep.txt"] and "Ignored" in caplog.text
+    assert out == ["//yt/out/keep.txt"]
+    assert "Ignored" in caplog.text
 
 
 def test_yt_prod_client_run_vanilla_raises_when_run_operation_returns_none(

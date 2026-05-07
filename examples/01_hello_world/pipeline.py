@@ -1,5 +1,4 @@
-"""
-Hello World Pipeline
+"""Hello World Pipeline.
 =====================
 
 The simplest example of a YT Framework pipeline.

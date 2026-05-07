@@ -1,12 +1,14 @@
-"""
-Tar archive + bash bootstrap helpers for command-string YT jobs.
+"""Tar archive + bash bootstrap helpers for command-string YT jobs.
 
 Kept in a separate module so the feature can be reverted or disabled in one place.
 """
 
 from __future__ import annotations
 
-import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import logging
 
 
 def bootstrap_shell_run_wrapper(
@@ -14,12 +16,11 @@ def bootstrap_shell_run_wrapper(
     wrapper_filename: str,
     logger: logging.Logger,
 ) -> str:
-    """
-    Build the inner bash snippet: extract tarball and execute a wrapper script in cwd.
+    """Build the inner bash snippet: extract tarball and execute a wrapper script in cwd.
 
     Same pattern as map tar mode (see TarArchiveDependencyBuilder._create_bootstrap_command).
     """
-    logger.debug(f"Creating tar bootstrap for wrapper {wrapper_filename}")
+    logger.debug("Creating tar bootstrap for wrapper %s", wrapper_filename)
     return f"""set -e
 tar -xzf {archive_name}
 ./{wrapper_filename}

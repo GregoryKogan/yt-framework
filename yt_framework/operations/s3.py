@@ -1,7 +1,6 @@
 """Driver-side helpers to list S3 keys and persist paths into Cypress tables."""
 
 import logging
-from typing import List, Optional
 
 from yt_framework.yt.client_base import BaseYTClient
 from ytjobs.s3.client import S3Client
@@ -12,11 +11,10 @@ def list_s3_files(
     bucket: str,
     prefix: str,
     logger: logging.Logger,
-    extension: Optional[str] = None,
-    max_files: Optional[int] = None,
-) -> List[str]:
-    """
-    List files from S3 bucket with optional filtering.
+    extension: str | None = None,
+    max_files: int | None = None,
+) -> list[str]:
+    """List files from S3 bucket with optional filtering.
 
     Args:
         s3_client: S3 client instance
@@ -28,8 +26,9 @@ def list_s3_files(
 
     Returns:
         List of S3 file paths
+
     """
-    logger.info(f"Listing files from S3: s3://{bucket}/{prefix}")
+    logger.info("Listing files from S3: s3://%s/%s", bucket, prefix)
 
     paths = s3_client.list_files(
         bucket=bucket,
@@ -38,14 +37,14 @@ def list_s3_files(
         max_files=max_files,
     )
 
-    logger.info(f"Found {len(paths)} files")
+    logger.info("Found %s files", len(paths))
 
     if paths:
         logger.debug("Sample paths:")
         for path in paths[:3]:
-            logger.debug(f"  - {path}")
+            logger.debug("  - %s", path)
         if len(paths) > 3:
-            logger.debug(f"  ... and {len(paths) - 3} more")
+            logger.debug("  ... and %s more", len(paths) - 3)
 
     return paths
 
@@ -53,12 +52,11 @@ def list_s3_files(
 def save_s3_paths_to_table(
     yt_client: BaseYTClient,
     bucket: str,
-    paths: List[str],
+    paths: list[str],
     output_table: str,
     logger: logging.Logger,
 ) -> None:
-    """
-    Save S3 file paths to YT table as bucket and path columns.
+    """Save S3 file paths to YT table as bucket and path columns.
 
     Args:
         yt_client: YT client instance
@@ -69,12 +67,13 @@ def save_s3_paths_to_table(
 
     Returns:
         None
+
     """
-    logger.info(f"Saving {len(paths)} paths to YT table: {output_table}")
+    logger.info("Saving %s paths to YT table: %s", len(paths), output_table)
 
     # Convert paths to table rows
     rows = [{"bucket": bucket, "path": path} for path in paths]
 
     yt_client.write_table(table_path=output_table, rows=rows, append=False)
 
-    logger.info(f"✓ Saved {len(rows)} paths → {output_table}")
+    logger.info("✓ Saved %s paths → %s", len(rows), output_table)
