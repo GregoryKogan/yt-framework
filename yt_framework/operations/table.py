@@ -83,5 +83,6 @@ def download_table(
     with open(output_file, "w") as f:
         f.writelines(json.dumps(row) + "\n" for row in rows)
 
-    row_count = sum(1 for _ in open(output_file))
+    with open(output_file) as f:
+        row_count = sum(1 for _ in f)
     logger.info("✓ Downloaded %s rows → %s", row_count, output_file)

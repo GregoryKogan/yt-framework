@@ -185,17 +185,13 @@ class YTIgnorePattern:
                         return True
             return False
 
-        # For file patterns, check the full path
-        if self._regex.match(path_str):
-            return True
-
-        # Also check just the filename, but only if pattern doesn't contain path separators
-        # Patterns like **/*.pyc or subdir/*.py should only match full paths
-        if "/" not in self.pattern and "**" not in self.pattern:
-            if self._regex.match(Path(path_str).name):
-                return True
-
-        return False
+        # For file patterns, check full path first, then filename-only fallback.
+        filename_match = (
+            "/" not in self.pattern
+            and "**" not in self.pattern
+            and bool(self._regex.match(Path(path_str).name))
+        )
+        return bool(self._regex.match(path_str)) or filename_match
 
 
 class YTIgnoreMatcher:

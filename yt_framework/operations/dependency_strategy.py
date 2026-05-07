@@ -119,18 +119,22 @@ class TarArchiveDependencyBuilder:
         if operation_type == "map_reduce":
             if mapper is not None and reducer is not None:
                 require_consistent_map_reduce_legs(mapper, reducer)
-            if tar_bootstrap_flag and mapper is not None and reducer is not None:
-                if map_reduce_leg_kind(mapper) == "command":
-                    w_m, w_r = map_reduce_wrapper_names(stage_name)
-                    inner_m = bootstrap_shell_run_wrapper(archive_name, w_m, logger)
-                    inner_r = bootstrap_shell_run_wrapper(archive_name, w_r, logger)
-                    mapper_command = wrap_bootstrap_as_bash_c(inner_m)
-                    reducer_command = wrap_bootstrap_as_bash_c(inner_r)
-                    logger.info(
-                        "tar_command_bootstrap enabled: map-reduce legs use tar extract + %s / %s",
-                        w_m,
-                        w_r,
-                    )
+            if (
+                tar_bootstrap_flag
+                and mapper is not None
+                and reducer is not None
+                and map_reduce_leg_kind(mapper) == "command"
+            ):
+                w_m, w_r = map_reduce_wrapper_names(stage_name)
+                inner_m = bootstrap_shell_run_wrapper(archive_name, w_m, logger)
+                inner_r = bootstrap_shell_run_wrapper(archive_name, w_r, logger)
+                mapper_command = wrap_bootstrap_as_bash_c(inner_m)
+                reducer_command = wrap_bootstrap_as_bash_c(inner_r)
+                logger.info(
+                    "tar_command_bootstrap enabled: map-reduce legs use tar extract + %s / %s",
+                    w_m,
+                    w_r,
+                )
             bootstrap_command = ""
         elif operation_type == "reduce":
             if tar_bootstrap_flag and reducer is not None and isinstance(reducer, str):

@@ -28,6 +28,7 @@ def run_command(cmd, logger, description="command", timeout=10):
             text=True,
             timeout=timeout,
             shell=isinstance(cmd, str),
+            check=False,
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -90,7 +91,7 @@ def log_gpu_info(logger) -> None:
                 logger.info("GPU %s: %s", i, torch.cuda.get_device_name(i))
                 props = torch.cuda.get_device_properties(i)
                 logger.info("  - Compute capability: %s.%s", props.major, props.minor)
-                logger.info(f"  - Total memory: {props.total_memory / 1024**3:.2f} GB")
+                logger.info("  - Total memory: %.2f GB", props.total_memory / 1024**3)
     except ImportError:
         logger.info("PyTorch: Not installed")
     except Exception as e:
@@ -565,12 +566,12 @@ def log_metadata(logger, start_time) -> None:
     """Log execution metadata."""
     log_section_header(logger, "11. EXECUTION METADATA")
 
-    end_time = datetime.now()
+    end_time = datetime.now(datetime.UTC)
     duration = (end_time - start_time).total_seconds()
 
     logger.info("Start time (UTC): %s", start_time.isoformat())
     logger.info("End time (UTC): %s", end_time.isoformat())
-    logger.info(f"Duration: {duration:.2f} seconds")
+    logger.info("Duration: %.2f seconds", duration)
 
     # YT job info
     yt_job_id = os.environ.get("YT_JOB_ID")
@@ -587,7 +588,7 @@ def log_metadata(logger, start_time) -> None:
 
 def main() -> None:
     """Main execution function."""
-    start_time = datetime.now()
+    start_time = datetime.now(datetime.UTC)
 
     # Initialize logger
     logger = get_logger("logenv", level=logging.INFO)

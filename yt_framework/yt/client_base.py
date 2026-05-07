@@ -632,8 +632,8 @@ class BaseYTClient(ABC):
             error = operation.get_error()
             if error:
                 self.logger.error("Error: %s", error)
-        except Exception:
-            pass
+        except Exception as exc:
+            self.logger.debug("Failed to read operation error details: %s", exc)
 
     def _log_error_from_exception(self, exception: Exception) -> None:
         """Extract and log error from exception."""

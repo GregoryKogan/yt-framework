@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+import shutil
 import subprocess
 
 from omegaconf import OmegaConf
@@ -18,18 +19,22 @@ def main() -> None:
     logger.info("")
 
     config = OmegaConf.load(get_config_path())
+    cowsay_bin = shutil.which("cowsay")
+    if not cowsay_bin:
+        msg = "cowsay binary not found in PATH"
+        raise RuntimeError(msg)
 
     try:
         result = subprocess.run(
-            ["cowsay", config.job.message], capture_output=True, text=True, check=True
+            [cowsay_bin, config.job.message], capture_output=True, text=True, check=True
         )
         logger.info("\n%s\n", result.stdout)
-    except Exception:
+    except Exception as err:
         logger.exception("Error running cowsay")
         logger.info("This job will run only in a custom Docker image!")
         logger.info("Custom Docker images are only used in production mode!")
         msg = "This job will run only in a custom Docker image!"
-        raise RuntimeError(msg)
+        raise RuntimeError(msg) from err
 
     logger.info("")
     logger.info("=" * 60)

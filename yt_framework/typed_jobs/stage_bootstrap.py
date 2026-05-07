@@ -16,12 +16,28 @@ import os
 import sys
 import tarfile
 import threading
+from pathlib import Path
 from typing import Any
 
 import yt.wrapper as yt
 
 _BOOTSTRAPPED_LOCK = threading.Lock()
 _BOOTSTRAPPED_KEYS: set[str] = set()
+
+
+def _safe_extractall(tf: tarfile.TarFile, destination: Path) -> None:
+    """Extract archive members while rejecting path traversal entries."""
+    destination = destination.resolve()
+    members = tf.getmembers()
+    for member in members:
+        member_target = (destination / member.name).resolve()
+        if not member_target.is_relative_to(destination):
+            msg = (
+                f"Refusing to extract archive member outside destination: {member.name}"
+            )
+            raise RuntimeError(msg)
+    for member in members:
+        tf.extract(member, destination)
 
 
 def _find_source_tarball_root() -> str | None:
@@ -31,7 +47,7 @@ def _find_source_tarball_root() -> str | None:
 
     # TypedJob reducers may run with cwd under tmpfs/modules; tarball stays higher.
     for _ in range(6):
-        parent = os.path.dirname(candidates[-1])
+        parent = str(Path(candidates[-1]).parent)
         if parent == candidates[-1] or parent in seen:
             break
         candidates.append(parent)
@@ -57,14 +73,14 @@ def _bootstrap_once(stage_name: str) -> None:
     if not root:
         candidates: list[str] = [os.getcwd()]
         for _ in range(6):
-            parent = os.path.dirname(candidates[-1])
+            parent = str(Path(candidates[-1]).parent)
             if parent == candidates[-1]:
                 break
             candidates.append(parent)
 
         for base in candidates:
             stage_src = os.path.join(base, "stages", stage_name, "src")
-            if os.path.isdir(stage_src):
+            if Path(stage_src).is_dir():
                 root = base
                 break
 
@@ -86,7 +102,7 @@ def _bootstrap_once(stage_name: str) -> None:
     tarball = os.path.join(root, "source.tar.gz")
     if os.path.isfile(tarball) and not os.path.isfile(ytjobs_marker):
         with tarfile.open(tarball, "r:gz") as tf:
-            tf.extractall(root)
+            _safe_extractall(tf, Path(root))
 
     # Ensure imports work for:
     # - framework packages (yt_framework/ embedded in archive root)
@@ -94,7 +110,7 @@ def _bootstrap_once(stage_name: str) -> None:
     # - stage-local helpers under stages/<stage_name>/src
     if root not in sys.path:
         sys.path.insert(0, root)
-    if os.path.isdir(stage_src) and stage_src not in sys.path:
+    if Path(stage_src).is_dir() and stage_src not in sys.path:
         sys.path.insert(0, stage_src)
 
     # Parity with command-mode wrappers.
@@ -115,11 +131,11 @@ def _bootstrap_once(stage_name: str) -> None:
             os.environ["TOKENIZER_ARTIFACT_DIR"] = tokenizer_artifact_dir
         artifact_dir_abs = os.path.join(root, tokenizer_artifact_dir)
         if os.path.isfile(artifact_tar):
-            os.makedirs(artifact_dir_abs, exist_ok=True)
+            Path(artifact_dir_abs).mkdir(parents=True, exist_ok=True)
             marker = os.path.join(artifact_dir_abs, ".extracted")
             if not os.path.isfile(marker):
                 with tarfile.open(artifact_tar, "r:gz") as tf:
-                    tf.extractall(artifact_dir_abs)
+                    _safe_extractall(tf, Path(artifact_dir_abs))
                 with open(marker, "w", encoding="utf-8") as m:
                     m.write("ok\n")
 

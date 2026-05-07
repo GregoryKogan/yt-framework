@@ -627,12 +627,13 @@ class YTDevClient(BaseYTClient):
             open(logs_path, "w") as ferr,
         ):
             proc = subprocess.run(
-                ["bash", "-c", mapper_job],
+                ["/bin/bash", "-c", mapper_job],
                 stdin=fin,
                 stdout=fout,
                 stderr=ferr,
                 env=env_merged,
                 cwd=str(sandbox_dir),
+                check=False,
             )
 
         # Copy output back
@@ -752,10 +753,11 @@ class YTDevClient(BaseYTClient):
         self.logger.info("  Dev: stderr=%s", logs_path)
         with open(logs_path, "w") as ferr:
             proc = subprocess.run(
-                ["bash", "-c", local_command],
+                ["/bin/bash", "-c", local_command],
                 stderr=ferr,
                 env=env_merged,
                 cwd=str(sandbox_dir),
+                check=False,
             )
 
         err_hint = f"Output written to {logs_path}" if proc.returncode != 0 else ""

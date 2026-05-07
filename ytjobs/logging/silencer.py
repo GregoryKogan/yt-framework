@@ -80,33 +80,28 @@ def suppress_all_output():
     original_stdout_fd = os.dup(1)  # stdout FD
     original_stderr_fd = os.dup(2)  # stderr FD
 
-    # Open devnull for writing
-    devnull = open(os.devnull, "w")
-    devnull_fd = devnull.fileno()
+    with open(os.devnull, "w") as devnull:
+        devnull_fd = devnull.fileno()
+        try:
+            # Redirect Python streams to devnull
+            sys.stdout = devnull
+            sys.stderr = devnull
 
-    try:
-        # Redirect Python streams to devnull
-        sys.stdout = devnull
-        sys.stderr = devnull
+            # Redirect OS-level file descriptors (this catches C library output like Ceres)
+            os.dup2(devnull_fd, 1)  # Redirect stdout FD
+            os.dup2(devnull_fd, 2)  # Redirect stderr FD
 
-        # Redirect OS-level file descriptors (this catches C library output like Ceres)
-        os.dup2(devnull_fd, 1)  # Redirect stdout FD
-        os.dup2(devnull_fd, 2)  # Redirect stderr FD
+            yield
 
-        yield
+        finally:
+            # Restore OS-level file descriptors first
+            os.dup2(original_stdout_fd, 1)
+            os.dup2(original_stderr_fd, 2)
 
-    finally:
-        # Restore OS-level file descriptors first
-        os.dup2(original_stdout_fd, 1)
-        os.dup2(original_stderr_fd, 2)
+            # Close duplicate FDs
+            os.close(original_stdout_fd)
+            os.close(original_stderr_fd)
 
-        # Close duplicate FDs
-        os.close(original_stdout_fd)
-        os.close(original_stderr_fd)
-
-        # Restore Python streams
-        sys.stdout = original_stdout
-        sys.stderr = original_stderr
-
-        # Close devnull
-        devnull.close()
+            # Restore Python streams
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr

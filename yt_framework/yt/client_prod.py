@@ -868,15 +868,14 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         self.logger.info("Uploading %s → %s", local_path.name, yt_path)
         try:
             # Ensure parent directory exists before uploading if requested
-            if create_parent_dir:
+            if create_parent_dir and "/" in yt_path:
                 # Extract parent directory from yt_path (everything before the last '/')
-                if "/" in yt_path:
-                    parent_dir = "/".join(yt_path.split("/")[:-1])
-                    if parent_dir:
-                        self.logger.debug(
-                            "Ensuring parent directory exists: %s", parent_dir
-                        )
-                        self.create_path(parent_dir, node_type="map_node")
+                parent_dir = "/".join(yt_path.split("/")[:-1])
+                if parent_dir:
+                    self.logger.debug(
+                        "Ensuring parent directory exists: %s", parent_dir
+                    )
+                    self.create_path(parent_dir, node_type="map_node")
 
             with open(local_path, "rb") as f:
                 self.client.write_file(
