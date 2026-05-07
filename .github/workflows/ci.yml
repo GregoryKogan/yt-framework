@@ -31,6 +31,7 @@ jobs:
       - name: Run tests
         run: |
           pytest \
+            -m "not yt_cluster" \
             --cov=yt_framework \
             --cov=ytjobs \
             --cov-report=term-missing \

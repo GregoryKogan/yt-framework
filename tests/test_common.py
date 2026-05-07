@@ -15,6 +15,7 @@ from yt_framework.operations.common import (
     extract_docker_auth_from_operation_config,
     extract_max_failed_jobs,
     extract_operation_resources,
+    extract_secure_env_client_kwargs,
     prepare_docker_auth,
 )
 from yt_framework.yt.client_base import BaseYTClient
@@ -192,3 +193,17 @@ def test_build_environment_loads_secrets_from_configs_dir(tmp_path: Path) -> Non
     (cfg_dir / "secrets.env").write_text("YT_TOKEN=abc\n")
     env = build_environment(cfg_dir, _LOG)
     assert env.get("YT_TOKEN") == "abc"
+
+
+def test_extract_secure_env_client_kwargs_reads_operation_options() -> None:
+    cfg = OmegaConf.create(
+        {
+            "environment_public_keys": ["DEBUG"],
+            "use_plain_environment_for_secrets": True,
+        }
+    )
+    out = extract_secure_env_client_kwargs(cfg)
+    assert out == {
+        "environment_public_keys": ["DEBUG"],
+        "use_plain_environment_for_secrets": True,
+    }
