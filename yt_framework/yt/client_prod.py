@@ -1248,13 +1248,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                 preferred_name="reduce_job",
                 preferred_value=reduce_job,
             )
-            if use_plain:
-                public_env, secure_flat = dict(env), {}
-            else:
-                public_env, secure_flat = partition_env_for_yt_spec(
-                    env, environment_public_keys
-                )
-            mapper_leg = _maybe_wrap_string_command_for_vault(mapper_leg, secure_flat)
+            public_env, secure_flat, mapper_leg = _partition_and_maybe_wrap_leg(
+                mapper_leg,
+                env,
+                environment_public_keys=environment_public_keys,
+                use_plain_environment_for_secrets=use_plain,
+            )
             reducer_leg = _maybe_wrap_string_command_for_vault(reducer_leg, secure_flat)
             merged_vault = merge_secure_vault(
                 secure_flat,

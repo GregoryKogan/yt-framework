@@ -74,6 +74,12 @@ def test_wrap_command_roundtrip_shell_words() -> None:
     assert shlex.split(tail, posix=True) == [inner]
 
 
+def test_wrap_command_contract_requires_python3_and_bash() -> None:
+    wrapped = wrap_shell_command_with_secure_vault_promotion("echo ok")
+    assert wrapped.startswith("python3 -c ")
+    assert " bash -c " in wrapped
+
+
 def test_merge_secure_vault_docker_and_user_override() -> None:
     out = merge_secure_vault(
         {"K": "v"},

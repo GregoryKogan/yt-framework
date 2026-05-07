@@ -74,6 +74,8 @@ def wrap_shell_command_with_secure_vault_promotion(inner: str) -> str:
     Prefix a shell command so vault vars are promoted then the user command runs under bash.
 
     Uses only the Python stdlib (no ``yt_framework`` import) for minimal job sandboxes.
+    This wrapper intentionally requires both ``python3`` and ``bash`` binaries in
+    the job image.
     """
     snippet = (
         "import os,sys\n"
