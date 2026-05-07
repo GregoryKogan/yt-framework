@@ -6,10 +6,12 @@ import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import Generator, cast
 
 import pytest
 
+from yt_framework.yt.client_base import OperationResources
+from yt_framework.yt.client_prod import YTProdClient
 from yt_framework.yt.factory import create_yt_client
 
 from integration.yt_cluster._cluster_config import (
@@ -33,10 +35,10 @@ def _null_logger(name: str) -> logging.Logger:
 class ClusterSessionContext:
     """Holds prod client and path roots for one pytest session."""
 
-    client: object  # YTProdClient; avoid import cycle in annotations
+    client: YTProdClient
     yt_run_root: str
     local_run_root: Path
-    resources: object  # OperationResources
+    resources: OperationResources
     secrets_full: dict[str, str]
 
 
@@ -50,10 +52,13 @@ def cluster_session() -> Generator[ClusterSessionContext, None, None]:
     local_run_root.mkdir(parents=True, exist_ok=True)
 
     logger = _null_logger("tests.integration.yt_cluster.session")
-    client = create_yt_client(
-        logger=logger,
-        mode="prod",
-        secrets=secrets,
+    client = cast(
+        YTProdClient,
+        create_yt_client(
+            logger=logger,
+            mode="prod",
+            secrets=secrets,
+        ),
     )
     resources = operation_resources_from_env(loaded)
 
@@ -88,12 +93,12 @@ def yt_case_prefix(
 
 
 @pytest.fixture
-def yt_client(cluster_session: ClusterSessionContext):
+def yt_client(cluster_session: ClusterSessionContext) -> YTProdClient:
     return cluster_session.client
 
 
 @pytest.fixture
-def op_resources(cluster_session: ClusterSessionContext):
+def op_resources(cluster_session: ClusterSessionContext) -> OperationResources:
     return cluster_session.resources
 
 

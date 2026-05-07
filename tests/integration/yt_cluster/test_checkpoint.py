@@ -23,3 +23,11 @@ def test_save_and_load_checkpoint_roundtrip(yt_case_prefix: str) -> None:
     data, loaded_meta = load_checkpoint(name, base_path=base)
     assert data == payload
     assert loaded_meta == meta
+
+
+@pytest.mark.yt_cluster
+def test_load_checkpoint_missing_returns_none_tuple(yt_case_prefix: str) -> None:
+    base = f"{yt_case_prefix}/checkpoints"
+    data, metadata = load_checkpoint("missing-checkpoint.bin", base_path=base)
+    assert data is None
+    assert metadata is None
