@@ -14,6 +14,7 @@ alwaysApply: true
 
 - Touch only required files. Root-cause fixes over rewrites. No destructive git without request. No dead code.
 - Done = proof (test/log/command output). No "done" without evidence. Divergence → re-plan, don’t patch. Thoroughness: very thorough.
+- Before completion, run `pre-commit run --all-files` from the repo root and do not finish until every hook passes.
 
 ## Code
 
