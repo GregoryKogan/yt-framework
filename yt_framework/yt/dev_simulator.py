@@ -66,27 +66,27 @@ class DuckDBSimulator:
             self.logger.warning("Table file not found: %s", local_jsonl_path)
             # Create empty table
             table_name = self._validated_table_identifier(
-                self._sanitize_table_name(yt_path)
+                self._sanitize_table_name(yt_path),
             )
             self.conn.execute("CREATE TABLE " + table_name + " (dummy INTEGER)")
             self.loaded_tables[yt_path] = table_name
             return table_name
 
         table_name = self._validated_table_identifier(
-            self._sanitize_table_name(yt_path)
+            self._sanitize_table_name(yt_path),
         )
 
         try:
             # Path is bound; identifier is whitelist-validated (not parameterizable in SQL).
             self.conn.execute(
-                "CREATE TABLE "
+                "CREATE TABLE "  # noqa: S608
                 + table_name
                 + " AS SELECT * FROM read_json_auto(?, format='newline_delimited')",
                 [str(local_jsonl_path.resolve())],
             )
 
             count_result = self.conn.execute(
-                "SELECT COUNT(*) FROM " + table_name
+                "SELECT COUNT(*) FROM " + table_name,  # noqa: S608
             ).fetchone()
             row_count = 0 if count_result is None else count_result[0]
             self.logger.debug(

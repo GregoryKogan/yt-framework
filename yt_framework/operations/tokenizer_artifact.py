@@ -133,7 +133,8 @@ def init_tokenizer_artifact_directory(
             source = Path(str(local_artifact_path))
             if not source.exists():
                 context.logger.warning(
-                    "tokenizer_artifact.local_artifact_path does not exist: %s", source
+                    "tokenizer_artifact.local_artifact_path does not exist: %s",
+                    source,
                 )
             elif context.deps.yt_client.exists(yt_artifact_path):
                 context.logger.info(
@@ -150,7 +151,9 @@ def init_tokenizer_artifact_directory(
                     yt_artifact_path,
                 )
                 context.deps.yt_client.upload_file(
-                    archive_local_path, yt_artifact_path, create_parent_dir=True
+                    archive_local_path,
+                    yt_artifact_path,
+                    create_parent_dir=True,
                 )
 
         if not context.deps.yt_client.exists(yt_artifact_path):

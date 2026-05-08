@@ -7,7 +7,7 @@ pattern (SOLID).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from omegaconf import DictConfig, ListConfig
 
@@ -65,8 +65,8 @@ class DependencyBuilder(Protocol):
         stage_config: DictConfig,
         logger: logging.Logger,
         *,
-        mapper: Any = None,
-        reducer: Any = None,
+        mapper: object = None,
+        reducer: object = None,
     ) -> DependencyBuildResult:
         """Build dependencies for an operation.
 
@@ -94,8 +94,8 @@ class TarArchiveDependencyBuilder:
         stage_config: DictConfig,
         logger: logging.Logger,
         *,
-        mapper: Any = None,
-        reducer: Any = None,
+        mapper: object = None,
+        reducer: object = None,
     ) -> DependencyBuildResult:
         """Build dependencies using tar archive strategy."""
         effective_type = (
@@ -140,7 +140,8 @@ class TarArchiveDependencyBuilder:
                 inner = bootstrap_shell_run_wrapper(archive_name, w, logger)
                 reducer_command = wrap_bootstrap_as_bash_c(inner)
                 logger.info(
-                    "tar_command_bootstrap enabled: reduce leg uses tar extract + %s", w
+                    "tar_command_bootstrap enabled: reduce leg uses tar extract + %s",
+                    w,
                 )
             bootstrap_command = ""
         else:
@@ -185,7 +186,7 @@ class TarArchiveDependencyBuilder:
                 model_name = stage_config.job.model_name
             checkpoint_base = None
             if "checkpoint" in operation_config and operation_config.checkpoint.get(
-                "checkpoint_base"
+                "checkpoint_base",
             ):
                 checkpoint_base = operation_config.checkpoint.checkpoint_base
             if model_name and checkpoint_base:
@@ -208,7 +209,7 @@ class TarArchiveDependencyBuilder:
             else:
                 logger.warning(
                     "tokenizer_artifact configured but artifact_name cannot be resolved; "
-                    "skipping dependency mount"
+                    "skipping dependency mount",
                 )
 
         logger.info("Total dependencies: %s files", len(dependencies))

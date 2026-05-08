@@ -5,7 +5,7 @@ from `configs/secrets.env` like other operations.
 """
 
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from omegaconf import DictConfig, OmegaConf
 
@@ -29,11 +29,11 @@ if TYPE_CHECKING:
 def run_map_reduce(
     context: "StageContext",
     operation_config: DictConfig,
-    mapper: Any = None,
-    reducer: Any = None,
-    output_schema: Any | None = None,
-    map_job: Any = None,
-    reduce_job: Any = None,
+    mapper: object = None,
+    reducer: object = None,
+    output_schema: object | None = None,
+    map_job: object = None,
+    reduce_job: object = None,
 ) -> bool:
     """Run a YT map-reduce operation and wait for completion.
 
@@ -124,7 +124,7 @@ def run_map_reduce(
         mapper = dep.mapper_command
         reducer = dep.reducer_command
         logger.info(
-            "Using tar bootstrap commands for map-reduce mapper and reducer legs"
+            "Using tar bootstrap commands for map-reduce mapper and reducer legs",
         )
     elif dep.mapper_command is not None or dep.reducer_command is not None:
         msg = (
@@ -149,7 +149,8 @@ def run_map_reduce(
             spec_kwargs["title"] = od
         else:
             spec_kwargs["operation_description"] = OmegaConf.to_container(
-                od, resolve=True
+                od,
+                resolve=True,
             )
 
     passthrough = collect_passthrough_kwargs(
@@ -206,9 +207,9 @@ def run_map_reduce(
 def run_reduce(
     context: "StageContext",
     operation_config: DictConfig,
-    reducer: Any = None,
-    output_schema: Any | None = None,
-    job: Any = None,
+    reducer: object = None,
+    output_schema: object | None = None,
+    job: object = None,
 ) -> bool:
     """Run a YT reduce-only operation and wait for completion.
 
@@ -286,7 +287,8 @@ def run_reduce(
             reduce_kw["title"] = rod
         else:
             reduce_kw["operation_description"] = OmegaConf.to_container(
-                rod, resolve=True
+                rod,
+                resolve=True,
             )
 
     passthrough = collect_passthrough_kwargs(

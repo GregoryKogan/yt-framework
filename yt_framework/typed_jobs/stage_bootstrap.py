@@ -16,7 +16,6 @@ import sys
 import tarfile
 import threading
 from pathlib import Path
-from typing import Any
 
 import yt.wrapper as yt
 
@@ -149,13 +148,13 @@ class StageBootstrapTypedJob(yt.TypedJob):
     bootstrap runs on the worker before ``__call__``.
     """
 
-    def __getstate__(self) -> Any:  # pragma: no cover (driver-side)
+    def __getstate__(self) -> object:  # pragma: no cover (driver-side)
         """Return picklable state so ``__setstate__`` runs on the worker."""
         # Ensure the pickling machinery carries a state object so `__setstate__` is called
         # during unpickling (required for our worker-side bootstrap).
         return dict(getattr(self, "__dict__", {}) or {})
 
-    def __setstate__(self, state: Any) -> None:  # pragma: no cover (worker-side)
+    def __setstate__(self, state: object) -> None:  # pragma: no cover (worker-side)
         """Restore state and run worker-side path/bootstrap once per unpickle."""
         stage_name = os.environ.get("YT_STAGE_NAME", "").strip()
         if stage_name:

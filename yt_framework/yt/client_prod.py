@@ -70,30 +70,35 @@ def _raise_value_error_from(cause: BaseException, message: str) -> None:
     raise ValueError(message) from cause
 
 
-def _maybe_wrap_string_command_for_vault(leg: Any, secure_flat: dict[str, str]) -> Any:
+def _maybe_wrap_string_command_for_vault(
+    leg: object, secure_flat: dict[str, str]
+) -> object:
     if secure_flat and isinstance(leg, str):
         return wrap_shell_command_with_secure_vault_promotion(leg)
     return leg
 
 
 def _partition_and_maybe_wrap_leg(
-    leg: Any,
+    leg: object,
     env: dict[str, str],
     *,
-    environment_public_keys: Any,
+    environment_public_keys: object,
     use_plain_environment_for_secrets: bool,
 ) -> tuple[dict[str, str], dict[str, str], Any]:
     if use_plain_environment_for_secrets:
         public_env, secure_flat = dict(env), {}
     else:
         public_env, secure_flat = partition_env_for_yt_spec(
-            env, environment_public_keys
+            env,
+            environment_public_keys,
         )
     leg = _maybe_wrap_string_command_for_vault(leg, secure_flat)
     return public_env, secure_flat, leg
 
 
-def _spec_builder_secure_vault(spec_builder: Any, vault: Mapping[str, Any]) -> Any:
+def _spec_builder_secure_vault(
+    spec_builder: object, vault: Mapping[str, Any]
+) -> object:
     if not vault:
         return spec_builder
     return spec_builder.secure_vault(dict(vault))
@@ -102,12 +107,12 @@ def _spec_builder_secure_vault(spec_builder: Any, vault: Mapping[str, Any]) -> A
 # YtClient.run_operation() only accepts these keyword args; everything else must be
 # applied via SpecBuilder chain methods (weight, title, description, …).
 _RUN_OPERATION_KWARGS = frozenset(
-    {"enable_optimizations", "run_operation_mutation_id", "sync"}
+    {"enable_optimizations", "run_operation_mutation_id", "sync"},
 )
 
 
 def _apply_spec_options_and_split_run_operation_kwargs(
-    spec_builder: Any,
+    spec_builder: object,
     kwargs: dict[str, Any],
 ) -> tuple[Any, dict[str, Any]]:
     """Apply SpecBuilder kwargs and split out ``run_operation`` options.
@@ -140,9 +145,9 @@ def _apply_spec_options_and_split_run_operation_kwargs(
 
 
 def _apply_command_leg_format(
-    leg_builder: Any,
-    leg: Any,
-) -> Any:
+    leg_builder: object,
+    leg: object,
+) -> object:
     """Configure wire format for command legs only.
 
     TypedJob legs keep their native typed protocol; command string legs use JSON.
@@ -153,9 +158,9 @@ def _apply_command_leg_format(
 
 
 def _apply_max_row_weight_to_spec_builder(
-    spec_builder: Any,
+    spec_builder: object,
     max_row_weight: str | None,
-) -> Any:
+) -> object:
     """Apply max row weight to spec builder when supported."""
     if max_row_weight is None:
         return spec_builder
@@ -241,7 +246,7 @@ class YTProdClient(BaseYTClient):
         if pickling.get("disable_module_upload"):
             existing_module_filter = cfg.get("module_filter")
 
-            def module_filter(module: Any) -> bool:
+            def module_filter(module: object) -> bool:
                 if callable(existing_module_filter):
                     existing_module_filter(module)
                 return False
@@ -253,7 +258,11 @@ class YTProdClient(BaseYTClient):
         self,
         path: str,
         node_type: Literal[
-            "table", "file", "map_node", "list_node", "document"
+            "table",
+            "file",
+            "map_node",
+            "list_node",
+            "document",
         ] = "map_node",
     ) -> None:
         """Create a path in YT.
@@ -298,6 +307,7 @@ class YTProdClient(BaseYTClient):
         self,
         table_path: str,
         rows: list[dict[str, Any]],
+        *,
         append: bool = False,
         replication_factor: int = 1,
         make_parents: bool = True,
@@ -321,7 +331,8 @@ class YTProdClient(BaseYTClient):
                 parent_dir = "/".join(table_path.rstrip("/").split("/")[:-1])
                 if parent_dir:
                     self.logger.debug(
-                        "Ensuring parent directory exists: %s", parent_dir
+                        "Ensuring parent directory exists: %s",
+                        parent_dir,
                     )
                     self.create_path(parent_dir, node_type="map_node")
 
@@ -364,7 +375,8 @@ class YTProdClient(BaseYTClient):
             # Type ignore needed because YT client's read_table has complex return types
             # but when called with JsonFormat(), it returns an iterable of dicts
             table_iterator = self.client.read_table(
-                TablePath(table_path), format=yt_format.JsonFormat()
+                TablePath(table_path),
+                format=yt_format.JsonFormat(),
             )
             results: list[dict[str, Any]] = list(table_iterator)  # type: ignore[arg-type]
             self.logger.info("✓ Read %s rows", len(results))
@@ -432,7 +444,8 @@ class YTProdClient(BaseYTClient):
         except Exception as e:  # noqa: BLE001
             # YT attribute/schema access is version-dependent; fall through to row read.
             self.logger.debug(
-                "Could not get schema from attributes: %s, trying to read table", e
+                "Could not get schema from attributes: %s, trying to read table",
+                e,
             )
 
         # Method 2: Try to read one row (may fail with binary columns)
@@ -440,7 +453,7 @@ class YTProdClient(BaseYTClient):
             rows = self.read_table(table_path)
             if not rows:
                 _raise_value_error(
-                    f"Table {table_path} is empty, cannot determine columns"
+                    f"Table {table_path} is empty, cannot determine columns",
                 )
             # Get column names from first row
             columns = list(rows[0].keys())
@@ -459,7 +472,7 @@ class YTProdClient(BaseYTClient):
                 temp_output = None
                 try:
                     self.logger.debug(
-                        "Reading failed due to binary columns, using YQL to infer schema"
+                        "Reading failed due to binary columns, using YQL to infer schema",
                     )
                     # Use YQL to create a temporary table with LIMIT 0 to infer schema
                     # This doesn't read actual data, just infers the schema
@@ -584,6 +597,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         on: str | list[str] | dict[str, str],
         how: Literal["inner", "left", "right", "full"] = "left",
         select_columns: list[str] | None = None,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -627,6 +641,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         input_table: str,
         output_table: str,
         condition: str,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -665,6 +680,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         input_table: str,
         output_table: str,
         columns: list[str],
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -700,6 +716,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         output_table: str,
         group_by: str | list[str],
         aggregations: dict[str, str | tuple[str, str]],
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -736,6 +753,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         self,
         tables: list[str],
         output_table: str,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -773,6 +791,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         input_table: str,
         output_table: str,
         columns: list[str] | None = None,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -807,6 +826,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         input_table: str,
         output_table: str,
         order_by: str | list[str],
+        *,
         ascending: bool = True,
         dry_run: bool = False,
         max_row_weight: str | None = None,
@@ -850,6 +870,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         input_table: str,
         output_table: str,
         limit: int,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -884,7 +905,11 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         return None
 
     def upload_file(
-        self, local_path: Path, yt_path: str, create_parent_dir: bool = False
+        self,
+        local_path: Path,
+        yt_path: str,
+        *,
+        create_parent_dir: bool = False,
     ) -> None:
         """Upload a file to YT.
 
@@ -902,7 +927,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 parent_dir = "/".join(yt_path.split("/")[:-1])
                 if parent_dir:
                     self.logger.debug(
-                        "Ensuring parent directory exists: %s", parent_dir
+                        "Ensuring parent directory exists: %s",
+                        parent_dir,
                     )
                     self.create_path(parent_dir, node_type="map_node")
 
@@ -919,7 +945,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             raise
 
     def upload_directory(
-        self, local_dir: Path, yt_dir: str, pattern: str = "*"
+        self,
+        local_dir: Path,
+        yt_dir: str,
+        pattern: str = "*",
     ) -> list[str]:
         """Upload a directory to YT cluster.
 
@@ -939,7 +968,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
 
         """
         self.logger.info(
-            "Uploading directory %s → %s", local_dir, yt_dir
+            "Uploading directory %s → %s",
+            local_dir,
+            yt_dir,
         )  # Create YT directory
         self.create_path(yt_dir, node_type="map_node")
 
@@ -953,7 +984,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 # Check if file should be ignored
                 if ignore_matcher.should_ignore(local_file):
                     self.logger.debug(
-                        "Ignoring file (matched .ytignore): %s", local_file
+                        "Ignoring file (matched .ytignore): %s",
+                        local_file,
                     )
                     ignored_count += 1
                     continue
@@ -974,13 +1006,14 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         self.logger.info("Uploaded %s files", len(uploaded))
         if ignored_count > 0:
             self.logger.info(
-                "Ignored %s files (matched .ytignore patterns)", ignored_count
+                "Ignored %s files (matched .ytignore patterns)",
+                ignored_count,
             )
         return uploaded
 
     def run_map(
         self,
-        command: Any,
+        command: object,
         input_table: str,
         output_table: str,
         files: list[tuple[str, str]],
@@ -989,9 +1022,10 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         output_schema: TableSchema | None = None,
         max_failed_jobs: int = 1,
         docker_auth: dict[str, str] | None = None,
-        job: Any = None,
+        job: object = None,
+        *,
         append: bool = False,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> Operation:
         """Run a map operation on YT cluster.
 
@@ -1042,7 +1076,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 pop_secure_env_client_kwargs(kwargs)
             )
             kwargs["max_row_weight"] = validate_max_row_weight(
-                kwargs.get("max_row_weight")
+                kwargs.get("max_row_weight"),
             )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
@@ -1099,13 +1133,14 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
-                spec_builder, kwargs
+                spec_builder,
+                kwargs,
             )
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
                 _raise_runtime_error(
-                    "Failed to submit operation: run_operation returned None"
+                    "Failed to submit operation: run_operation returned None",
                 )
 
             self.logger.info("Operation submitted: %s", operation.id)
@@ -1125,7 +1160,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         docker_auth: dict[str, str] | None = None,
         max_failed_jobs: int = 1,
         job: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> Operation:
         """Run a vanilla operation on YT cluster.
 
@@ -1169,7 +1204,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 pop_secure_env_client_kwargs(kwargs)
             )
             kwargs["max_row_weight"] = validate_max_row_weight(
-                kwargs.get("max_row_weight")
+                kwargs.get("max_row_weight"),
             )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
@@ -1227,13 +1262,14 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
-                spec_builder, kwargs
+                spec_builder,
+                kwargs,
             )
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
                 _raise_runtime_error(
-                    "Failed to submit operation: run_operation returned None"
+                    "Failed to submit operation: run_operation returned None",
                 )
 
             self.logger.info("Operation submitted: %s", operation.id)
@@ -1245,8 +1281,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
 
     def run_map_reduce(
         self,
-        mapper: Any,
-        reducer: Any,
+        mapper: object,
+        reducer: object,
         input_table: str,
         output_table: str,
         reduce_by: list[str],
@@ -1257,9 +1293,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         output_schema: TableSchema | None = None,
         max_failed_jobs: int = 1,
         docker_auth: dict[str, str] | None = None,
-        map_job: Any = None,
-        reduce_job: Any = None,
-        **kwargs: Any,
+        map_job: object = None,
+        reduce_job: object = None,
+        **kwargs: object,
     ) -> Operation:
         """Run a map-reduce operation on YT cluster."""
         self.logger.info("Submitting map-reduce operation")
@@ -1272,7 +1308,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 pop_secure_env_client_kwargs(kwargs)
             )
             kwargs["max_row_weight"] = validate_max_row_weight(
-                kwargs.get("max_row_weight")
+                kwargs.get("max_row_weight"),
             )
             mapper_leg = _resolve_aliased_job(
                 legacy_name="mapper",
@@ -1316,7 +1352,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 spec_builder = spec_builder.pool_trees([resources.pool_tree])
             if resources.user_slots:
                 spec_builder = spec_builder.resource_limits(
-                    {"user_slots": resources.user_slots}
+                    {"user_slots": resources.user_slots},
                 )
 
             od = kwargs.pop("operation_description", None)
@@ -1364,7 +1400,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
-                spec_builder, kwargs
+                spec_builder,
+                kwargs,
             )
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
@@ -1379,7 +1416,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
 
     def run_reduce(
         self,
-        reducer: Any,
+        reducer: object,
         input_table: str,
         output_table: str,
         reduce_by: list[str],
@@ -1389,8 +1426,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         output_schema: TableSchema | None = None,
         max_failed_jobs: int = 1,
         docker_auth: dict[str, str] | None = None,
-        job: Any = None,
-        **kwargs: Any,
+        job: object = None,
+        **kwargs: object,
     ) -> Operation:
         """Run a reduce-only operation on YT cluster."""
         self.logger.info("Submitting reduce operation")
@@ -1409,7 +1446,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 pop_secure_env_client_kwargs(kwargs)
             )
             kwargs["max_row_weight"] = validate_max_row_weight(
-                kwargs.get("max_row_weight")
+                kwargs.get("max_row_weight"),
             )
             public_env, secure_flat, reducer_leg = _partition_and_maybe_wrap_leg(
                 reducer_leg,
@@ -1440,7 +1477,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 spec_builder = spec_builder.pool_trees([resources.pool_tree])
             if resources.user_slots:
                 spec_builder = spec_builder.resource_limits(
-                    {"user_slots": resources.user_slots}
+                    {"user_slots": resources.user_slots},
                 )
 
             rod = kwargs.pop("operation_description", None)
@@ -1469,7 +1506,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
-                spec_builder, kwargs
+                spec_builder,
+                kwargs,
             )
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
@@ -1488,7 +1526,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         sort_by: list[str],
         pool: str | None = None,
         pool_tree: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> None:
         """Sort a table in place by the given columns."""
         self.logger.info("Sorting table %s by %s", table_path, sort_by)

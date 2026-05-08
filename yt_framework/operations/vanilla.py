@@ -129,7 +129,8 @@ def run_vanilla(
     )
     vanilla_operation_data.environment = env
     vanilla_operation_data.docker_auth = extract_docker_auth_from_operation_config(
-        operation_config, env
+        operation_config,
+        env,
     )
 
     log_header(
@@ -158,7 +159,8 @@ def run_vanilla(
             vanilla_kwargs["title"] = od
         else:
             vanilla_kwargs["operation_description"] = OmegaConf.to_container(
-                od, resolve=True
+                od,
+                resolve=True,
             )
 
     vanilla_kwargs.update(
@@ -176,7 +178,7 @@ def run_vanilla(
                 "environment_public_keys",
                 "use_plain_environment_for_secrets",
             },
-        )
+        ),
     )
 
     operation = context.deps.yt_client.run_vanilla(

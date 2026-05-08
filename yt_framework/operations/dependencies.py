@@ -49,7 +49,8 @@ def build_stage_dependencies(
         for py_file in src_dir.rglob("*.py"):
             rel_path = py_file.relative_to(src_dir)
             yt_path = f"{build_folder}/stages/{stage_dir_name}/src/{rel_path}".replace(
-                "\\", "/"
+                "\\",
+                "/",
             )
             local_path = f"stages/{stage_dir_name}/src/{rel_path}".replace("\\", "/")
             dependency_files.append((yt_path, local_path))
@@ -111,7 +112,9 @@ def add_checkpoint(
         # Create new list to avoid mutating input
         updated_files = [*dependencies, (checkpoint_file_path, model_name)]
         logger.info(
-            "✓ Checkpoint will be mounted: %s → %s", checkpoint_file_path, model_name
+            "✓ Checkpoint will be mounted: %s → %s",
+            checkpoint_file_path,
+            model_name,
         )
         return updated_files
     if model_name:
@@ -121,7 +124,7 @@ def add_checkpoint(
         )
     elif checkpoint_base:
         logger.debug(
-            "checkpoint_base is set but no model_name specified - checkpoint mounting skipped"
+            "checkpoint_base is set but no model_name specified - checkpoint mounting skipped",
         )
 
     return dependencies

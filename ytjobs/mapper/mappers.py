@@ -21,8 +21,8 @@ class StreamMapper:
     def map(
         self,
         processing_func: Callable[[Any], Iterator[Any]],
-        redirect_processing_output: bool = True,
-        **kwargs: Any,
+        redirect_processing_output: bool = True,  # noqa: FBT001,FBT002
+        **kwargs: object,
     ) -> None:
         """Read stdin line-by-line, process each, write results to stdout.
 
@@ -45,7 +45,10 @@ class StreamMapper:
             # Process row and write results as they're yielded
             try:
                 process_and_write_results(
-                    processing_func, row_data, redirect_processing_output, **kwargs
+                    processing_func,
+                    row_data,
+                    redirect_processing_output,
+                    **kwargs,
                 )
             except Exception as e:
                 log_error({"error": f"Processing failed: {e!s}", "row": line})
@@ -73,8 +76,8 @@ class BatchMapper:
     def map(
         self,
         processing_func: Callable[..., Iterator[Any]],
-        redirect_processing_output: bool = True,
-        **kwargs: Any,
+        redirect_processing_output: bool = True,  # noqa: FBT001,FBT002
+        **kwargs: object,
     ) -> None:
         """Read stdin in batches, process each batch, write results to stdout.
 
@@ -86,18 +89,22 @@ class BatchMapper:
         """
         if self.batch_size is None:
             self._process_all_rows(
-                processing_func, redirect_processing_output, **kwargs
+                processing_func,
+                redirect_processing_output,
+                **kwargs,
             )
         else:
             self._process_in_batches(
-                processing_func, redirect_processing_output, **kwargs
+                processing_func,
+                redirect_processing_output,
+                **kwargs,
             )
 
     def _process_all_rows(
         self,
         processing_func: Callable[..., Iterator[Any]],
-        redirect_processing_output: bool,
-        **kwargs: Any,
+        redirect_processing_output: bool,  # noqa: FBT001
+        **kwargs: object,
     ) -> None:
         """Process all rows from stdin at once."""
         rows = self._read_all_rows()
@@ -105,22 +112,25 @@ class BatchMapper:
         if rows:
             try:
                 process_and_write_results(
-                    processing_func, rows, redirect_processing_output, **kwargs
+                    processing_func,
+                    rows,
+                    redirect_processing_output,
+                    **kwargs,
                 )
             except Exception as e:
                 log_error(
                     {
                         "error": f"Batch processing failed: {e!s}",
                         "total_rows": len(rows),
-                    }
+                    },
                 )
                 raise
 
     def _process_in_batches(
         self,
         processing_func: Callable[..., Iterator[Any]],
-        redirect_processing_output: bool,
-        **kwargs: Any,
+        redirect_processing_output: bool,  # noqa: FBT001
+        **kwargs: object,
     ) -> None:
         """Process rows from stdin in batches."""
         if self.batch_size is None:
@@ -182,13 +192,16 @@ class BatchMapper:
         batch: list[Any],
         batch_number: int,
         processing_func: Callable[..., Iterator[Any]],
-        redirect_processing_output: bool,
-        **kwargs: Any,
+        redirect_processing_output: bool,  # noqa: FBT001
+        **kwargs: object,
     ) -> None:
         """Process a single batch."""
         try:
             process_and_write_results(
-                processing_func, batch, redirect_processing_output, **kwargs
+                processing_func,
+                batch,
+                redirect_processing_output,
+                **kwargs,
             )
         except Exception as e:
             log_error(
@@ -196,6 +209,6 @@ class BatchMapper:
                     "error": f"Batch {batch_number} processing failed: {e!s}",
                     "batch_size": len(batch),
                     "batch_number": batch_number,
-                }
+                },
             )
             raise

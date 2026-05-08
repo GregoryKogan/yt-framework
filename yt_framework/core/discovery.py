@@ -70,7 +70,9 @@ def discover_stages(
                 ):
                     discovered_stages.append(attr)
                     logger.debug(
-                        "Discovered stage: %s -> %s", stage_name, attr.__name__
+                        "Discovered stage: %s -> %s",
+                        stage_name,
+                        attr.__name__,
                     )
                     break  # Only take first BaseStage subclass per module
 

@@ -3,7 +3,7 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from omegaconf import DictConfig, OmegaConf
 from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
@@ -93,8 +93,8 @@ def run_map(
     context: "StageContext",
     operation_config: DictConfig,
     output_schema: TableSchema | None = None,
-    mapper: Any | None = None,
-    job: Any | None = None,
+    mapper: object | None = None,
+    job: object | None = None,
 ) -> bool:
     """Run YT map operation and wait for completion.
 
@@ -152,7 +152,8 @@ def run_map(
     )
     map_operation_data.environment = env
     map_operation_data.docker_auth = extract_docker_auth_from_operation_config(
-        operation_config, env
+        operation_config,
+        env,
     )
 
     logger.debug("Dependencies: %s files", len(map_operation_data.dependencies))
@@ -169,7 +170,8 @@ def run_map(
 
     logger.debug("Extracting operation resources from config")
     resources: OperationResources = extract_operation_resources(
-        operation_config, logger
+        operation_config,
+        logger,
     )
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
     append_output = bool(operation_config.get("append", False))
@@ -182,7 +184,8 @@ def run_map(
             map_kwargs["title"] = od
         else:
             map_kwargs["operation_description"] = OmegaConf.to_container(
-                od, resolve=True
+                od,
+                resolve=True,
             )
 
     reserved_keys = {

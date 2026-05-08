@@ -22,9 +22,9 @@ if TYPE_CHECKING:
 def _get_config_value_with_default(
     config: DictConfig,
     key: str,
-    default: Any,
+    default: object,
     logger: logging.Logger,
-) -> Any:
+) -> object:
     """Get config value with default, logging when default is used.
 
     Args:
@@ -114,19 +114,31 @@ def extract_operation_resources(
     resources_config = operation_config.get("resources") or operation_config
     pool = _get_config_value_with_default(resources_config, "pool", "default", logger)
     pool_tree = _get_config_value_with_default(
-        resources_config, "pool_tree", None, logger
+        resources_config,
+        "pool_tree",
+        None,
+        logger,
     )
     docker_image = _get_config_value_with_default(
-        resources_config, "docker_image", None, logger
+        resources_config,
+        "docker_image",
+        None,
+        logger,
     )
     memory_gb = _get_config_value_with_default(
-        resources_config, "memory_limit_gb", 4, logger
+        resources_config,
+        "memory_limit_gb",
+        4,
+        logger,
     )
     cpu_limit = _get_config_value_with_default(resources_config, "cpu_limit", 2, logger)
     gpu_limit = _get_config_value_with_default(resources_config, "gpu_limit", 0, logger)
     job_count = _get_config_value_with_default(resources_config, "job_count", 1, logger)
     user_slots = _get_config_value_with_default(
-        resources_config, "user_slots", None, logger
+        resources_config,
+        "user_slots",
+        None,
+        logger,
     )
     return OperationResources(
         pool=pool,
@@ -177,8 +189,8 @@ def build_operation_environment(
     context: "StageContext",
     operation_config: DictConfig,
     logger: logging.Logger,
-    include_stage_name: bool = True,
-    include_tokenizer_artifact: bool = True,
+    include_stage_name: bool = True,  # noqa: FBT001,FBT002
+    include_tokenizer_artifact: bool = True,  # noqa: FBT001,FBT002
 ) -> dict[str, str]:
     """Build operation environment from secrets + explicit env config + optional helpers."""
     env = build_environment(configs_dir=context.deps.configs_dir, logger=logger)
@@ -202,7 +214,8 @@ def build_operation_environment(
                     archive_name = resolve_tokenizer_archive_name(artifact_name)
                     env.setdefault("TOKENIZER_ARTIFACT_FILE", archive_name)
                     env.setdefault(
-                        "TOKENIZER_ARTIFACT_DIR", f"tokenizer_artifacts/{artifact_name}"
+                        "TOKENIZER_ARTIFACT_DIR",
+                        f"tokenizer_artifacts/{artifact_name}",
                     )
                     env.setdefault("TOKENIZER_ARTIFACT_NAME", artifact_name)
 
@@ -218,7 +231,7 @@ def extract_docker_auth_from_operation_config(
 ) -> dict[str, str] | None:
     """Resolve docker image from config and return auth payload if credentials exist."""
     docker_image = (operation_config.get("resources") or {}).get(
-        "docker_image"
+        "docker_image",
     ) or operation_config.get("docker_image")
     return prepare_docker_auth(
         docker_image=docker_image,
@@ -233,5 +246,8 @@ def extract_max_failed_jobs(
 ) -> int:
     """Extract max_failed_job_count with default."""
     return _get_config_value_with_default(
-        operation_config, "max_failed_job_count", 1, logger
+        operation_config,
+        "max_failed_job_count",
+        1,
+        logger,
     )
