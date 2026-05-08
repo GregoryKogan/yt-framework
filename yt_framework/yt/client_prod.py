@@ -408,6 +408,86 @@ class YTProdClient(BaseYTClient):
         else:
             return count
 
+    @staticmethod
+    def _filter_internal_yql_columns(columns: list[str]) -> list[str]:
+        return [col for col in columns if not col.startswith("_")]
+
+    @staticmethod
+    def _extract_columns_from_schema_value(schema: object) -> list[str]:
+        if not isinstance(schema, list):
+            return []
+        columns = [
+            col["name"] for col in schema if isinstance(col, dict) and "name" in col
+        ]
+        return YTProdClient._filter_internal_yql_columns(columns)
+
+    def _get_columns_from_table_attributes(self, table_path: str) -> list[str]:
+        attrs = self.client.get(table_path, attributes=["schema"])  # type: ignore[assignment]
+        if not (attrs and isinstance(attrs, dict) and "schema" in attrs):  # type: ignore[operator]
+            return []
+        return self._extract_columns_from_schema_value(attrs["schema"])  # type: ignore[index]
+
+    def _get_columns_from_first_row(self, table_path: str) -> list[str]:
+        rows = self.read_table(table_path)
+        if not rows:
+            _raise_value_error(f"Table {table_path} is empty, cannot determine columns")
+        filtered = self._filter_internal_yql_columns(list(rows[0].keys()))
+        if filtered:
+            return filtered
+        return list(rows[0].keys())
+
+    @staticmethod
+    def _is_binary_decode_error(error: Exception) -> bool:
+        error_str = str(error)
+        return "Failed to decode string" in error_str or "encoding" in error_str.lower()
+
+    def _infer_columns_via_temp_yql_table(self, table_path: str) -> list[str]:
+        temp_output = f"{table_path}.temp_schema_{uuid.uuid4().hex[:8]}"
+        try:
+            query = f"""{build_max_row_weight_pragma()}
+PRAGMA yt.InferSchema = '1';
+INSERT INTO `{temp_output}` WITH TRUNCATE
+SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
+            self.run_yql(query)
+            temp_attrs = self.client.get(temp_output, attributes=["schema"])  # type: ignore[assignment]
+            if temp_attrs and isinstance(temp_attrs, dict) and "schema" in temp_attrs:  # type: ignore[operator]
+                return self._extract_columns_from_schema_value(temp_attrs["schema"])  # type: ignore[index]
+            return []
+        finally:
+            with contextlib.suppress(Exception):
+                self.client.remove(temp_output)
+
+    def _handle_table_column_read_error(
+        self,
+        *,
+        table_path: str,
+        read_error: Exception,
+    ) -> list[str]:
+        if not self._is_binary_decode_error(read_error):
+            _raise_value_error_from(
+                read_error,
+                f"Failed to get table columns from {table_path}: {read_error}",
+            )
+        self.logger.debug(
+            "Reading failed due to binary columns, using YQL to infer schema",
+        )
+        try:
+            columns = self._infer_columns_via_temp_yql_table(table_path)
+            if columns:
+                return columns
+        except Exception as yql_error:  # noqa: BLE001
+            self.logger.debug("YQL schema inference failed: %s", yql_error)
+
+        msg = (
+            f"Table {table_path} contains binary columns that cannot be decoded. "
+            "This usually happens when a table was created with SELECT * and contains "
+            "internal YQL columns like _yql_column_0. Please recreate the table with "
+            f"explicit column selection, or delete and recreate it. Original error: {read_error}"
+        )
+        _raise_value_error_from(read_error, msg)
+        unreachable = "unreachable"
+        raise AssertionError(unreachable)
+
     def _get_table_columns(self, table_path: str) -> list[str]:
         """Get column names from a table.
 
@@ -426,21 +506,10 @@ class YTProdClient(BaseYTClient):
             ValueError: If table is empty or cannot be read
 
         """
-        # Method 1: Try to get schema from table attributes first (handles binary columns)
         try:
-            attrs = self.client.get(table_path, attributes=["schema"])  # type: ignore[assignment]
-            if attrs and isinstance(attrs, dict) and "schema" in attrs:  # type: ignore[operator]
-                schema = attrs["schema"]  # type: ignore[index]
-                if schema and isinstance(schema, list):
-                    columns = [
-                        col["name"]
-                        for col in schema
-                        if isinstance(col, dict) and "name" in col
-                    ]
-                    # Filter out internal YQL columns like _other, _yql_column_*
-                    columns = [col for col in columns if not col.startswith("_")]
-                    if columns:
-                        return columns
+            columns = self._get_columns_from_table_attributes(table_path)
+            if columns:
+                return columns
         except Exception as e:  # noqa: BLE001
             # YT attribute/schema access is version-dependent; fall through to row read.
             self.logger.debug(
@@ -448,95 +517,13 @@ class YTProdClient(BaseYTClient):
                 e,
             )
 
-        # Method 2: Try to read one row (may fail with binary columns)
         try:
-            rows = self.read_table(table_path)
-            if not rows:
-                _raise_value_error(
-                    f"Table {table_path} is empty, cannot determine columns",
-                )
-            # Get column names from first row
-            columns = list(rows[0].keys())
-            # Filter out internal YQL columns like _other, _yql_column_*
-            columns = [col for col in columns if not col.startswith("_")]
-            if not columns:
-                # If all columns were filtered out, use all keys (fallback)
-                columns = list(rows[0].keys())
+            return self._get_columns_from_first_row(table_path)
         except Exception as read_error:  # noqa: BLE001
-            # Method 3: If reading fails (e.g., binary columns), use YQL to infer schema
-            error_str = str(read_error)
-            if (
-                "Failed to decode string" in error_str
-                or "encoding" in error_str.lower()
-            ):
-                temp_output = None
-                try:
-                    self.logger.debug(
-                        "Reading failed due to binary columns, using YQL to infer schema",
-                    )
-                    # Use YQL to create a temporary table with LIMIT 0 to infer schema
-                    # This doesn't read actual data, just infers the schema
-                    temp_output = f"{table_path}.temp_schema_{uuid.uuid4().hex[:8]}"
-                    query = f"""{build_max_row_weight_pragma()}
-PRAGMA yt.InferSchema = '1';
-INSERT INTO `{temp_output}` WITH TRUNCATE
-SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
-
-                    # Execute query to create temp table with schema
-                    self.run_yql(query)
-
-                    # Get schema from the temporary table
-                    temp_attrs = self.client.get(temp_output, attributes=["schema"])  # type: ignore[assignment]
-                    if (
-                        temp_attrs
-                        and isinstance(temp_attrs, dict)
-                        and "schema" in temp_attrs
-                    ):  # type: ignore[operator]
-                        temp_schema = temp_attrs["schema"]  # type: ignore[index]
-                        if temp_schema and isinstance(temp_schema, list):
-                            columns = [
-                                col["name"]
-                                for col in temp_schema
-                                if isinstance(col, dict) and "name" in col
-                            ]
-                            # Filter out internal YQL columns
-                            columns = [
-                                col for col in columns if not col.startswith("_")
-                            ]
-                            if columns:
-                                # Clean up temp table before returning
-                                if temp_output:
-                                    with contextlib.suppress(Exception):
-                                        self.client.remove(temp_output)
-                                return columns
-
-                    # Clean up temp table if we got here
-                    if temp_output:
-                        with contextlib.suppress(Exception):
-                            self.client.remove(temp_output)
-                except Exception as yql_error:  # noqa: BLE001
-                    self.logger.debug("YQL schema inference failed: %s", yql_error)
-                    # Clean up temp table if it was created
-                    if temp_output:
-                        with contextlib.suppress(Exception):
-                            self.client.remove(temp_output)
-
-                # If all methods fail, provide helpful error message
-                msg = (
-                    f"Table {table_path} contains binary columns that cannot be decoded. "
-                    f"This usually happens when a table was created with SELECT * and contains "
-                    f"internal YQL columns like _yql_column_0. Please recreate the table with "
-                    f"explicit column selection, or delete and recreate it. Original error: {read_error}"
-                )
-
-                _raise_value_error_from(read_error, msg)
-
-            _raise_value_error_from(
-                read_error,
-                f"Failed to get table columns from {table_path}: {read_error}",
+            return self._handle_table_column_read_error(
+                table_path=table_path,
+                read_error=read_error,
             )
-        else:
-            return columns
 
     def run_yql(
         self,
@@ -1303,43 +1290,29 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         self.logger.info("  Reduce by: %s", reduce_by)
 
         try:
-            kwargs = dict(kwargs)
-            environment_public_keys, use_plain, user_secure_vault = (
-                pop_secure_env_client_kwargs(kwargs)
-            )
-            kwargs["max_row_weight"] = validate_max_row_weight(
-                kwargs.get("max_row_weight"),
-            )
-            mapper_leg = _resolve_aliased_job(
-                legacy_name="mapper",
-                legacy_value=mapper,
-                preferred_name="map_job",
-                preferred_value=map_job,
-            )
-            reducer_leg = _resolve_aliased_job(
-                legacy_name="reducer",
-                legacy_value=reducer,
-                preferred_name="reduce_job",
-                preferred_value=reduce_job,
-            )
-            public_env, secure_flat, mapper_leg = _partition_and_maybe_wrap_leg(
+            (
+                kwargs,
                 mapper_leg,
-                env,
-                environment_public_keys=environment_public_keys,
-                use_plain_environment_for_secrets=use_plain,
-            )
-            reducer_leg = _maybe_wrap_string_command_for_vault(reducer_leg, secure_flat)
-            merged_vault = merge_secure_vault(
-                secure_flat,
-                docker_image=resources.docker_image,
+                reducer_leg,
+                public_env,
+                merged_vault,
+                file_paths,
+                source_table,
+                dest_table,
+            ) = self._prepare_map_reduce_runtime(
+                mapper=mapper,
+                reducer=reducer,
+                map_job=map_job,
+                reduce_job=reduce_job,
+                env=env,
+                resources=resources,
                 docker_auth=docker_auth,
-                user_secure_vault=user_secure_vault,
+                files=files,
+                input_table=input_table,
+                output_table=output_table,
+                output_schema=output_schema,
+                kwargs=kwargs,
             )
-            file_paths = [
-                FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
-            ]
-            source_table = TablePath(input_table)
-            dest_table = TablePath(output_table, append=False, schema=output_schema)
 
             spec_builder = (
                 MapReduceSpecBuilder()
@@ -1359,33 +1332,22 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             if isinstance(od, dict):
                 spec_builder = spec_builder.description(od)
 
-            mapper_builder = (
-                spec_builder.begin_mapper()
-                .command(mapper_leg)
-                .file_paths(file_paths)
-                .environment(public_env)
-                .memory_limit(resources.memory_gb * 1024**3)
-                .cpu_limit(resources.cpu_limit)
-                .gpu_limit(resources.gpu_limit)
+            spec_builder = self._configure_map_reduce_leg(
+                spec_builder=spec_builder,
+                leg_name="mapper",
+                leg_command=mapper_leg,
+                file_paths=file_paths,
+                public_env=public_env,
+                resources=resources,
             )
-            mapper_builder = _apply_command_leg_format(mapper_builder, mapper_leg)
-            if resources.docker_image:
-                mapper_builder = mapper_builder.docker_image(resources.docker_image)
-            mapper_builder.end_mapper()
-
-            reducer_builder = (
-                spec_builder.begin_reducer()
-                .command(reducer_leg)
-                .file_paths(file_paths)
-                .environment(public_env)
-                .memory_limit(resources.memory_gb * 1024**3)
-                .cpu_limit(resources.cpu_limit)
-                .gpu_limit(resources.gpu_limit)
+            spec_builder = self._configure_map_reduce_leg(
+                spec_builder=spec_builder,
+                leg_name="reducer",
+                leg_command=reducer_leg,
+                file_paths=file_paths,
+                public_env=public_env,
+                resources=resources,
             )
-            reducer_builder = _apply_command_leg_format(reducer_builder, reducer_leg)
-            if resources.docker_image:
-                reducer_builder = reducer_builder.docker_image(resources.docker_image)
-            reducer_builder.end_reducer()
 
             spec_builder = _spec_builder_secure_vault(spec_builder, merged_vault)
             spec_builder = spec_builder.reduce_by(reduce_by)
@@ -1413,6 +1375,110 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             raise
         else:
             return operation
+
+    def _prepare_map_reduce_runtime(
+        self,
+        *,
+        mapper: object,
+        reducer: object,
+        map_job: object,
+        reduce_job: object,
+        env: dict[str, str],
+        resources: OperationResources,
+        docker_auth: dict[str, str] | None,
+        files: list[tuple[str, str]],
+        input_table: str,
+        output_table: str,
+        output_schema: TableSchema | None,
+        kwargs: object,
+    ) -> tuple[
+        dict[str, object],
+        object,
+        object,
+        dict[str, str],
+        dict[str, str],
+        list[FilePath],
+        TablePath,
+        TablePath,
+    ]:
+        mutable_kwargs = dict(kwargs)
+        environment_public_keys, use_plain, user_secure_vault = (
+            pop_secure_env_client_kwargs(mutable_kwargs)
+        )
+        mutable_kwargs["max_row_weight"] = validate_max_row_weight(
+            mutable_kwargs.get("max_row_weight"),
+        )
+        mapper_leg = _resolve_aliased_job(
+            legacy_name="mapper",
+            legacy_value=mapper,
+            preferred_name="map_job",
+            preferred_value=map_job,
+        )
+        reducer_leg = _resolve_aliased_job(
+            legacy_name="reducer",
+            legacy_value=reducer,
+            preferred_name="reduce_job",
+            preferred_value=reduce_job,
+        )
+        public_env, secure_flat, mapper_leg = _partition_and_maybe_wrap_leg(
+            mapper_leg,
+            env,
+            environment_public_keys=environment_public_keys,
+            use_plain_environment_for_secrets=use_plain,
+        )
+        reducer_leg = _maybe_wrap_string_command_for_vault(reducer_leg, secure_flat)
+        merged_vault = merge_secure_vault(
+            secure_flat,
+            docker_image=resources.docker_image,
+            docker_auth=docker_auth,
+            user_secure_vault=user_secure_vault,
+        )
+        file_paths = [
+            FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
+        ]
+        source_table = TablePath(input_table)
+        dest_table = TablePath(output_table, append=False, schema=output_schema)
+        return (
+            mutable_kwargs,
+            mapper_leg,
+            reducer_leg,
+            public_env,
+            merged_vault,
+            file_paths,
+            source_table,
+            dest_table,
+        )
+
+    def _configure_map_reduce_leg(
+        self,
+        *,
+        spec_builder: MapReduceSpecBuilder,
+        leg_name: Literal["mapper", "reducer"],
+        leg_command: object,
+        file_paths: list[FilePath],
+        public_env: dict[str, str],
+        resources: OperationResources,
+    ) -> MapReduceSpecBuilder:
+        if leg_name == "mapper":
+            leg_builder = spec_builder.begin_mapper()
+        else:
+            leg_builder = spec_builder.begin_reducer()
+        leg_builder = (
+            leg_builder.command(leg_command)
+            .file_paths(file_paths)
+            .environment(public_env)
+            .memory_limit(resources.memory_gb * 1024**3)
+            .cpu_limit(resources.cpu_limit)
+            .gpu_limit(resources.gpu_limit)
+        )
+        leg_builder = _apply_command_leg_format(leg_builder, leg_command)
+        if resources.docker_image:
+            leg_builder = leg_builder.docker_image(resources.docker_image)
+        if leg_name == "mapper":
+            leg_builder.end_mapper()
+        else:
+            leg_builder.end_reducer()
+        return spec_builder
 
     def run_reduce(
         self,

@@ -165,6 +165,24 @@ def _pragma_header(max_row_weight: str | None = None) -> str:
     )
 
 
+def _resolve_join_strategy(
+    on: str | list[str] | dict[str, str],
+    select_columns: list[str] | None,
+) -> tuple[bool, list[str] | None, str]:
+    """Return join strategy as ``(use_using, using_columns, join_conditions)``."""
+    if isinstance(on, str):
+        if select_columns:
+            return True, [on], ""
+        return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
+    if isinstance(on, list):
+        if select_columns:
+            return True, on, ""
+        return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
+    if isinstance(on, dict):
+        return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
+    return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
+
+
 def build_join_query(
     left_table: str,
     right_table: str,
@@ -197,50 +215,10 @@ def build_join_query(
     if join_type == "FULL":
         join_type = "FULL OUTER"
 
-    # Determine if we can use USING clause (same column names on both sides)
-    # When select_columns is provided, USING works well
-    # When select_columns is NOT provided, USING + SELECT * causes _other conflicts
-    # So we use ON clause with a.*, b.* when select_columns is not provided
-    use_using = False
-    using_columns = None
-    join_conditions = None
-
-    if isinstance(on, str):
-        # Single column with same name on both sides
-        if select_columns:
-            # When select_columns is provided, use USING
-            use_using = True
-            using_columns = [on]
-        else:
-            # When select_columns is not provided, use ON clause to avoid _other conflicts
-            use_using = False
-            join_conditions = _format_join_conditions(
-                on,
-                left_alias="a",
-                right_alias="b",
-            )
-    elif isinstance(on, list):
-        # Multiple columns with same names
-        if select_columns:
-            # When select_columns is provided, use USING
-            use_using = True
-            using_columns = on
-        else:
-            # When select_columns is not provided, use ON clause to avoid _other conflicts
-            use_using = False
-            join_conditions = _format_join_conditions(
-                on,
-                left_alias="a",
-                right_alias="b",
-            )
-    elif isinstance(on, dict):
-        # Different column names - must use ON clause
-        use_using = False
-        join_conditions = _format_join_conditions(on, left_alias="a", right_alias="b")
-    else:
-        # Fallback: use ON clause
-        use_using = False
-        join_conditions = _format_join_conditions(on, left_alias="a", right_alias="b")
+    use_using, using_columns, join_conditions = _resolve_join_strategy(
+        on=on,
+        select_columns=select_columns,
+    )
 
     if select_columns:
         select_clause = _format_column_list(select_columns)
@@ -251,7 +229,7 @@ def build_join_query(
 
     if use_using:
         # Format USING clause
-        if using_columns is None:
+        if not using_columns:
             msg = "using_columns must be set when use_using is True"
             raise ValueError(msg)
         if len(using_columns) == 1:
@@ -267,7 +245,7 @@ FROM {_escape_table_name(left_table)} AS a
 {join_type} JOIN {_escape_table_name(right_table)} AS b
 {using_clause};"""  # noqa: S608
     else:
-        if join_conditions is None:
+        if not join_conditions:
             msg = "join_conditions must be set when use_using is False"
             raise ValueError(msg)
         query = f"""{_pragma_header(max_row_weight)}

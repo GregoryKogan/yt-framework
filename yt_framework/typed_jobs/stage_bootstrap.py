@@ -63,30 +63,81 @@ def _find_source_tarball_root() -> str | None:
     return None
 
 
-def _bootstrap_once(stage_name: str) -> None:
+def _infer_root_from_stage_dir(stage_name: str) -> str | None:
+    candidates: list[str] = [str(Path.cwd())]
+    for _ in range(6):
+        parent = str(Path(candidates[-1]).parent)
+        if parent == candidates[-1]:
+            break
+        candidates.append(parent)
+    for base in candidates:
+        stage_src_path = Path(base) / "stages" / stage_name / "src"
+        if stage_src_path.is_dir():
+            return base
+    return None
+
+
+def _resolve_bootstrap_root(stage_name: str) -> str:
     root = _find_source_tarball_root()
+    if root:
+        return root
+    inferred_root = _infer_root_from_stage_dir(stage_name)
+    if inferred_root:
+        return inferred_root
+    return str(Path.cwd())
 
-    # If code archive was already extracted, `source.tar.gz` may not exist anymore.
-    # In that case, infer the root from the stage directory.
-    if not root:
-        candidates: list[str] = [str(Path.cwd())]
-        for _ in range(6):
-            parent = str(Path(candidates[-1]).parent)
-            if parent == candidates[-1]:
-                break
-            candidates.append(parent)
 
-        for base in candidates:
-            stage_src_path = Path(base) / "stages" / stage_name / "src"
-            if stage_src_path.is_dir():
-                root = base
-                break
+def _ensure_code_archive_extracted(root: str, ytjobs_marker: str) -> None:
+    tarball = str(Path(root) / "source.tar.gz")
+    if Path(tarball).is_file() and not Path(ytjobs_marker).is_file():
+        with tarfile.open(tarball, "r:gz") as tf:
+            _safe_extractall(tf, Path(root))
 
-    if not root:
-        # Last resort: still try current cwd to avoid hard failures in unusual sandboxes.
-        root = str(Path.cwd())
 
+def _ensure_import_paths(root: str, stage_name: str) -> None:
     stage_src = str(Path(root) / "stages" / stage_name / "src")
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    if Path(stage_src).is_dir() and stage_src not in sys.path:
+        sys.path.insert(0, stage_src)
+
+
+def _ensure_job_config_path(root: str, stage_name: str) -> None:
+    job_config_path = str(Path(root) / "stages" / stage_name / "config.yaml")
+    if Path(job_config_path).is_file():
+        os.environ["JOB_CONFIG_PATH"] = job_config_path
+
+
+def _extract_tokenizer_artifact_if_needed(root: str) -> None:
+    tokenizer_artifact_file = os.environ.get("TOKENIZER_ARTIFACT_FILE", "").strip()
+    tokenizer_artifact_dir = os.environ.get("TOKENIZER_ARTIFACT_DIR", "").strip()
+    if not tokenizer_artifact_file:
+        return
+
+    artifact_tar = str(Path(root) / tokenizer_artifact_file)
+    if not tokenizer_artifact_dir:
+        artifact_name = os.environ.get("TOKENIZER_ARTIFACT_NAME", "default").strip()
+        tokenizer_artifact_dir = str(
+            Path("tokenizer_artifacts") / (artifact_name or "default")
+        )
+        os.environ["TOKENIZER_ARTIFACT_DIR"] = tokenizer_artifact_dir
+
+    artifact_dir_abs = str(Path(root) / tokenizer_artifact_dir)
+    if not Path(artifact_tar).is_file():
+        return
+
+    Path(artifact_dir_abs).mkdir(parents=True, exist_ok=True)
+    marker = str(Path(artifact_dir_abs) / ".extracted")
+    if Path(marker).is_file():
+        return
+
+    with tarfile.open(artifact_tar, "r:gz") as tf:
+        _safe_extractall(tf, Path(artifact_dir_abs))
+    Path(marker).write_text("ok\n", encoding="utf-8")
+
+
+def _bootstrap_once(stage_name: str) -> None:
+    root = _resolve_bootstrap_root(stage_name)
     ytjobs_marker = str(Path(root) / "ytjobs" / "__init__.py")
 
     # Extract only if we haven't already bootstrapped this root.
@@ -97,46 +148,10 @@ def _bootstrap_once(stage_name: str) -> None:
             return
         _BOOTSTRAPPED_KEYS.add(key)
 
-    tarball = str(Path(root) / "source.tar.gz")
-    if Path(tarball).is_file() and not Path(ytjobs_marker).is_file():
-        with tarfile.open(tarball, "r:gz") as tf:
-            _safe_extractall(tf, Path(root))
-
-    # Ensure imports work for:
-    # - framework packages (yt_framework/ embedded in archive root)
-    # - user packages from upload_modules
-    # - stage-local helpers under stages/<stage_name>/src
-    if root not in sys.path:
-        sys.path.insert(0, root)
-    if Path(stage_src).is_dir() and stage_src not in sys.path:
-        sys.path.insert(0, stage_src)
-
-    # Parity with command-mode wrappers.
-    job_config_path = str(Path(root) / "stages" / stage_name / "config.yaml")
-    if Path(job_config_path).is_file():
-        os.environ["JOB_CONFIG_PATH"] = job_config_path
-
-    tokenizer_artifact_file = os.environ.get("TOKENIZER_ARTIFACT_FILE", "").strip()
-    tokenizer_artifact_dir = os.environ.get("TOKENIZER_ARTIFACT_DIR", "").strip()
-    if tokenizer_artifact_file:
-        artifact_tar = str(Path(root) / tokenizer_artifact_file)
-        if not tokenizer_artifact_dir:
-            artifact_name = (
-                os.environ.get("TOKENIZER_ARTIFACT_NAME", "default").strip()
-                or "default"
-            )
-            tokenizer_artifact_dir = str(
-                Path("tokenizer_artifacts") / artifact_name,
-            )
-            os.environ["TOKENIZER_ARTIFACT_DIR"] = tokenizer_artifact_dir
-        artifact_dir_abs = str(Path(root) / tokenizer_artifact_dir)
-        if Path(artifact_tar).is_file():
-            Path(artifact_dir_abs).mkdir(parents=True, exist_ok=True)
-            marker = str(Path(artifact_dir_abs) / ".extracted")
-            if not Path(marker).is_file():
-                with tarfile.open(artifact_tar, "r:gz") as tf:
-                    _safe_extractall(tf, Path(artifact_dir_abs))
-                Path(marker).write_text("ok\n", encoding="utf-8")
+    _ensure_code_archive_extracted(root, ytjobs_marker)
+    _ensure_import_paths(root, stage_name)
+    _ensure_job_config_path(root, stage_name)
+    _extract_tokenizer_artifact_if_needed(root)
 
 
 class StageBootstrapTypedJob(yt.TypedJob):

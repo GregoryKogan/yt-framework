@@ -934,6 +934,116 @@ class YTDevClient(BaseYTClient):
 
         return env_merged
 
+    def _try_copy_checkpoint_file(
+        self,
+        *,
+        yt_path: str,
+        local_name: str,
+        sandbox_dir: Path,
+        local_checkpoint_path: str | None,
+    ) -> bool:
+        if not local_checkpoint_path:
+            return False
+        checkpoint_filename = Path(local_checkpoint_path).name
+        yt_filename = Path(yt_path).name
+        if checkpoint_filename not in (yt_filename, local_name):
+            return False
+        checkpoint_path = Path(local_checkpoint_path)
+        if not checkpoint_path.exists():
+            self.logger.warning(
+                "  Dev: checkpoint path does not exist: %s",
+                checkpoint_path,
+            )
+            return False
+        dest_file = sandbox_dir / local_name
+        dest_file.parent.mkdir(parents=True, exist_ok=True)
+        self.logger.info(
+            "  Dev: copying checkpoint %s -> %s",
+            checkpoint_path,
+            dest_file,
+        )
+        shutil.copy2(checkpoint_path, dest_file)
+        return True
+
+    def _try_copy_tarball_from_build(
+        self,
+        *,
+        yt_path: str,
+        local_name: str,
+        sandbox_dir: Path,
+    ) -> bool:
+        if not yt_path.endswith(".tar.gz"):
+            return False
+        local_build = self.pipeline_dir / ".build"
+        if not local_build.exists():
+            return False
+        source_file = local_build / Path(yt_path).name
+        if not source_file.exists():
+            return False
+        dest_file = sandbox_dir / local_name
+        dest_file.parent.mkdir(parents=True, exist_ok=True)
+        self.logger.debug("  Dev: copying %s -> %s", source_file, dest_file)
+        shutil.copy2(source_file, dest_file)
+        return True
+
+    def _copy_file_to_sandbox(
+        self,
+        source_file: Path,
+        sandbox_file: Path,
+        *,
+        source_label: str | None = None,
+    ) -> None:
+        sandbox_file.parent.mkdir(parents=True, exist_ok=True)
+        if source_label:
+            self.logger.debug(
+                "  Dev: copying %s %s -> %s",
+                source_label,
+                source_file,
+                sandbox_file,
+            )
+        else:
+            self.logger.debug("  Dev: copying %s -> %s", source_file, sandbox_file)
+        shutil.copy2(source_file, sandbox_file)
+
+    def _resolve_installed_ytjobs_file(self, local_name: str) -> Path | None:
+        if not local_name.startswith("ytjobs/"):
+            return None
+        yj_mod = sys.modules.get("ytjobs")
+        if yj_mod is None:
+            try:
+                yj_mod = importlib.import_module("ytjobs")
+            except ImportError:
+                return None
+        if not getattr(yj_mod, "__file__", None):
+            return None
+        ytjobs_dir = Path(yj_mod.__file__).parent
+        ytjobs_rel_path = local_name.replace("ytjobs/", "")
+        source_file = ytjobs_dir / ytjobs_rel_path
+        if source_file.exists():
+            return source_file
+        return None
+
+    def _try_copy_regular_file(
+        self,
+        *,
+        local_name: str,
+        sandbox_dir: Path,
+    ) -> bool:
+        source_file = self.pipeline_dir / local_name
+        sandbox_file = sandbox_dir / local_name
+        if source_file.exists():
+            self._copy_file_to_sandbox(source_file, sandbox_file)
+            return True
+        ytjobs_file = self._resolve_installed_ytjobs_file(local_name)
+        if ytjobs_file is None:
+            return False
+        self._copy_file_to_sandbox(
+            ytjobs_file,
+            sandbox_file,
+            source_label="ytjobs",
+        )
+        return True
+
     def _upload_files(self, files: list[tuple[str, str]], sandbox_dir: Path) -> None:
         """Upload files to sandbox directory."""
         self._pipeline_dir_or_raise()
@@ -946,88 +1056,24 @@ class YTDevClient(BaseYTClient):
                 local_checkpoint_path,
             )
 
-        for file_info in files:
-            yt_path, local_name = file_info
-            copied = False
-
-            # Handle checkpoint files - copy from local_checkpoint_path if available
-            # Match if either the yt_path filename or local_name matches the checkpoint filename
-            if local_checkpoint_path:
-                checkpoint_filename = Path(local_checkpoint_path).name
-                yt_filename = Path(yt_path).name
-                # Check if this is a checkpoint file (matches by filename)
-                if checkpoint_filename in (yt_filename, local_name):
-                    checkpoint_path = Path(local_checkpoint_path)
-                    if checkpoint_path.exists():
-                        # Use the expected local_name in sandbox (from dependency)
-                        dest_file = sandbox_dir / local_name
-                        dest_file.parent.mkdir(parents=True, exist_ok=True)
-                        self.logger.info(
-                            "  Dev: copying checkpoint %s -> %s",
-                            checkpoint_path,
-                            dest_file,
-                        )
-                        shutil.copy2(checkpoint_path, dest_file)
-                        copied = True
-                    else:
-                        self.logger.warning(
-                            "  Dev: checkpoint path does not exist: %s",
-                            checkpoint_path,
-                        )
-
-            # Handle build files (source.tar.gz, etc.)
-            if not copied and yt_path.endswith(".tar.gz"):
-                # Try to find the file in .build directory
-                local_build = self.pipeline_dir / ".build"
-                if local_build.exists():
-                    # Extract just the filename from yt_path
-                    filename = Path(yt_path).name
-                    source_file = local_build / filename
-                    if source_file.exists():
-                        dest_file = sandbox_dir / local_name
-                        dest_file.parent.mkdir(parents=True, exist_ok=True)
-                        self.logger.debug(
-                            "  Dev: copying %s -> %s",
-                            source_file,
-                            dest_file,
-                        )
-                        shutil.copy2(source_file, dest_file)
-                        copied = True
-
-            # Handle regular stage files and ytjobs files
-            # local_name is like "stages/run_vanilla/src/vanilla.py" or "ytjobs/..."
+        for yt_path, local_name in files:
+            copied = self._try_copy_checkpoint_file(
+                yt_path=yt_path,
+                local_name=local_name,
+                sandbox_dir=sandbox_dir,
+                local_checkpoint_path=local_checkpoint_path,
+            )
             if not copied:
-                # Try to find the file relative to pipeline_dir
-                source_file = self.pipeline_dir / local_name
-                if source_file.exists():
-                    dest_file = sandbox_dir / local_name
-                    dest_file.parent.mkdir(parents=True, exist_ok=True)
-                    self.logger.debug("  Dev: copying %s -> %s", source_file, dest_file)
-                    shutil.copy2(source_file, dest_file)
-                    copied = True
-                # Also try ytjobs files - they might be in the installed package
-                elif local_name.startswith("ytjobs/"):
-                    yj_mod = sys.modules.get("ytjobs")
-                    if yj_mod is None:
-                        try:
-                            yj_mod = importlib.import_module("ytjobs")
-                        except ImportError:
-                            yj_mod = None
-                    if yj_mod is not None and getattr(yj_mod, "__file__", None):
-                        ytjobs_dir = Path(yj_mod.__file__).parent
-                        ytjobs_rel_path = local_name.replace("ytjobs/", "")
-                        source_file = ytjobs_dir / ytjobs_rel_path
-                        if source_file.exists():
-                            dest_file = sandbox_dir / local_name
-                            dest_file.parent.mkdir(parents=True, exist_ok=True)
-                            self.logger.debug(
-                                "  Dev: copying ytjobs %s -> %s",
-                                source_file,
-                                dest_file,
-                            )
-                            shutil.copy2(source_file, dest_file)
-                            copied = True
-
+                copied = self._try_copy_tarball_from_build(
+                    yt_path=yt_path,
+                    local_name=local_name,
+                    sandbox_dir=sandbox_dir,
+                )
+            if not copied:
+                copied = self._try_copy_regular_file(
+                    local_name=local_name,
+                    sandbox_dir=sandbox_dir,
+                )
             if not copied:
                 self.logger.debug(
                     "  Dev: skipping file %s -> %s (not found locally)",
