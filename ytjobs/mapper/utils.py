@@ -25,8 +25,8 @@ def read_input_rows() -> Iterable[object]:
             print(row.bucket, row.path)
 
     """
-    for line in sys.stdin:
-        line = line.strip()
+    for raw_line in sys.stdin:
+        line = raw_line.strip()
         if not line:
             continue
 

@@ -48,7 +48,7 @@ def get_cached_model(model_name: str = "yolov8n-seg.pt"):
         if not Path(checkpoint_file).exists():
             msg = (
                 f"Checkpoint file not found: {checkpoint_file}\n"
-                f"Current directory: {os.getcwd()}\n"
+                f"Current directory: {Path.cwd()}\n"
                 f"Files in directory: {[p.name for p in Path().iterdir()]}\n"
                 f"Please ensure checkpoint is mounted as a file in the job."
             )

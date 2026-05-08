@@ -281,10 +281,10 @@ class YTIgnoreMatcher:
 
         """
         try:
-            with open(ytignore_file, encoding="utf-8") as f:
-                for line in f:
+            with ytignore_file.open(encoding="utf-8") as f:
+                for raw_line in f:
                     # Remove leading and trailing whitespace
-                    line = line.strip()
+                    line = raw_line.strip()
 
                     # Skip empty lines and comments
                     if not line or line.startswith("#"):

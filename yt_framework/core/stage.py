@@ -121,7 +121,7 @@ class BaseStage(ABC):
 
         Raises:
             FileNotFoundError: If config.yaml file is not found in stage directory.
-            ValueError: If config.yaml does not contain a dictionary.
+            TypeError: If config.yaml does not contain a dictionary (wrong node type).
 
         """
         self.deps = deps
@@ -143,7 +143,7 @@ class BaseStage(ABC):
         # Ensure it's a DictConfig (not ListConfig)
         if not isinstance(loaded_config, DictConfig):
             msg = f"Stage config file must contain a dictionary, got {type(loaded_config).__name__}"
-            raise ValueError(msg)
+            raise TypeError(msg)
         self.config = cast("DictConfig", loaded_config)
 
     @property

@@ -242,7 +242,7 @@ def log_file_structure(logger) -> None:
     """Log formatted file structure of current directory."""
     log_section_header(logger, "5. FILE STRUCTURE")
 
-    cwd = os.getcwd()
+    cwd = Path.cwd()
     logger.info("Working directory: %s", cwd)
     logger.info("")
 
@@ -383,7 +383,7 @@ def log_process_info(logger) -> None:
         logger.info("Groups: %s", groups_output)
 
     # Current working directory
-    logger.info("Working directory: %s", os.getcwd())
+    logger.info("Working directory: %s", Path.cwd())
 
     # Ulimit settings
     ulimit_output = run_command(["bash", "-c", "ulimit -a"], logger, "ulimit")

@@ -9,11 +9,11 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-import yt_framework
+import yt_framework  # noqa: E402
 
 # -- Project information -----------------------------------------------------
 project = "YT Framework"
-copyright = "2026, Artem Zavarzin, Gregory Koganovsky"
+copyright = "2026, Artem Zavarzin, Gregory Koganovsky"  # noqa: A001
 author = "Artem Zavarzin, Gregory Koganovsky"
 release = yt_framework.__version__
 

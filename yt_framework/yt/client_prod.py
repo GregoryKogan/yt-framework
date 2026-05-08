@@ -877,7 +877,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                     )
                     self.create_path(parent_dir, node_type="map_node")
 
-            with open(local_path, "rb") as f:
+            with local_path.open("rb") as f:
                 self.client.write_file(
                     yt_path,
                     f,

@@ -163,8 +163,8 @@ def test_bootstrap_once_extracts_tokenizer_artifact_and_sets_default_dir(
     sb._bootstrap_once(stage)
     marker = workspace / "tokenizer_artifacts" / "default" / ".extracted"
     assert marker.is_file(), "tokenizer tarball should extract once"
-    assert os.environ.get("TOKENIZER_ARTIFACT_DIR") == os.path.join(
-        "tokenizer_artifacts", "default"
+    assert os.environ.get("TOKENIZER_ARTIFACT_DIR") == str(
+        Path("tokenizer_artifacts") / "default",
     )
 
 

@@ -80,9 +80,9 @@ def download_table(
 
     rows = yt_client.read_table(table_path)
 
-    with open(output_file, "w") as f:
+    with output_file.open("w") as f:
         f.writelines(json.dumps(row) + "\n" for row in rows)
 
-    with open(output_file) as f:
+    with output_file.open() as f:
         row_count = sum(1 for _ in f)
     logger.info("✓ Downloaded %s rows → %s", row_count, output_file)

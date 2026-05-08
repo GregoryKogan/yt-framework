@@ -33,9 +33,9 @@ def load_env_file(env_path: Path) -> dict[str, str]:
         return env_vars
 
     try:
-        with open(env_path) as f:
-            for line in f:
-                line = line.strip()
+        with env_path.open() as f:
+            for raw_line in f:
+                line = raw_line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     key, value = line.split("=", 1)
                     key = key.strip()

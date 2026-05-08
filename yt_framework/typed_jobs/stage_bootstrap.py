@@ -1,7 +1,4 @@
-from __future__ import annotations
-
-"""
-Worker-side bootstrap for TypedJob legs.
+"""Worker-side bootstrap for TypedJob legs.
 
 YT Framework command-mode legs always run a wrapper that:
 - extracts `source.tar.gz`
@@ -10,6 +7,8 @@ YT Framework command-mode legs always run a wrapper that:
 TypedJob legs historically rely on stage-side `_ensure_stage_on_path()` helpers.
 This base class centralizes that behavior so stage code stays simple.
 """
+
+from __future__ import annotations
 
 import contextlib
 import os
@@ -43,7 +42,7 @@ def _safe_extractall(tf: tarfile.TarFile, destination: Path) -> None:
 def _find_source_tarball_root() -> str | None:
     """Return sandbox root that contains `source.tar.gz` (or None)."""
     seen: set[str] = set()
-    candidates: list[str] = [os.getcwd()]
+    candidates: list[str] = [str(Path.cwd())]
 
     # TypedJob reducers may run with cwd under tmpfs/modules; tarball stays higher.
     for _ in range(6):
@@ -60,7 +59,7 @@ def _find_source_tarball_root() -> str | None:
         if not base or base in seen:
             continue
         seen.add(base)
-        if os.path.isfile(os.path.join(base, "source.tar.gz")):
+        if (Path(base) / "source.tar.gz").is_file():
             return base
     return None
 
@@ -71,7 +70,7 @@ def _bootstrap_once(stage_name: str) -> None:
     # If code archive was already extracted, `source.tar.gz` may not exist anymore.
     # In that case, infer the root from the stage directory.
     if not root:
-        candidates: list[str] = [os.getcwd()]
+        candidates: list[str] = [str(Path.cwd())]
         for _ in range(6):
             parent = str(Path(candidates[-1]).parent)
             if parent == candidates[-1]:
@@ -79,17 +78,17 @@ def _bootstrap_once(stage_name: str) -> None:
             candidates.append(parent)
 
         for base in candidates:
-            stage_src = os.path.join(base, "stages", stage_name, "src")
-            if Path(stage_src).is_dir():
+            stage_src_path = Path(base) / "stages" / stage_name / "src"
+            if stage_src_path.is_dir():
                 root = base
                 break
 
     if not root:
         # Last resort: still try current cwd to avoid hard failures in unusual sandboxes.
-        root = os.getcwd()
+        root = str(Path.cwd())
 
-    stage_src = os.path.join(root, "stages", stage_name, "src")
-    ytjobs_marker = os.path.join(root, "ytjobs", "__init__.py")
+    stage_src = str(Path(root) / "stages" / stage_name / "src")
+    ytjobs_marker = str(Path(root) / "ytjobs" / "__init__.py")
 
     # Extract only if we haven't already bootstrapped this root.
     # Marker is `ytjobs/__init__.py` because ytjobs/ is always present in the archive.
@@ -99,8 +98,8 @@ def _bootstrap_once(stage_name: str) -> None:
             return
         _BOOTSTRAPPED_KEYS.add(key)
 
-    tarball = os.path.join(root, "source.tar.gz")
-    if os.path.isfile(tarball) and not os.path.isfile(ytjobs_marker):
+    tarball = str(Path(root) / "source.tar.gz")
+    if Path(tarball).is_file() and not Path(ytjobs_marker).is_file():
         with tarfile.open(tarball, "r:gz") as tf:
             _safe_extractall(tf, Path(root))
 
@@ -114,30 +113,31 @@ def _bootstrap_once(stage_name: str) -> None:
         sys.path.insert(0, stage_src)
 
     # Parity with command-mode wrappers.
-    job_config_path = os.path.join(root, "stages", stage_name, "config.yaml")
-    if os.path.isfile(job_config_path):
+    job_config_path = str(Path(root) / "stages" / stage_name / "config.yaml")
+    if Path(job_config_path).is_file():
         os.environ["JOB_CONFIG_PATH"] = job_config_path
 
     tokenizer_artifact_file = os.environ.get("TOKENIZER_ARTIFACT_FILE", "").strip()
     tokenizer_artifact_dir = os.environ.get("TOKENIZER_ARTIFACT_DIR", "").strip()
     if tokenizer_artifact_file:
-        artifact_tar = os.path.join(root, tokenizer_artifact_file)
+        artifact_tar = str(Path(root) / tokenizer_artifact_file)
         if not tokenizer_artifact_dir:
             artifact_name = (
                 os.environ.get("TOKENIZER_ARTIFACT_NAME", "default").strip()
                 or "default"
             )
-            tokenizer_artifact_dir = os.path.join("tokenizer_artifacts", artifact_name)
+            tokenizer_artifact_dir = str(
+                Path("tokenizer_artifacts") / artifact_name,
+            )
             os.environ["TOKENIZER_ARTIFACT_DIR"] = tokenizer_artifact_dir
-        artifact_dir_abs = os.path.join(root, tokenizer_artifact_dir)
-        if os.path.isfile(artifact_tar):
+        artifact_dir_abs = str(Path(root) / tokenizer_artifact_dir)
+        if Path(artifact_tar).is_file():
             Path(artifact_dir_abs).mkdir(parents=True, exist_ok=True)
-            marker = os.path.join(artifact_dir_abs, ".extracted")
-            if not os.path.isfile(marker):
+            marker = str(Path(artifact_dir_abs) / ".extracted")
+            if not Path(marker).is_file():
                 with tarfile.open(artifact_tar, "r:gz") as tf:
                     _safe_extractall(tf, Path(artifact_dir_abs))
-                with open(marker, "w", encoding="utf-8") as m:
-                    m.write("ok\n")
+                Path(marker).write_text("ok\n", encoding="utf-8")
 
 
 class StageBootstrapTypedJob(yt.TypedJob):

@@ -45,7 +45,7 @@ def test_normalize_upload_paths_none_returns_empty_list() -> None:
 
 
 def test_normalize_upload_paths_rejects_non_list_container() -> None:
-    with pytest.raises(ValueError, match="upload_paths must be a list"):
+    with pytest.raises(TypeError, match="upload_paths must be a list"):
         _normalize_upload_paths({"source": "x"})
 
 
@@ -55,7 +55,7 @@ def test_normalize_upload_paths_requires_source_key() -> None:
 
 
 def test_normalize_upload_paths_rejects_non_mapping_element() -> None:
-    with pytest.raises(ValueError, match=r"upload_paths\[0\] must be a mapping"):
+    with pytest.raises(TypeError, match=r"upload_paths\[0\] must be a mapping"):
         _normalize_upload_paths(["not-a-dict"])
 
 
