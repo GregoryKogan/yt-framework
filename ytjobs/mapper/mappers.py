@@ -34,8 +34,8 @@ class StreamMapper:
             **kwargs: Additional keyword arguments to pass to processing_func
 
         """
-        for line in sys.stdin:
-            line = line.strip()
+        for raw_line in sys.stdin:
+            line = raw_line.strip()
             if not line:
                 continue
 
@@ -132,8 +132,8 @@ class BatchMapper:
         batch = []
         batch_count = 0
 
-        for line in sys.stdin:
-            line = line.strip()
+        for raw_line in sys.stdin:
+            line = raw_line.strip()
             if not line:
                 continue
 
@@ -168,8 +168,8 @@ class BatchMapper:
     def _read_all_rows(self) -> list[Any]:
         """Read all rows from stdin."""
         rows = []
-        for line in sys.stdin:
-            line = line.strip()
+        for raw_line in sys.stdin:
+            line = raw_line.strip()
             if not line:
                 continue
 

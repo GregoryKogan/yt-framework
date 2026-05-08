@@ -94,9 +94,6 @@ ignore = [
     "C901",
     "ARG002",
     "BLE001",
-    "PLW2901",
-    "EXE001",
-    "E402",
     "D205",
     "D401",
     "D417",
@@ -109,22 +106,16 @@ ignore = [
     "S108",
     "S603",
     "S105",
-    "TRY004",
     "S608",
     "PLR2004",
     "ARG001",
-    "PTH109",
-    "PTH113",
-    "PTH118",
-    "PTH123",
     "S301",
-    "A001",
-    "INP001",
 ]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests: pydocstyle and strict try/except/annotation rules are intentionally relaxed.
 "tests/**" = [
+    "INP001", # Pytest layout: tests/ on sys.path; not a package (import integration, conftest).
     "ANN002",
     "ARG005",
     "B017",

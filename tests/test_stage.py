@@ -111,7 +111,7 @@ def test_base_stage_raises_file_not_found_when_config_yaml_missing(
         mod.S(deps, logger)
 
 
-def test_base_stage_raises_value_error_when_config_is_not_mapping(
+def test_base_stage_raises_type_error_when_config_is_not_mapping(
     tmp_path: Path,
 ) -> None:
     mod = _load_stage_impl_module(
@@ -125,7 +125,7 @@ def test_base_stage_raises_value_error_when_config_is_not_mapping(
         config_text="- a\n",
     )
     deps, logger = _deps_and_logger(tmp_path / "cfg")
-    with pytest.raises(ValueError, match="must contain a dictionary"):
+    with pytest.raises(TypeError, match="must contain a dictionary"):
         mod.S(deps, logger)
 
 

@@ -153,7 +153,7 @@ class YTDevClient(BaseYTClient):
         self.logger.info("Writing %s rows → %s (%s)", len(rows), table_path, mode_str)
         p = self._table_local_path(table_path)
         self._dev_dir().mkdir(parents=True, exist_ok=True)
-        with open(p, "a" if append else "w") as f:
+        with p.open("a" if append else "w") as f:
             f.writelines(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
 
     def read_table(self, table_path: str) -> list[dict[str, Any]]:
@@ -174,9 +174,9 @@ class YTDevClient(BaseYTClient):
             self.logger.warning("Table file not found: %s, returning empty list", p)
             return []
         results = []
-        with open(p) as f:
-            for line in f:
-                line = line.strip()
+        with p.open() as f:
+            for raw_line in f:
+                line = raw_line.strip()
                 if line:
                     results.append(json.loads(line))
         self.logger.info("✓ Read %s rows", len(results))
@@ -195,7 +195,7 @@ class YTDevClient(BaseYTClient):
         p = self._table_local_path(table_path)
         if not p.exists():
             return 0
-        with open(p) as f:
+        with p.open() as f:
             n = sum(1 for line in f if line.strip())
         self.logger.debug("Row count: %s", n)
         return n
@@ -622,9 +622,9 @@ class YTDevClient(BaseYTClient):
 
         logs_path = self._dev_dir() / f"{self._table_basename(output_table)}.log"
         with (
-            open(sandbox_input) as fin,
-            open(sandbox_output, "w") as fout,
-            open(logs_path, "w") as ferr,
+            sandbox_input.open() as fin,
+            sandbox_output.open("w") as fout,
+            logs_path.open("w") as ferr,
         ):
             proc = subprocess.run(
                 ["/bin/bash", "-c", mapper_job],
@@ -640,7 +640,7 @@ class YTDevClient(BaseYTClient):
         output_path = self._table_local_path(output_table)
         if proc.returncode == 0 and sandbox_output.exists():
             if append and output_path.exists():
-                with open(output_path, "ab") as out, open(sandbox_output, "rb") as sand:
+                with output_path.open("ab") as out, sandbox_output.open("rb") as sand:
                     out.write(sand.read())
             else:
                 shutil.copy2(sandbox_output, output_path)
@@ -751,7 +751,7 @@ class YTDevClient(BaseYTClient):
 
         self.logger.info("  Dev: sandbox=%s", sandbox_dir)
         self.logger.info("  Dev: stderr=%s", logs_path)
-        with open(logs_path, "w") as ferr:
+        with logs_path.open("w") as ferr:
             proc = subprocess.run(
                 ["/bin/bash", "-c", local_command],
                 stderr=ferr,

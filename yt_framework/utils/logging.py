@@ -158,5 +158,7 @@ def log_config(
     for key, value in config_dict.items():
         # Mask sensitive data
         if "secret" in key.lower() or "key" in key.lower():
-            value = "***" + str(value)[-4:] if value else "(not set)"
-        logger.info("    %s: %s", key, value)
+            display = "***" + str(value)[-4:] if value else "(not set)"
+        else:
+            display = value
+        logger.info("    %s: %s", key, display)

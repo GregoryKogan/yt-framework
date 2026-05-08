@@ -3,6 +3,7 @@ import sys
 from collections.abc import Callable
 from contextlib import contextmanager
 from functools import wraps
+from pathlib import Path
 from typing import Any, TypeVar, cast
 
 _F = TypeVar("_F", bound=Callable[..., Any])
@@ -80,7 +81,7 @@ def suppress_all_output():
     original_stdout_fd = os.dup(1)  # stdout FD
     original_stderr_fd = os.dup(2)  # stderr FD
 
-    with open(os.devnull, "w") as devnull:
+    with Path(os.devnull).open("w") as devnull:
         devnull_fd = devnull.fileno()
         try:
             # Redirect Python streams to devnull

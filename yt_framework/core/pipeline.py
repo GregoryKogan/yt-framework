@@ -50,22 +50,23 @@ def _normalize_upload_paths(raw: Any) -> list[dict[str, str]]:
 
     if not isinstance(raw, (list, tuple, ListConfig)):
         msg = "upload_paths must be a list of {source, target?} dicts."
-        raise ValueError(msg)
+        raise TypeError(msg)
 
     normalized: list[dict[str, str]] = []
     for idx, element in enumerate(raw):
-        if isinstance(element, DictConfig):
-            element = OmegaConf.to_container(element, resolve=True)
-        if not isinstance(element, Mapping):
+        item: Any = element
+        if isinstance(item, DictConfig):
+            item = OmegaConf.to_container(item, resolve=True)
+        if not isinstance(item, Mapping):
             msg = (
                 f"upload_paths[{idx}] must be a mapping with at least a 'source' key, "
-                f"got {type(element).__name__!r}."
+                f"got {type(item).__name__!r}."
             )
-            raise ValueError(msg)
-        if "source" not in element:
+            raise TypeError(msg)
+        if "source" not in item:
             msg = f"upload_paths[{idx}] is missing required 'source' key."
             raise ValueError(msg)
-        normalized.append({k: str(v) for k, v in element.items()})
+        normalized.append({k: str(v) for k, v in item.items()})
 
     return normalized
 
