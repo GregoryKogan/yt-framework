@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import shutil
 from dataclasses import dataclass
@@ -32,6 +33,21 @@ def _null_logger(name: str) -> logging.Logger:
     log.addHandler(logging.NullHandler())
     log.setLevel(logging.INFO)
     return log
+
+
+def cleanup_cluster_clients(client: object) -> None:
+    """Close YT HTTP sessions to avoid socket ResourceWarning at process exit."""
+    with contextlib.suppress(Exception):
+        raw_client = getattr(client, "client", None)
+        close_raw_client = getattr(raw_client, "_cleanup", None)
+        if callable(close_raw_client):
+            close_raw_client()
+
+    with contextlib.suppress(Exception):
+        import yt.wrapper as yt  # pyright: ignore[reportMissingImports]
+
+        if hasattr(yt.config, "_cleanup"):
+            yt.config._cleanup()  # type: ignore[attr-defined]
 
 
 @dataclass(frozen=True)
@@ -84,6 +100,7 @@ def cluster_session() -> Generator[ClusterSessionContext, None, None]:
             logger.exception("Failed to remove YT test root %s", yt_run_root)
         if local_run_root.is_dir():
             shutil.rmtree(local_run_root, ignore_errors=True)
+        cleanup_cluster_clients(client)
 
 
 @pytest.fixture
