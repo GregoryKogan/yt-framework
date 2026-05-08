@@ -6,16 +6,15 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: local
+  - repo: https://github.com/DetachHead/basedpyright-pre-commit-mirror
+    rev: 1.39.3
     hooks:
-      - id: pyright
-        name: pyright (strict)
-        entry: >-
-          bash -lc 'PYBIN=$(conda run -n yt-framework -- python -c "import sys; print(sys.executable)")
-          && conda run -n yt-framework -- pyright --pythonpath "$PYBIN"'
-        language: system
+      - id: basedpyright
         pass_filenames: false
         always_run: true
+
+  - repo: local
+    hooks:
       - id: pytest
         name: pytest (pre-push)
         entry: bash -c 'conda run -n yt-framework -- pytest'

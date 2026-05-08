@@ -16,7 +16,7 @@ alwaysApply: true
 - Done = proof (test/log/command output). No "done" without evidence. Divergence → re-plan, don’t patch. Thoroughness: very thorough.
 - Before declaring success, run commit-equivalent verification for the exact changed/new file set (including newly added untracked files), then run `pre-commit run --all-files`.
 - Before completion, run `pre-commit run --all-files` from the repo root and do not finish until every hook passes.
-- Never relax automatic checks (Ruff, pre-commit hooks, pyright, pytest, or similar), bypass hooks, or widen ignore lists without explicit user permission.
+- Never relax automatic checks (Ruff, pre-commit hooks, basedpyright, pytest, or similar), bypass hooks, or widen ignore lists without explicit user permission.
 - If any automatic check fails, fix the root cause in code/config; do not bypass with `--no-verify`, per-file rule suppressions, or check-level downgrades unless explicitly approved by the user.
 
 ## Code
