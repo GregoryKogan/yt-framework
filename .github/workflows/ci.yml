@@ -50,9 +50,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Pyright
+      - name: BasedPyright
         run: |
-          pyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"
+          basedpyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"
 
   test:
     runs-on: ubuntu-latest
