@@ -10,7 +10,9 @@ repos:
     hooks:
       - id: pyright
         name: pyright (strict)
-        entry: conda run -n yt-framework -- pyright
+        entry: >-
+          bash -lc 'PYBIN=$(conda run -n yt-framework -- python -c "import sys; print(sys.executable)")
+          && conda run -n yt-framework -- pyright --pythonpath "$PYBIN"'
         language: system
         pass_filenames: false
         always_run: true

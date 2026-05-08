@@ -57,6 +57,13 @@ class S3ClientOptions:
     boto_config: BotoConfig | None = None
 
 
+def _coerce_int_option(value: object, option_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        msg = f"{option_name} must be an integer, got {value!r}"
+        raise TypeError(msg)
+    return value
+
+
 def _options_from_legacy_kwargs(
     options: S3ClientOptions | None,
     legacy_kwargs: dict[str, object],
@@ -79,8 +86,14 @@ def _options_from_legacy_kwargs(
 
     return replace(
         merged_options,
-        max_retries=int(legacy_kwargs.get("max_retries", merged_options.max_retries)),
-        timeout=int(legacy_kwargs.get("timeout", merged_options.timeout)),
+        max_retries=_coerce_int_option(
+            legacy_kwargs.get("max_retries", merged_options.max_retries),
+            "max_retries",
+        ),
+        timeout=_coerce_int_option(
+            legacy_kwargs.get("timeout", merged_options.timeout),
+            "timeout",
+        ),
         logger=legacy_kwargs.get("logger", merged_options.logger),
         region_name=(
             str(legacy_kwargs["region_name"])

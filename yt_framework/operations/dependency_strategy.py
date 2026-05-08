@@ -73,6 +73,7 @@ class DependencyBuilder(Protocol):
         Optional ``mapper`` / ``reducer`` are used for map_reduce / reduce tar command
         bootstrap when ``tar_command_bootstrap`` is enabled in ``operation_config``.
         """
+        ...
 
 
 class TarArchiveDependencyBuilder:
@@ -297,12 +298,13 @@ class TarArchiveDependencyBuilder:
         operation_config: DictConfig,
         logger: logging.Logger,
     ) -> None:
-        for item in operation_config.get("file_paths") or []:
+        file_paths = operation_config.get("file_paths", [])
+        for item in file_paths:
             if (
                 isinstance(item, (list, tuple, ListConfig))
                 and len(item) >= _FILE_PATH_PAIR_MIN_LEN
             ):
-                yt_path, local_path = item[0], item[1]
+                yt_path, local_path = str(item[0]), str(item[1])
                 dependencies.append((yt_path, local_path))
                 logger.info("Added file dependency: %s", yt_path)
                 continue
@@ -344,7 +346,10 @@ class TarArchiveDependencyBuilder:
         logger: logging.Logger,
     ) -> None:
         tokenizer_cfg = operation_config.get("tokenizer_artifact")
-        if not (tokenizer_cfg and tokenizer_cfg.get("artifact_base")):
+        if not isinstance(tokenizer_cfg, DictConfig):
+            return
+        artifact_base = tokenizer_cfg.get("artifact_base")
+        if not isinstance(artifact_base, str) or not artifact_base.strip():
             return
         artifact_name = resolve_tokenizer_artifact_name(
             stage_config=stage_config,
@@ -352,12 +357,11 @@ class TarArchiveDependencyBuilder:
         )
         if not artifact_name:
             logger.warning(
-                "tokenizer_artifact configured but artifact_name cannot be resolved; "
-                "skipping dependency mount",
+                "tokenizer_artifact configured but artifact_name cannot be resolved; skipping dependency mount",
             )
             return
         artifact_archive = resolve_tokenizer_archive_name(artifact_name)
-        artifact_path = f"{tokenizer_cfg.artifact_base}/{artifact_archive}"
+        artifact_path = f"{artifact_base}/{artifact_archive}"
         dependencies.append((artifact_path, artifact_archive))
         logger.info("Added tokenizer artifact dependency: %s", artifact_path)
 

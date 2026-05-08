@@ -178,8 +178,6 @@ def _resolve_join_strategy(
         if select_columns:
             return True, on, ""
         return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
-    if isinstance(on, dict):
-        return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
     return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
 
 

@@ -50,18 +50,18 @@ class OperationResources:
 
     def __post_init__(self) -> None:
         """Validate resource fields after initialization."""
-        if self.memory_gb is None or self.memory_gb <= 0:
+        if self.memory_gb <= 0:
             msg = f"memory_gb must be set to a positive integer, got {self.memory_gb}"
             raise ValueError(msg)
-        if self.cpu_limit is None or self.cpu_limit <= 0:
+        if self.cpu_limit <= 0:
             msg = f"cpu_limit must be set to a positive integer, got {self.cpu_limit}"
             raise ValueError(msg)
-        if self.gpu_limit is None or self.gpu_limit < 0:
+        if self.gpu_limit < 0:
             msg = (
                 f"gpu_limit must be set to a non-negative integer, got {self.gpu_limit}"
             )
             raise ValueError(msg)
-        if self.job_count is None or self.job_count <= 0:
+        if self.job_count <= 0:
             msg = f"job_count must be set to a positive integer, got {self.job_count}"
             raise ValueError(msg)
 
@@ -599,7 +599,7 @@ class BaseYTClient(ABC):
         task_name: str,
         job: object = None,
         **kwargs: object,
-    ) -> Operation:
+    ) -> Operation | None:
         """Run a vanilla operation on YT.
 
         Args:
@@ -615,7 +615,7 @@ class BaseYTClient(ABC):
                 - max_failed_jobs: Maximum number of failed jobs before operation fails
 
         Returns:
-            Operation object
+            Operation object or None when submission fails.
 
         """
 

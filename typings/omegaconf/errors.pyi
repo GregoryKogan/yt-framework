@@ -1,0 +1,1 @@
+OmegaConfBaseException = Exception

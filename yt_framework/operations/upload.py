@@ -454,7 +454,9 @@ def _write_wrapper_file(
     logger.debug("Created wrapper script: %s", wrapper_path)
 
 
-def _load_stage_job_section(stage_dir: Path, logger: logging.Logger) -> dict:
+def _load_stage_job_section(
+    stage_dir: Path, logger: logging.Logger
+) -> dict[str, object]:
     """Return ``job`` dict from stage ``config.yaml`` if present."""
     cfg_path = stage_dir / "config.yaml"
     if not cfg_path.is_file():
@@ -623,8 +625,7 @@ def _create_map_reduce_command_wrappers(
         )
     else:
         logger.warning(
-            "Stage %s: map_reduce_mapper wrapper created but no reducer script — "
-            "map-reduce command mode will fail until job.map_reduce_command.reducer_script is set",
+            "Stage %s: map_reduce_mapper wrapper created but no reducer script — map-reduce command mode will fail until job.map_reduce_command.reducer_script is set",
             stage_name,
         )
 

@@ -176,7 +176,7 @@ def run_map(
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
     append_output = bool(operation_config.get("append", False))
 
-    map_kwargs: dict = {}
+    map_kwargs: dict[str, object] = {}
     od = operation_config.get("operation_description")
     if od:
         if isinstance(od, str):

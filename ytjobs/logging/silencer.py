@@ -2,7 +2,7 @@
 
 import os
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
@@ -44,7 +44,7 @@ def manage_output(
 
 
 @contextmanager
-def redirect_stdout_to_stderr() -> Iterator[None]:
+def redirect_stdout_to_stderr() -> Generator[None, None, None]:
     """Context manager that redirects stdout to stderr.
 
     This is useful for YTsaurus mappers where you need clean JSON on stdout,
@@ -64,7 +64,7 @@ def redirect_stdout_to_stderr() -> Iterator[None]:
 
 
 @contextmanager
-def suppress_all_output() -> Iterator[None]:
+def suppress_all_output() -> Generator[None, None, None]:
     """Context manager that suppresses ALL output: stdout, stderr, and warnings.
 
     This is useful when you need complete silence from noisy libraries
