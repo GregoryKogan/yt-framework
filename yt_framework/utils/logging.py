@@ -136,7 +136,7 @@ def log_success(logger: logging.Logger, message: str) -> None:
 
 def log_config(
     logger: logging.Logger,
-    config_dict: dict,
+    config_dict: dict[str, object],
     title: str = "Configuration",
 ) -> None:
     """Log configuration in a readable format.

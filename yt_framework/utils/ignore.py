@@ -70,6 +70,7 @@ class YTIgnorePattern:
         self.is_negation = is_negation
         self.is_directory = pattern.endswith("/")
         self.is_rooted = pattern.startswith("/")
+        self._regex: re.Pattern[str] = re.compile(r"$^")
 
         if self.is_directory:
             self.pattern = pattern[:-1]

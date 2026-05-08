@@ -15,9 +15,12 @@ def _raise_file_not_found(message: str) -> None:
 
 def _resolve_model_name(context: "StageContext") -> str | None:
     job_cfg = context.config.get("job")
-    if not job_cfg:
+    if not isinstance(job_cfg, DictConfig):
         return None
-    return job_cfg.get("model_name")
+    model_name = job_cfg.get("model_name")
+    if isinstance(model_name, str) and model_name.strip():
+        return model_name
+    return None
 
 
 def _upload_local_checkpoint_if_needed(
@@ -103,8 +106,18 @@ def init_checkpoint_directory(
 
     """
     # Get checkpoint-related config values from checkpoint_config
-    checkpoint_base = checkpoint_config.get("checkpoint_base")
-    local_checkpoint_path = checkpoint_config.get("local_checkpoint_path")
+    checkpoint_base_value = checkpoint_config.get("checkpoint_base")
+    local_checkpoint_path_value = checkpoint_config.get("local_checkpoint_path")
+    checkpoint_base = (
+        str(checkpoint_base_value)
+        if isinstance(checkpoint_base_value, str) and checkpoint_base_value.strip()
+        else None
+    )
+    local_checkpoint_path = (
+        str(local_checkpoint_path_value)
+        if isinstance(local_checkpoint_path_value, str)
+        else None
+    )
 
     model_name = _resolve_model_name(context)
 

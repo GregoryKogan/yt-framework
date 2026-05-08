@@ -51,8 +51,14 @@ def run_sort(
 
     """
     logger = context.logger
-    table_path = operation_config.get("input_table")
-    sort_by = list(operation_config.get("sort_by") or [])
+    input_table_value = operation_config.get("input_table")
+    table_path = (
+        str(input_table_value)
+        if isinstance(input_table_value, str) and input_table_value.strip()
+        else ""
+    )
+    sort_by_value = operation_config.get("sort_by", [])
+    sort_by = [str(column) for column in sort_by_value]
 
     if not table_path:
         msg = (

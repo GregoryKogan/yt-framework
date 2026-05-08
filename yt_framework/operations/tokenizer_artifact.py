@@ -105,7 +105,12 @@ def init_tokenizer_artifact_directory(
     - uploads local artifact from `local_artifact_path` if provided and missing in YT;
     - validates artifact presence in YT.
     """
-    artifact_base = tokenizer_artifact_config.get("artifact_base")
+    artifact_base_value = tokenizer_artifact_config.get("artifact_base")
+    artifact_base = (
+        str(artifact_base_value)
+        if isinstance(artifact_base_value, str) and artifact_base_value.strip()
+        else None
+    )
     if not artifact_base:
         return
 
@@ -122,7 +127,12 @@ def init_tokenizer_artifact_directory(
 
     archive_name = resolve_tokenizer_archive_name(artifact_name)
     yt_artifact_path = f"{artifact_base}/{archive_name}"
-    local_artifact_path = tokenizer_artifact_config.get("local_artifact_path")
+    local_artifact_path_value = tokenizer_artifact_config.get("local_artifact_path")
+    local_artifact_path = (
+        str(local_artifact_path_value)
+        if isinstance(local_artifact_path_value, str) and local_artifact_path_value
+        else None
+    )
 
     context.deps.yt_client.create_path(artifact_base, node_type="map_node")
     context.logger.info("Tokenizer artifact directory ready: %s", artifact_base)
