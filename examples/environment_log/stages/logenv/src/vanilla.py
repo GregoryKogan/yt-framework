@@ -18,6 +18,10 @@ from typing import cast
 from ytjobs.config import get_config_path
 from ytjobs.logging.logger import get_logger
 
+_BYTES_PER_KIB = 1024
+_TREE_LISTING_TRUNCATE_AT = 200
+_TREE_LISTING_MAX_LINES = 500
+
 
 def run_command(cmd, logger, description="command", timeout=10):
     """Safely execute a command and return output."""
@@ -302,12 +306,12 @@ def log_file_structure(logger) -> None:
                     else:
                         try:
                             size = entry.stat().st_size
-                            if size < 1024:
+                            if size < _BYTES_PER_KIB:
                                 size_str = f"{size} B"
-                            elif size < 1024**2:
-                                size_str = f"{size / 1024:.1f} KB"
+                            elif size < _BYTES_PER_KIB**2:
+                                size_str = f"{size / _BYTES_PER_KIB:.1f} KB"
                             else:
-                                size_str = f"{size / 1024**2:.1f} MB"
+                                size_str = f"{size / _BYTES_PER_KIB**2:.1f} MB"
                             items.append(f"{prefix}{current}{entry.name} ({size_str})")
                             file_count += 1
                         except Exception as e:
@@ -325,12 +329,14 @@ def log_file_structure(logger) -> None:
 
         tree_items, total_files = format_tree(cwd, max_depth=3)
         logger.info("%s/", Path(cwd).name)
-        for item in tree_items[:500]:  # Limit total output
+        for item in tree_items[:_TREE_LISTING_MAX_LINES]:  # Limit total output
             logger.info(item)
 
-        if total_files >= 200:
+        if total_files >= _TREE_LISTING_TRUNCATE_AT:
             logger.info("... (output truncated)")
-        logger.info("\nTotal items shown: %s", min(total_files, 500))
+        logger.info(
+            "\nTotal items shown: %s", min(total_files, _TREE_LISTING_MAX_LINES)
+        )
 
     except Exception:
         logger.exception("Error generating file structure")

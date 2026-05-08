@@ -1,7 +1,6 @@
-"""DuckDB Dev Mode Simulator.
-==========================
+"""Simulate YQL operations locally using DuckDB for dev-mode testing.
 
-Simulates YQL operations locally using DuckDB for dev mode testing.
+Provides table-backed SQL execution with YT-like path conventions.
 """
 
 import logging
@@ -98,11 +97,11 @@ class DuckDBSimulator:
             )
 
             self.loaded_tables[yt_path] = table_name
-            return table_name
-
         except Exception:
             self.logger.exception("Failed to load table %s", yt_path)
             raise
+        else:
+            return table_name
 
     def yql_to_sql(self, yql_query: str) -> tuple[str, str | None]:
         """Convert YQL query to DuckDB SQL.
@@ -165,13 +164,15 @@ class DuckDBSimulator:
             if result:
                 columns = [desc[0] for desc in self.conn.description]
                 # Convert to list of dicts
-                return [dict(zip(columns, row, strict=False)) for row in result]
-            return []
-
+                rows = [dict(zip(columns, row, strict=False)) for row in result]
+            else:
+                rows = []
         except Exception:
             self.logger.exception("Failed to execute SQL query")
             self.logger.exception("Query: %s", sql)
             raise
+        else:
+            return rows
 
     def execute_yql(self, yql_query: str) -> tuple[list[dict[str, Any]], str | None]:
         """Execute YQL query by converting to SQL.

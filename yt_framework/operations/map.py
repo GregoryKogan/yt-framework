@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
 
 from yt_framework.utils.logging import log_header, log_success
@@ -181,9 +181,7 @@ def run_map(
             logger.info("Operation label: %s", od)
             map_kwargs["title"] = od
         else:
-            from omegaconf import OmegaConf as _OmegaConf
-
-            map_kwargs["operation_description"] = _OmegaConf.to_container(
+            map_kwargs["operation_description"] = OmegaConf.to_container(
                 od, resolve=True
             )
 

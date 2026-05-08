@@ -1,9 +1,4 @@
-"""Mapper Utilities.
-================
-
-Common utilities for YT mapper scripts.
-Includes Row class and input reading helpers.
-"""
+"""Shared helpers for YT mapper scripts (rows, stdin parsing, errors)."""
 
 import json
 import sys
@@ -33,7 +28,7 @@ def read_input_rows() -> Iterable[object]:
         try:
             row_data = json.loads(line)
             yield row_data
-        except Exception as e:
+        except (TypeError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as e:
             error_msg = {"error": f"Failed to parse row: {e!s}", "row": line}
             sys.stderr.write(json.dumps(error_msg) + "\n")
 

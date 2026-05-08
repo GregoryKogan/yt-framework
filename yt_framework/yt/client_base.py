@@ -1,7 +1,6 @@
-"""Base YT Client.
-==============
+"""Abstract base class for YT client implementations.
 
-Abstract base class for YT client implementations.
+Concrete dev and prod clients inherit from ``BaseYTClient``.
 """
 
 import logging
@@ -50,6 +49,7 @@ class OperationResources:
     user_slots: int | None = None
 
     def __post_init__(self) -> None:
+        """Validate resource fields after initialization."""
         if self.memory_gb is None or self.memory_gb <= 0:
             msg = f"memory_gb must be set to a positive integer, got {self.memory_gb}"
             raise ValueError(msg)
@@ -577,7 +577,7 @@ class BaseYTClient(ABC):
         env: dict[str, str],
         task_name: str,
         job: Any = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> Operation:
         """Run a vanilla operation on YT.
 
@@ -613,17 +613,16 @@ class BaseYTClient(ABC):
         try:
             operation.wait()
             state = operation.get_state()
-
+        except Exception as e:
+            self.logger.exception("Operation failed")
+            self._log_error_from_exception(e)
+            return False
+        else:
             if state == "completed":
                 self.logger.info("Operation completed successfully")
                 return True
             self.logger.error("Operation %s", state)
             self._log_operation_error(operation)
-            return False
-
-        except Exception as e:
-            self.logger.exception("Operation failed")
-            self._log_error_from_exception(e)
             return False
 
     def _log_operation_error(self, operation: Operation) -> None:
@@ -632,7 +631,7 @@ class BaseYTClient(ABC):
             error = operation.get_error()
             if error:
                 self.logger.error("Error: %s", error)
-        except Exception as exc:
+        except (AttributeError, KeyError, TypeError) as exc:
             self.logger.debug("Failed to read operation error details: %s", exc)
 
     def _log_error_from_exception(self, exception: Exception) -> None:

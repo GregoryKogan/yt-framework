@@ -11,13 +11,22 @@ from typing import Any, Literal
 LegKind = Literal["typed", "command"]
 
 
+def _ytsaurus_typed_job_type() -> type | None:
+    """Resolve ``yt.wrapper.TypedJob`` lazily so import hooks/tests can simulate failure."""
+    try:
+        from yt.wrapper import TypedJob  # noqa: PLC0415, I001  # pyright: ignore[reportMissingImports]
+    except ImportError:
+        return None
+    else:
+        return TypedJob
+
+
 def is_typed_job(obj: Any) -> bool:
     """Return True if ``obj`` is a YTsaurus ``TypedJob`` instance."""
-    try:
-        from yt.wrapper import TypedJob  # pyright: ignore[reportMissingImports]
-    except ImportError:
+    tj = _ytsaurus_typed_job_type()
+    if tj is None:
         return False
-    return isinstance(obj, TypedJob)
+    return isinstance(obj, tj)
 
 
 def map_reduce_leg_kind(obj: Any) -> LegKind:

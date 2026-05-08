@@ -1,6 +1,7 @@
 """`.ytignore` parsing (gitignore-style) for upload tarballs."""
 
 import fnmatch
+import logging
 import re
 from pathlib import Path
 
@@ -301,10 +302,8 @@ class YTIgnoreMatcher:
                     # Create pattern object
                     ignore_pattern = YTIgnorePattern(pattern, base_dir, is_negation)
                     self.patterns.append(ignore_pattern)
-        except Exception as e:
+        except (OSError, UnicodeDecodeError, ValueError) as e:
             # Log error but don't fail - just skip this .ytignore file
-            import logging
-
             logger = logging.getLogger(__name__)
             logger.warning("Failed to parse .ytignore file %s: %s", ytignore_file, e)
 
@@ -338,7 +337,7 @@ class YTIgnoreMatcher:
 
 
 def should_ignore_file(file_path: Path, base_dir: Path) -> bool:
-    """Convenience function to check if a file should be ignored.
+    """Return whether ``file_path`` should be ignored under ``base_dir``.
 
     This is a shorthand for creating a YTIgnoreMatcher and checking a single file.
     For checking multiple files, create a YTIgnoreMatcher instance directly to

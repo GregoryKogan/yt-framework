@@ -2,6 +2,7 @@
 
 import contextlib
 import logging
+import uuid
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
@@ -17,6 +18,9 @@ from yt.wrapper import (  # pyright: ignore[reportMissingImports]
 )
 from yt.wrapper import (
     format as yt_format,
+)
+from yt.wrapper import (
+    schema as yt_schema,
 )
 from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
 from yt.wrapper.spec_builders import (  # pyright: ignore[reportMissingImports]
@@ -41,6 +45,29 @@ from yt_framework.yt.operation_secure_env import (
     pop_secure_env_client_kwargs,
     wrap_shell_command_with_secure_vault_promotion,
 )
+from yt_framework.yt.yql_builder import (
+    build_distinct_query,
+    build_filter_query,
+    build_group_by_query,
+    build_join_query,
+    build_limit_query,
+    build_select_query,
+    build_sort_query,
+    build_union_query,
+)
+
+
+def _raise_runtime_error(message: str) -> None:
+    """Raise RuntimeError from a nested function (TRY301)."""
+    raise RuntimeError(message)
+
+
+def _raise_value_error(message: str) -> None:
+    raise ValueError(message)
+
+
+def _raise_value_error_from(cause: BaseException, message: str) -> None:
+    raise ValueError(message) from cause
 
 
 def _maybe_wrap_string_command_for_vault(leg: Any, secure_flat: dict[str, str]) -> Any:
@@ -83,8 +110,10 @@ def _apply_spec_options_and_split_run_operation_kwargs(
     spec_builder: Any,
     kwargs: dict[str, Any],
 ) -> tuple[Any, dict[str, Any]]:
-    """Apply kwargs that correspond to SpecBuilder chain methods (e.g. ``weight``,
-    ``title``, ``alias``). Remaining keys must be only those accepted by
+    """Apply SpecBuilder kwargs and split out ``run_operation`` options.
+
+    Keys matching SpecBuilder chain methods (e.g. ``weight``, ``title``, ``alias``)
+    stay on the builder. Remaining keys must be only those accepted by
     ``YtClient.run_operation`` (see ``_RUN_OPERATION_KWARGS``).
     """
     kwargs = dict(kwargs)
@@ -159,6 +188,7 @@ class YTProdClient(BaseYTClient):
             secrets: Dictionary containing YT credentials. Expected keys:
                     - YT_PROXY
                     - YT_TOKEN
+            pickling: Optional pickling-related client config (see ``_apply_pickling_config``).
 
         """
         super().__init__(logger)
@@ -184,7 +214,8 @@ class YTProdClient(BaseYTClient):
                 )
             else:
                 self.logger.debug("YT Client initialized with proxy: %s", yt_proxy)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # YT client config shape varies by version; best-effort disable only.
             self.logger.warning(
                 "Could not disable proxy discovery: %s. Continuing with default settings.",
                 e,
@@ -337,10 +368,11 @@ class YTProdClient(BaseYTClient):
             )
             results: list[dict[str, Any]] = list(table_iterator)  # type: ignore[arg-type]
             self.logger.info("✓ Read %s rows", len(results))
-            return results
         except Exception:
             self.logger.exception("Failed to read table")
             raise
+        else:
+            return results
 
     def row_count(self, table_path: str) -> int:
         """Get number of rows in a YT table.
@@ -358,10 +390,11 @@ class YTProdClient(BaseYTClient):
         try:
             count = self.client.row_count(table_path)
             self.logger.debug("Row count: %s", count)
-            return count
         except Exception:
             self.logger.exception("Failed to get row count")
             raise
+        else:
+            return count
 
     def _get_table_columns(self, table_path: str) -> list[str]:
         """Get column names from a table.
@@ -396,7 +429,8 @@ class YTProdClient(BaseYTClient):
                     columns = [col for col in columns if not col.startswith("_")]
                     if columns:
                         return columns
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # YT attribute/schema access is version-dependent; fall through to row read.
             self.logger.debug(
                 "Could not get schema from attributes: %s, trying to read table", e
             )
@@ -405,8 +439,9 @@ class YTProdClient(BaseYTClient):
         try:
             rows = self.read_table(table_path)
             if not rows:
-                msg = f"Table {table_path} is empty, cannot determine columns"
-                raise ValueError(msg)
+                _raise_value_error(
+                    f"Table {table_path} is empty, cannot determine columns"
+                )
             # Get column names from first row
             columns = list(rows[0].keys())
             # Filter out internal YQL columns like _other, _yql_column_*
@@ -414,8 +449,7 @@ class YTProdClient(BaseYTClient):
             if not columns:
                 # If all columns were filtered out, use all keys (fallback)
                 columns = list(rows[0].keys())
-            return columns
-        except Exception as read_error:
+        except Exception as read_error:  # noqa: BLE001
             # Method 3: If reading fails (e.g., binary columns), use YQL to infer schema
             error_str = str(read_error)
             if (
@@ -429,13 +463,11 @@ class YTProdClient(BaseYTClient):
                     )
                     # Use YQL to create a temporary table with LIMIT 0 to infer schema
                     # This doesn't read actual data, just infers the schema
-                    import uuid
-
                     temp_output = f"{table_path}.temp_schema_{uuid.uuid4().hex[:8]}"
                     query = f"""{build_max_row_weight_pragma()}
 PRAGMA yt.InferSchema = '1';
 INSERT INTO `{temp_output}` WITH TRUNCATE
-SELECT * FROM `{table_path}` LIMIT 0;"""
+SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
 
                     # Execute query to create temp table with schema
                     self.run_yql(query)
@@ -469,7 +501,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                     if temp_output:
                         with contextlib.suppress(Exception):
                             self.client.remove(temp_output)
-                except Exception as yql_error:
+                except Exception as yql_error:  # noqa: BLE001
                     self.logger.debug("YQL schema inference failed: %s", yql_error)
                     # Clean up temp table if it was created
                     if temp_output:
@@ -483,10 +515,15 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
                     f"internal YQL columns like _yql_column_0. Please recreate the table with "
                     f"explicit column selection, or delete and recreate it. Original error: {read_error}"
                 )
-                raise ValueError(msg) from read_error
 
-            msg = f"Failed to get table columns from {table_path}: {read_error}"
-            raise ValueError(msg) from read_error
+                _raise_value_error_from(read_error, msg)
+
+            _raise_value_error_from(
+                read_error,
+                f"Failed to get table columns from {table_path}: {read_error}",
+            )
+        else:
+            return columns
 
     def run_yql(
         self,
@@ -531,7 +568,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             else:
                 error = query_obj.get_error()
                 msg = f"Query failed with state {state}: {error}"
-                raise RuntimeError(msg)
+                _raise_runtime_error(msg)
 
         except Exception:
             self.logger.exception("Failed to execute YQL query")
@@ -563,13 +600,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             how: Join type - "inner", "left", "right", or "full"
             select_columns: Optional list of columns to select (with table aliases)
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight pragma for generated YQL.
 
         Returns:
             YQL query string if dry_run=True, None otherwise
 
         """
-        from yt_framework.yt.yql_builder import build_join_query
-
         query = build_join_query(
             left_table=left_table,
             right_table=right_table,
@@ -601,13 +637,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             output_table: Path to output table
             condition: WHERE condition (e.g., "status = 'active' AND total > 100")
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight pragma for generated YQL.
 
         Returns:
             YQL query string if dry_run=True, None otherwise
 
         """
-        from yt_framework.yt.yql_builder import build_filter_query
-
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
 
@@ -640,13 +675,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             output_table: Path to output table
             columns: List of column names to select
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight pragma for generated YQL.
 
         Returns:
             YQL query string if dry_run=True, None otherwise
 
         """
-        from yt_framework.yt.yql_builder import build_select_query
-
         query = build_select_query(
             input_table=input_table,
             output_table=output_table,
@@ -678,13 +712,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             aggregations: Dict mapping output column names to aggregation functions
                          e.g., {"order_count": "count", "total_amount": "sum"}
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight pragma for generated YQL.
 
         Returns:
             YQL query string if dry_run=True, None otherwise
 
         """
-        from yt_framework.yt.yql_builder import build_group_by_query
-
         query = build_group_by_query(
             input_table=input_table,
             output_table=output_table,
@@ -712,13 +745,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             tables: List of table paths to union
             output_table: Path to output table
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight pragma for generated YQL.
 
         Returns:
             YQL query string if dry_run=True, None otherwise
 
         """
-        from yt_framework.yt.yql_builder import build_union_query
-
         # Get columns from first table to avoid _other column issues
         # All tables in union should have the same columns
         columns = self._get_table_columns(tables[0])
@@ -751,13 +783,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             output_table: Path to output table
             columns: Optional list of columns to select (if None, selects all)
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight pragma for generated YQL.
 
         Returns:
             YQL query string if dry_run=True, None otherwise
 
         """
-        from yt_framework.yt.yql_builder import build_distinct_query
-
         query = build_distinct_query(
             input_table=input_table,
             output_table=output_table,
@@ -790,13 +821,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             order_by: Column(s) to sort by
             ascending: Sort direction (True for ASC, False for DESC)
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight pragma for generated YQL.
 
         Returns:
             YQL query string if dry_run=True, None otherwise
 
         """
-        from yt_framework.yt.yql_builder import build_sort_query
-
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
 
@@ -830,13 +860,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             output_table: Path to output table
             limit: Maximum number of rows to return
             dry_run: If True, return the YQL query without executing
+            max_row_weight: Optional max row weight pragma for generated YQL.
 
         Returns:
             YQL query string if dry_run=True, None otherwise
 
         """
-        from yt_framework.yt.yql_builder import build_limit_query
-
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
 
@@ -982,6 +1011,8 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             docker_auth: Optional Docker authentication for private registries.
             job: Preferred mapper job alias.
             append: If True, append mapper output to an existing output table.
+            **kwargs: SpecBuilder chain options (e.g. ``weight``, ``title``) and
+                ``run_operation`` flags such as ``sync``.
 
         Returns:
             Operation: YT operation object that can be monitored and waited on.
@@ -1073,15 +1104,16 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
-                msg = "Failed to submit operation: run_operation returned None"
-                raise RuntimeError(msg)
+                _raise_runtime_error(
+                    "Failed to submit operation: run_operation returned None"
+                )
 
             self.logger.info("Operation submitted: %s", operation.id)
-            return operation
-
         except Exception:
             self.logger.exception("Failed to submit operation")
             raise
+        else:
+            return operation
 
     def run_vanilla(
         self,
@@ -1200,15 +1232,16 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
-                msg = "Failed to submit operation: run_operation returned None"
-                raise RuntimeError(msg)
+                _raise_runtime_error(
+                    "Failed to submit operation: run_operation returned None"
+                )
 
             self.logger.info("Operation submitted: %s", operation.id)
-            return operation
-
         except Exception:
             self.logger.exception("Failed to submit vanilla operation")
             raise
+        else:
+            return operation
 
     def run_map_reduce(
         self,
@@ -1336,13 +1369,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
-                msg = "Failed to submit map-reduce operation"
-                raise RuntimeError(msg)
+                _raise_runtime_error("Failed to submit map-reduce operation")
             self.logger.info("Map-reduce operation submitted: %s", operation.id)
-            return operation
         except Exception:
             self.logger.exception("Failed to submit map-reduce operation")
             raise
+        else:
+            return operation
 
     def run_reduce(
         self,
@@ -1441,13 +1474,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
             run_op.setdefault("sync", False)
             operation = self.client.run_operation(spec_builder, **run_op)
             if operation is None:
-                msg = "Failed to submit reduce operation"
-                raise RuntimeError(msg)
+                _raise_runtime_error("Failed to submit reduce operation")
             self.logger.info("Reduce operation submitted: %s", operation.id)
-            return operation
         except Exception:
             self.logger.exception("Failed to submit reduce operation")
             raise
+        else:
+            return operation
 
     def run_sort(
         self,
@@ -1460,10 +1493,6 @@ SELECT * FROM `{table_path}` LIMIT 0;"""
         """Sort a table in place by the given columns."""
         self.logger.info("Sorting table %s by %s", table_path, sort_by)
         try:
-            from yt.wrapper import (
-                schema as yt_schema,
-            )  # pyright: ignore[reportMissingImports]
-
             sort_columns = [
                 yt_schema.SortColumn(col, sort_order="ascending") for col in sort_by
             ]

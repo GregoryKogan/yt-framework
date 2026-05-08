@@ -41,7 +41,7 @@ def load_env_file(env_path: Path) -> dict[str, str]:
                     key = key.strip()
                     value = value.strip()
                     env_vars[key] = value
-    except Exception as e:
+    except OSError as e:
         warnings.warn(f"Could not load {env_path}: {e}", UserWarning, stacklevel=2)
 
     return env_vars

@@ -7,8 +7,11 @@ import tarfile
 from pathlib import Path
 from typing import Literal
 
+import yaml
 from omegaconf import OmegaConf
+from omegaconf.errors import OmegaConfBaseException
 
+import ytjobs
 from yt_framework.utils import log_header, log_success
 from yt_framework.utils.ignore import YTIgnoreMatcher
 from yt_framework.yt.client_base import BaseYTClient
@@ -22,8 +25,6 @@ _BUILD_CODE_DIR = ".build"
 
 def _get_ytjobs_dir() -> Path:
     """Get ytjobs package directory dynamically."""
-    import ytjobs
-
     return Path(ytjobs.__file__).parent
 
 
@@ -78,13 +79,13 @@ def _copy_ytjobs_to_build_dir(
     return file_count
 
 
-def _resolve_upload_target(source: str, target: str | None, pipeline_dir: Path) -> str:
+def _resolve_upload_target(source: str, target: str | None, _pipeline_dir: Path) -> str:
     """Resolve target name for upload_paths entry.
 
     Args:
         source: Source path from config
         target: Optional target from config
-        pipeline_dir: Pipeline directory (unused, for API consistency)
+        _pipeline_dir: Reserved for future path resolution (call sites pass pipeline root).
 
     Returns:
         Target name (from config or derived from source basename)
@@ -359,7 +360,13 @@ def _copy_stage_to_build_dir(
                     shutil.copy2(config_path, target_config)
                     file_count += 1
                     logger.debug("  Copied config: %s/config.yaml", stage_name)
-            except Exception as exc:
+            except (
+                OSError,
+                OmegaConfBaseException,
+                TypeError,
+                ValueError,
+                yaml.YAMLError,
+            ) as exc:
                 # If config parsing fails, skip this stage config.
                 logger.debug("Skipping invalid config %s: %s", config_path, exc)
         else:
@@ -455,7 +462,13 @@ def _load_stage_job_section(stage_dir: Path, logger: logging.Logger) -> dict:
             return {}
         job = cfg.get("job")
         return job if isinstance(job, dict) else {}
-    except Exception as e:
+    except (
+        OSError,
+        OmegaConfBaseException,
+        TypeError,
+        ValueError,
+        yaml.YAMLError,
+    ) as e:
         logger.warning("Could not read %s for wrapper script paths: %s", cfg_path, e)
         return {}
 
@@ -464,8 +477,9 @@ def _resolve_map_reduce_command_scripts(
     stage_dir: Path,
     logger: logging.Logger,
 ) -> tuple[str | None, str | None]:
-    """Resolve mapper/reducer Python entrypoints under stages/<name>/src/ for map-reduce
-    command mode wrappers. Uses ``job.map_reduce_command`` when set.
+    """Resolve mapper and reducer entrypoints for map-reduce command mode.
+
+    Looks under ``stages/<name>/src/`` and uses ``job.map_reduce_command`` when set.
     """
     job = _load_stage_job_section(stage_dir, logger)
     mrc = job.get("map_reduce_command") or {}
@@ -611,7 +625,7 @@ def _create_reduce_command_wrapper(
     build_dir: Path,
     logger: logging.Logger,
 ) -> None:
-    """Wrapper for reduce-only operations with ``tar_command_bootstrap``."""
+    """Create the reduce-only shell wrapper when ``tar_command_bootstrap`` is enabled."""
     red = _resolve_reduce_command_script(stage_dir, logger)
     if not red:
         return
@@ -747,7 +761,7 @@ def build_code_locally(
         target = _resolve_upload_target(
             source=source,
             target=entry.get("target"),
-            pipeline_dir=pipeline_dir,
+            _pipeline_dir=pipeline_dir,
         )
         path_files += _copy_path_to_build_dir(
             source_path=source,

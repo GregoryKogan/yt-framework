@@ -51,7 +51,7 @@ class ColoredFormatter(logging.Formatter):
 def setup_logging(
     level: int = logging.INFO, name: str | None = None, use_colors: bool = True
 ) -> logging.Logger:
-    """Setup logging with consistent formatting.
+    """Configure logging with consistent formatting.
 
     Args:
         level: Logging level (default: INFO)

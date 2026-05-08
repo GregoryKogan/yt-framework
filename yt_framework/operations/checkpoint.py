@@ -9,6 +9,10 @@ if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
 
 
+def _raise_file_not_found(message: str) -> None:
+    raise FileNotFoundError(message)
+
+
 def init_checkpoint_directory(
     context: "StageContext",
     checkpoint_config: DictConfig,
@@ -96,7 +100,7 @@ def init_checkpoint_directory(
                     f"or manually upload {checkpoint_name} to {checkpoint_base}"
                 )
                 context.logger.error(error_msg)
-                raise FileNotFoundError(error_msg)
+                _raise_file_not_found(error_msg)
 
             context.logger.debug("Required checkpoint verified: %s", yt_checkpoint_path)
         else:

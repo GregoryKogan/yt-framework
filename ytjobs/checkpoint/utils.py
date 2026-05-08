@@ -1,8 +1,6 @@
-"""Checkpoint Utilities for YTsaurus.
-==================================
+"""Save and load checkpoints on the YTsaurus Cypress filesystem.
 
-Utilities for saving and loading checkpoints in YTsaurus Cypress file system.
-Works without internet access - uses YT's internal distributed file system.
+Uses YT's internal storage only (no external network required).
 """
 
 import json
@@ -61,7 +59,7 @@ def save_checkpoint(
     base_dir = "/".join(checkpoint_path.split("/")[:-1])
     try:
         yt.create("map_node", base_dir, recursive=True, ignore_existing=True)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         log.warning("Could not create checkpoint directory %s: %s", base_dir, e)
 
     # Save checkpoint
@@ -84,7 +82,7 @@ def save_checkpoint(
                 compute_md5=True,
             )
             log.debug("Saved checkpoint metadata: %s", metadata_path)
-        except Exception as e:
+        except (OSError, TypeError, ValueError) as e:
             log.warning("Failed to save checkpoint metadata: %s", e)
 
     return checkpoint_path
@@ -127,14 +125,14 @@ def load_checkpoint(
                 metadata_json = yt.read_file(metadata_path).read().decode("utf-8")
                 metadata = json.loads(metadata_json)
                 log.debug("Loaded checkpoint metadata: %s", metadata_path)
-            except Exception as e:
+            except (OSError, TypeError, ValueError, json.JSONDecodeError) as e:
                 log.warning("Failed to load checkpoint metadata: %s", e)
-
-        return data, metadata
 
     except Exception:
         log.exception("Failed to load checkpoint %s", checkpoint_path)
         return None, None
+    else:
+        return data, metadata
 
 
 def list_checkpoints(
@@ -211,11 +209,11 @@ def delete_checkpoint(
             yt.remove(metadata_path, force=True)
             log.debug("Deleted checkpoint metadata: %s", metadata_path)
 
-        return True
-
     except Exception:
         log.exception("Failed to delete checkpoint %s", checkpoint_path)
         return False
+    else:
+        return True
 
 
 def save_processing_state(
@@ -281,7 +279,8 @@ def load_processing_state(
     try:
         state = json.loads(data.decode("utf-8"))
         log.debug("Loaded processing state: %s", state_name)
-        return state
-    except Exception:
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
         log.exception("Failed to parse processing state %s", state_name)
         return None
+    else:
+        return state

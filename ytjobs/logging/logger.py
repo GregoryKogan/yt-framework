@@ -1,14 +1,15 @@
-"""Text Logger for ptrack Pipeline.
-=================================
+"""Human-readable structured logging to stderr for job pipelines.
 
-Provides structured human-readable logging to stderr for the ptrack pipeline.
-All logs are formatted as readable text, written to stderr.
+Formats log records as plain text on stderr.
 """
 
 import datetime
 import logging
 import sys
 from typing import Any
+
+_LOG_STRING_PREVIEW_MAX_LEN = 100
+_LOG_STRING_ELLIPSIS_LEN = 3
 
 
 class TextFormatter(logging.Formatter):
@@ -93,8 +94,9 @@ class TextFormatter(logging.Formatter):
             return "{" + items + "}"
         if isinstance(value, str):
             # Truncate very long strings
-            if len(value) > 100:
-                return value[:97] + "..."
+            if len(value) > _LOG_STRING_PREVIEW_MAX_LEN:
+                tail = _LOG_STRING_PREVIEW_MAX_LEN - _LOG_STRING_ELLIPSIS_LEN
+                return value[:tail] + "..."
             return value
         return str(value)
 

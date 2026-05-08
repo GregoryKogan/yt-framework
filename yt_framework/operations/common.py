@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from yt_framework.utils.env import load_secrets
 from yt_framework.yt.client_base import OperationResources
@@ -48,12 +48,12 @@ def _get_config_value_with_default(
         if value is None:
             logger.info("  Using default %s=%s (value is None in config)", key, default)
             return default
-
-        return value
-    except Exception:
+    except (AttributeError, KeyError, RuntimeError, TypeError):
         # Key doesn't exist or access failed, use default
         logger.info("  Using default %s=%s (not specified in config)", key, default)
         return default
+    else:
+        return value
 
 
 def build_environment(
@@ -159,9 +159,6 @@ def collect_passthrough_kwargs(
 
     OmegaConf dict nodes are resolved to plain Python containers.
     """
-    from omegaconf import DictConfig as OmegaDictConfig
-    from omegaconf import OmegaConf
-
     out: dict[str, Any] = {}
     for k in operation_config:
         if k in reserved_keys:
@@ -169,7 +166,7 @@ def collect_passthrough_kwargs(
         v = operation_config.get(k)
         if v is None:
             continue
-        if isinstance(v, OmegaDictConfig):
+        if isinstance(v, DictConfig):
             out[str(k)] = OmegaConf.to_container(v, resolve=True)
         else:
             out[str(k)] = v

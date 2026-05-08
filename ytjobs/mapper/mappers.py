@@ -1,8 +1,6 @@
-"""Mapper Base Classes.
-===================
+"""Reusable mapper base classes for stdin/stdout JSONL processing.
 
-Reusable mapper classes that handle stdin/stdout boilerplate.
-Allows users to focus on processing logic.
+Handles line iteration and error logging so stages implement only row logic.
 """
 
 import sys
