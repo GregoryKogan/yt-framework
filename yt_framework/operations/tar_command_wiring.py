@@ -36,7 +36,7 @@ def wrap_bootstrap_as_bash_c(bootstrap_command: str) -> str:
 def map_reduce_wrapper_names(
     stage_name: str,
 ) -> tuple[str, str]:
-    """Wrapper filenames inside the tarball for map-reduce command legs."""
+    """Return wrapper filenames inside the tarball for map-reduce command legs."""
     return (
         f"operation_wrapper_{stage_name}_map_reduce_mapper.sh",
         f"operation_wrapper_{stage_name}_map_reduce_reducer.sh",
@@ -44,5 +44,5 @@ def map_reduce_wrapper_names(
 
 
 def reduce_wrapper_name(stage_name: str) -> str:
-    """Wrapper filename for reduce-only command leg."""
+    """Return wrapper filename for the reduce-only command leg."""
     return f"operation_wrapper_{stage_name}_reduce.sh"

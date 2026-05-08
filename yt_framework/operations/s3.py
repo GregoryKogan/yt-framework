@@ -5,6 +5,8 @@ import logging
 from yt_framework.yt.client_base import BaseYTClient
 from ytjobs.s3.client import S3Client
 
+_S3_PATH_DEBUG_PREVIEW = 3
+
 
 def list_s3_files(
     s3_client: S3Client,
@@ -41,10 +43,10 @@ def list_s3_files(
 
     if paths:
         logger.debug("Sample paths:")
-        for path in paths[:3]:
+        for path in paths[:_S3_PATH_DEBUG_PREVIEW]:
             logger.debug("  - %s", path)
-        if len(paths) > 3:
-            logger.debug("  ... and %s more", len(paths) - 3)
+        if len(paths) > _S3_PATH_DEBUG_PREVIEW:
+            logger.debug("  ... and %s more", len(paths) - _S3_PATH_DEBUG_PREVIEW)
 
     return paths
 

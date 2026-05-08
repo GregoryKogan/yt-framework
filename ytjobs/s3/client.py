@@ -6,12 +6,15 @@ from urllib.parse import urlparse
 
 import boto3
 from botocore.client import Config as BotoConfig
+from botocore.exceptions import ClientError
 
 
 def _decode_http_chunked_if_present(data: bytes, logger: logging.Logger) -> bytes:
-    """If `data` is HTTP chunked-transfer encoded (stored by buggy S3-compatible
-    backends when uploading from dev/local), decode it
-    and return only the payload. Otherwise return `data` unchanged.
+    """Decode HTTP chunked-transfer payloads when present, else return ``data``.
+
+    Some S3-compatible backends store chunked-encoded bodies from dev/local uploads;
+    strip framing and return the raw payload. If ``data`` is not chunked, return it
+    unchanged.
     """
     if not data or data[0:1] not in b"0123456789abcdefABCDEF":
         return data
@@ -241,10 +244,11 @@ class S3Client:
             data = response["Body"].read()
             data = _decode_http_chunked_if_present(data, self.logger)
             self.logger.debug("Downloaded %s bytes", len(data))
-            return data
         except Exception:
             self.logger.exception("Failed to download")
             raise
+        else:
+            return data
 
     def download_by_uri(self, s3_uri: str) -> bytes:
         """Download object bytes from ``s3://bucket/key``.
@@ -286,10 +290,11 @@ class S3Client:
                 params["ContentType"] = content_type
 
             self.client.put_object(**params)
-            self.logger.debug("Upload completed")
         except Exception:
             self.logger.exception("Failed to upload")
             raise
+        else:
+            self.logger.debug("Upload completed")
 
     def exists(self, bucket: str, key: str) -> bool:
         """Return whether an object exists (``head_object`` succeeds).
@@ -304,6 +309,7 @@ class S3Client:
         """
         try:
             self.client.head_object(Bucket=bucket, Key=key)
-            return True
-        except Exception:
+        except (ClientError, OSError):
             return False
+        else:
+            return True

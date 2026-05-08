@@ -1,10 +1,7 @@
-"""Dependency Strategy Pattern.
-============================
+"""Dependency strategies for deployment-mode operation preparation.
 
-Strategy pattern for building dependencies in deployment mode.
-
-This module provides a clean separation between deployment strategy and operation
-preparation logic, following SOLID principles.
+Separates deployment concerns from operation preparation using the strategy
+pattern (SOLID).
 """
 
 from __future__ import annotations
@@ -28,10 +25,13 @@ from yt_framework.operations.tokenizer_artifact import (
     resolve_tokenizer_archive_name,
     resolve_tokenizer_artifact_name,
 )
+from yt_framework.utils import log_header
 
 if TYPE_CHECKING:
     import logging
     from pathlib import Path
+
+_FILE_PATH_PAIR_MIN_LEN = 2
 
 
 @dataclass
@@ -98,8 +98,6 @@ class TarArchiveDependencyBuilder:
         reducer: Any = None,
     ) -> DependencyBuildResult:
         """Build dependencies using tar archive strategy."""
-        from yt_framework.utils import log_header
-
         effective_type = (
             "map" if operation_type in ("map_reduce", "reduce") else operation_type
         )
@@ -169,7 +167,10 @@ class TarArchiveDependencyBuilder:
 
         # Add extra file_paths from operation_config (e.g. secrets, extra files)
         for item in operation_config.get("file_paths") or []:
-            if isinstance(item, (list, tuple, ListConfig)) and len(item) >= 2:
+            if (
+                isinstance(item, (list, tuple, ListConfig))
+                and len(item) >= _FILE_PATH_PAIR_MIN_LEN
+            ):
                 yt_path, local_path = item[0], item[1]
                 dependencies.append((yt_path, local_path))
                 logger.info("Added file dependency: %s", yt_path)

@@ -74,7 +74,7 @@ def discover_stages(
                     )
                     break  # Only take first BaseStage subclass per module
 
-        except Exception as e:
+        except (AttributeError, ImportError, ModuleNotFoundError, OSError) as e:
             logger.warning("Failed to import stage from %s: %s", stage_file, e)
             continue
 

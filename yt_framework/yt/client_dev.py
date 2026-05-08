@@ -1,22 +1,49 @@
 """Local filesystem stand-in for Cypress tables and subprocess-backed jobs."""
 
+import importlib
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
+from omegaconf import DictConfig, OmegaConf
 from yt.wrapper import Operation  # pyright: ignore[reportMissingImports]
 
+import yt_framework
+import ytjobs
 from yt_framework.operations.job_command import is_typed_job, resolve_aliased_job
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
+from yt_framework.yt.dev_simulator import (
+    DuckDBSimulator,
+    extract_output_table,
+    extract_table_references,
+)
 from yt_framework.yt.max_row_weight import ensure_max_row_weight_pragma
 from yt_framework.yt.operation_secure_env import pop_secure_env_client_kwargs
+from yt_framework.yt.yql_builder import (
+    build_distinct_query,
+    build_filter_query,
+    build_group_by_query,
+    build_join_query,
+    build_limit_query,
+    build_select_query,
+    build_sort_query,
+    build_union_query,
+)
 
 if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
+
+_DEV_BUILD_SPLIT_PARTS = 2
+
+
+def _raise_value_error(message: str) -> None:
+    raise ValueError(message)
 
 
 class _DevOperation:
@@ -219,8 +246,9 @@ class YTDevClient(BaseYTClient):
         try:
             rows = self.read_table(table_path)
             if not rows:
-                msg = f"Table {table_path} is empty, cannot determine columns"
-                raise ValueError(msg)
+                _raise_value_error(
+                    f"Table {table_path} is empty, cannot determine columns"
+                )
             # Get column names from first row
             columns = list(rows[0].keys())
             # Filter out internal YQL columns like _other, _yql_column_*
@@ -228,10 +256,11 @@ class YTDevClient(BaseYTClient):
             if not columns:
                 # If all columns were filtered out, use all keys (fallback)
                 columns = list(rows[0].keys())
-            return columns
         except Exception:
             self.logger.exception("Failed to get table columns")
             raise
+        else:
+            return columns
 
     def run_yql(
         self,
@@ -254,12 +283,6 @@ class YTDevClient(BaseYTClient):
             max_row_weight=max_row_weight,
         )
         self.logger.debug("Query:\n%s", query_with_max_row_weight)
-
-        from yt_framework.yt.dev_simulator import (
-            DuckDBSimulator,
-            extract_output_table,
-            extract_table_references,
-        )
 
         # Create DuckDB simulator
         simulator = DuckDBSimulator(dev_dir=self._dev_dir(), logger=self.logger)
@@ -310,8 +333,6 @@ class YTDevClient(BaseYTClient):
         max_row_weight: str | None = None,
     ) -> str | None:
         """Join two tables using YQL (executed locally with DuckDB in dev mode)."""
-        from yt_framework.yt.yql_builder import build_join_query
-
         query = build_join_query(
             left_table=left_table,
             right_table=right_table,
@@ -337,8 +358,6 @@ class YTDevClient(BaseYTClient):
         max_row_weight: str | None = None,
     ) -> str | None:
         """Filter table rows using WHERE condition (executed locally with DuckDB in dev mode)."""
-        from yt_framework.yt.yql_builder import build_filter_query
-
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
 
@@ -365,8 +384,6 @@ class YTDevClient(BaseYTClient):
         max_row_weight: str | None = None,
     ) -> str | None:
         """Select specific columns from a table (executed locally with DuckDB in dev mode)."""
-        from yt_framework.yt.yql_builder import build_select_query
-
         query = build_select_query(
             input_table=input_table,
             output_table=output_table,
@@ -390,8 +407,6 @@ class YTDevClient(BaseYTClient):
         max_row_weight: str | None = None,
     ) -> str | None:
         """Group by columns and compute aggregations (executed locally with DuckDB in dev mode)."""
-        from yt_framework.yt.yql_builder import build_group_by_query
-
         query = build_group_by_query(
             input_table=input_table,
             output_table=output_table,
@@ -414,8 +429,6 @@ class YTDevClient(BaseYTClient):
         max_row_weight: str | None = None,
     ) -> str | None:
         """Union multiple tables (executed locally with DuckDB in dev mode)."""
-        from yt_framework.yt.yql_builder import build_union_query
-
         # Get columns from first table to avoid _other column issues
         # All tables in union should have the same columns
         columns = self._get_table_columns(tables[0])
@@ -442,8 +455,6 @@ class YTDevClient(BaseYTClient):
         max_row_weight: str | None = None,
     ) -> str | None:
         """Get distinct rows from a table (executed locally with DuckDB in dev mode)."""
-        from yt_framework.yt.yql_builder import build_distinct_query
-
         query = build_distinct_query(
             input_table=input_table,
             output_table=output_table,
@@ -467,8 +478,6 @@ class YTDevClient(BaseYTClient):
         max_row_weight: str | None = None,
     ) -> str | None:
         """Sort table by columns (executed locally with DuckDB in dev mode)."""
-        from yt_framework.yt.yql_builder import build_sort_query
-
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
 
@@ -496,8 +505,6 @@ class YTDevClient(BaseYTClient):
         max_row_weight: str | None = None,
     ) -> str | None:
         """Limit number of rows from a table (executed locally with DuckDB in dev mode)."""
-        from yt_framework.yt.yql_builder import build_limit_query
-
         # Get columns from input table to avoid _other column issues
         columns = self._get_table_columns(input_table)
 
@@ -576,6 +583,7 @@ class YTDevClient(BaseYTClient):
             output_schema: Optional output table schema (not used in dev mode).
             max_failed_jobs: Maximum failed jobs allowed (not used in dev mode).
             docker_auth: Optional Docker authentication (not used in dev mode).
+            job: Mapper command string when set; otherwise ``command`` is used.
             append: If True and output JSONL exists, append mapper stdout lines to it.
             **kwargs: Additional arguments (not used in dev mode).
 
@@ -634,6 +642,7 @@ class YTDevClient(BaseYTClient):
                 env=env_merged,
                 cwd=str(sandbox_dir),
                 check=False,
+                shell=False,
             )
 
         # Copy output back
@@ -655,7 +664,7 @@ class YTDevClient(BaseYTClient):
         env: dict[str, str],
         task_name: str = "main",
         job: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> Operation:
         """Run a vanilla operation locally using subprocess.
 
@@ -667,6 +676,7 @@ class YTDevClient(BaseYTClient):
             files: List of (yt_path, local_path) tuples for dependencies.
             env: Environment variables dictionary.
             task_name: Task name for logging (default: "main").
+            job: Command string when set; otherwise ``command`` is executed.
             **kwargs: Additional arguments (not used in dev mode).
 
         Returns:
@@ -702,13 +712,11 @@ class YTDevClient(BaseYTClient):
         local_command = vanilla_job
         if "/build/" in vanilla_job:
             # Extract the path after /build/ and use it as local path
-            import re
-
             # Split command into parts and find the /build/ part
             # Command format: "python3 //tmp/examples/05_vanilla_operation/build/stages/run_vanilla/src/vanilla.py"
             # We want to extract: "stages/run_vanilla/src/vanilla.py"
             parts = vanilla_job.split("/build/", 1)
-            if len(parts) == 2:
+            if len(parts) == _DEV_BUILD_SPLIT_PARTS:
                 # parts[1] contains "stages/run_vanilla/src/vanilla.py" (may have leading/trailing spaces)
                 local_path = parts[1].strip()
                 # Replace the entire YT path with the local path
@@ -758,6 +766,7 @@ class YTDevClient(BaseYTClient):
                 env=env_merged,
                 cwd=str(sandbox_dir),
                 check=False,
+                shell=False,
             )
 
         err_hint = f"Output written to {logs_path}" if proc.returncode != 0 else ""
@@ -882,15 +891,11 @@ class YTDevClient(BaseYTClient):
         pp_parts = [str(self.pipeline_dir)]
 
         # Add yt_framework to PYTHONPATH
-        import yt_framework
-
         yt_framework_dir = Path(yt_framework.__file__).parent
         if yt_framework_dir.parent not in [Path(p) for p in pp_parts]:
             pp_parts.append(str(yt_framework_dir.parent))
 
         # Add ytjobs to PYTHONPATH
-        import ytjobs
-
         ytjobs_dir = Path(ytjobs.__file__).parent
         if ytjobs_dir.parent not in [Path(p) for p in pp_parts]:
             pp_parts.append(str(ytjobs_dir.parent))
@@ -970,22 +975,26 @@ class YTDevClient(BaseYTClient):
                     copied = True
                 # Also try ytjobs files - they might be in the installed package
                 elif local_name.startswith("ytjobs/"):
-                    try:
-                        import ytjobs
-
-                        ytjobs_dir = Path(ytjobs.__file__).parent
+                    yj_mod = sys.modules.get("ytjobs")
+                    if yj_mod is None:
+                        try:
+                            yj_mod = importlib.import_module("ytjobs")
+                        except ImportError:
+                            yj_mod = None
+                    if yj_mod is not None and getattr(yj_mod, "__file__", None):
+                        ytjobs_dir = Path(yj_mod.__file__).parent
                         ytjobs_rel_path = local_name.replace("ytjobs/", "")
                         source_file = ytjobs_dir / ytjobs_rel_path
                         if source_file.exists():
                             dest_file = sandbox_dir / local_name
                             dest_file.parent.mkdir(parents=True, exist_ok=True)
                             self.logger.debug(
-                                "  Dev: copying ytjobs %s -> %s", source_file, dest_file
+                                "  Dev: copying ytjobs %s -> %s",
+                                source_file,
+                                dest_file,
                             )
                             shutil.copy2(source_file, dest_file)
                             copied = True
-                    except ImportError:
-                        pass
 
             if not copied:
                 self.logger.debug(
@@ -1029,7 +1038,7 @@ class YTDevClient(BaseYTClient):
         return sandbox_dir, sandbox_input, sandbox_output
 
     def _setup_map_environment(self, env: dict[str, str]) -> dict[str, str]:
-        """Setup environment variables for map operation."""
+        """Build the environment dict for a dev-mode map run."""
         env_merged = self._build_env(env)
 
         # Try to setup checkpoint config from stage config
@@ -1039,7 +1048,7 @@ class YTDevClient(BaseYTClient):
 
         return env_merged
 
-    def _find_checkpoint_in_config(self, stage_config) -> str | None:
+    def _find_checkpoint_in_config(self, stage_config: DictConfig) -> str | None:
         """Find checkpoint local_checkpoint_path in stage config.
 
         Searches through all operations in client.operations dynamically,
@@ -1052,8 +1061,6 @@ class YTDevClient(BaseYTClient):
             Local checkpoint path string if found, None otherwise
 
         """
-        from omegaconf import OmegaConf
-
         # First, try legacy path
         local_checkpoint = OmegaConf.select(
             stage_config, "client.local_checkpoint_path"
@@ -1084,8 +1091,6 @@ class YTDevClient(BaseYTClient):
             return None
 
         try:
-            from omegaconf import OmegaConf
-
             # Try to find a stage config with checkpoint configuration
             # Check all stage configs, not just the first one
             for stage_dir in stages_dir.iterdir():
@@ -1105,19 +1110,19 @@ class YTDevClient(BaseYTClient):
                                         checkpoint_path,
                                     )
                                     return str(checkpoint_path)
-                        except Exception as e:
+                        except Exception as e:  # noqa: BLE001
                             # Continue to next stage config
                             self.logger.debug(
                                 "  Dev: error reading %s: %s", stage_config_path, e
                             )
                             continue
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.debug("  Dev: error scanning stages directory: %s", e)
 
         return None
 
     def _setup_checkpoint_config(self, env_merged: dict[str, str]) -> None:
-        """Setup checkpoint config from stage config if available."""
+        """Merge checkpoint-related variables from stage config when available."""
         self._pipeline_dir_or_raise()
 
         # Try to find stage config by scanning stages directory
@@ -1130,8 +1135,6 @@ class YTDevClient(BaseYTClient):
         # In practice, the calling code should set JOB_CONFIG_PATH if needed
         # This is a fallback for backward compatibility
         try:
-            from omegaconf import OmegaConf
-
             # Try to find a stage config (use first one found as fallback)
             for stage_dir in stages_dir.iterdir():
                 if stage_dir.is_dir():
@@ -1169,12 +1172,12 @@ class YTDevClient(BaseYTClient):
                                         "  Dev: local_checkpoint_path not found: %s",
                                         checkpoint_path,
                                     )
-                        except Exception as e:
+                        except Exception as e:  # noqa: BLE001
                             self.logger.warning(
                                 "  Dev: failed to load checkpoint config: %s", e
                             )
 
                         # Only use first found config as fallback
                         break
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.debug("  Dev: could not setup checkpoint config: %s", e)

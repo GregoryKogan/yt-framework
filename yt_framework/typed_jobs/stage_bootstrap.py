@@ -150,11 +150,13 @@ class StageBootstrapTypedJob(yt.TypedJob):
     """
 
     def __getstate__(self) -> Any:  # pragma: no cover (driver-side)
+        """Return picklable state so ``__setstate__`` runs on the worker."""
         # Ensure the pickling machinery carries a state object so `__setstate__` is called
         # during unpickling (required for our worker-side bootstrap).
         return dict(getattr(self, "__dict__", {}) or {})
 
     def __setstate__(self, state: Any) -> None:  # pragma: no cover (worker-side)
+        """Restore state and run worker-side path/bootstrap once per unpickle."""
         stage_name = os.environ.get("YT_STAGE_NAME", "").strip()
         if stage_name:
             _bootstrap_once(stage_name)

@@ -16,7 +16,7 @@ def create_yt_client(
     secrets: dict[str, str] | None = None,
     pickling: dict[str, Any] | None = None,
 ) -> BaseYTClient:
-    """Factory function to create appropriate YT client based on mode.
+    """Create a YT client for the given pipeline mode.
 
     Args:
         logger: Logger instance (default: creates new logger)
@@ -26,6 +26,7 @@ def create_yt_client(
                 Expected keys:
                 - YT_PROXY: YTsaurus proxy URL
                 - YT_TOKEN: YTsaurus authentication token
+        pickling: Optional pickling-related client config (prod only).
 
     Returns:
         BaseYTClient instance (YTProdClient or YTDevClient)

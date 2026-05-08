@@ -84,35 +84,18 @@ ignore = [
     "ANN401", # typing.Any at YT/S3 client boundaries and dynamic job specs.
     "FBT001", # Boolean-typed parameters: kw-only migration is API churn.
     "FBT002",
-    # Large follow-up refactors (keep select=ALL; silence until addressed systematically):
-    "PLC0415",
-    "TRY300",
-    "TRY301",
-    "PLR0913",
-    "PLR0912",
-    "PLR0915",
-    "C901",
-    "ARG002",
-    "BLE001",
-    "D205",
-    "D401",
-    "D417",
-    "D105",
-    "D100",
-    "ANN001",
-    "ANN003",
-    "ANN201",
-    "ANN202",
-    "S108",
-    "S603",
-    "S105",
-    "S608",
-    "PLR2004",
-    "ARG001",
-    "S301",
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# Dev client matches prod signatures; many parameters are intentionally unused.
+# Subprocess jobs run bash -c with pipeline-built commands (Bandit cannot verify).
+"yt_framework/yt/client_dev.py" = ["ARG002", "S603"]
+# YQL is built from framework-controlled paths; Bandit cannot see that.
+"yt_framework/yt/yql_builder.py" = ["S608"]
+"yt_framework/yt/dev_simulator.py" = ["S608"]
+# Complexity: orchestration-heavy library code; refactor helpers incrementally.
+"yt_framework/**/*.py" = ["PLR0912", "PLR0913", "PLR0915", "C901"]
+"ytjobs/**/*.py" = ["PLR0912", "PLR0913", "PLR0915", "C901"]
 # Tests: pydocstyle and strict try/except/annotation rules are intentionally relaxed.
 "tests/**" = [
     "INP001", # Pytest layout: tests/ on sys.path; not a package (import integration, conftest).
@@ -138,6 +121,23 @@ ignore = [
     "TRY003",
     "TRY400",
     "TRY401",
+    "D401", # Short fixture docstrings need not be imperative.
+    "TRY301", # Tests intentionally raise inside try for exc_info checks.
+    "ARG001", # Pytest hooks and fakes keep full signatures for API compatibility.
+    "ARG002",
+    "PLC0415", # Lazy imports for optional YT/botocore test doubles.
+    "S105", # Test fixtures: fake secrets / auth dict keys flagged as passwords.
+    "S108", # Test paths under /tmp and similar for local integration harnesses.
+    "S301", # Intentional pickle round-trips in bootstrap tests.
+    "ANN202", # Private helpers in tests omit return types for brevity.
+    "ANN001", # Pytest fixtures and parametrized tests omit argument annotations.
+    "ANN003", # **kwargs on test doubles / hooks.
+    "PLR2004", # Asserts and samples use literal counts and sizes.
+    "S608", # Test YQL/SQL snippets are intentional literals.
+    "PLR0912", # Integration tests mirror wide production call shapes.
+    "PLR0913",
+    "PLR0915",
+    "C901",
 ]
 # Runnable demos: not API-grade modules; keep lint focused on the library.
 "examples/**" = [
@@ -154,6 +154,23 @@ ignore = [
     "T201",
     "TRY003",
     "TRY400",
+    "S105",
+    "S108",
+    "S301",
+    "ANN202",
+    "D100",
+    "D205",
+    "D401",
+    "TRY300",
+    "TRY301",
+    "BLE001",
+    "PLC0415", # Optional deps (torch, tf) imported inside try blocks in demos.
+    "ANN001", # Demos omit parameter annotations.
+    "ANN201", # Demos omit return types on small helpers.
+    "S603", # Examples spawn subprocesses with fixed or demo-local commands.
+    "C901", # Demos use monolithic logging / setup functions.
+    "PLR0913", # Example pipelines mirror wide operation signatures.
+    "PLR0915",
 ]
 
 [tool.ruff.format]

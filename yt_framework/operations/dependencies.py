@@ -3,11 +3,11 @@
 import logging
 from pathlib import Path
 
+import ytjobs
+
 
 def _get_ytjobs_dir() -> Path:
     """Get ytjobs package directory dynamically."""
-    import ytjobs
-
     return Path(ytjobs.__file__).parent
 
 

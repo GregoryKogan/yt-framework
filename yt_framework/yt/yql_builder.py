@@ -1,10 +1,12 @@
-"""YQL Query Builder.
-=================
+"""Build YQL query strings for common table operations.
 
-Utility functions for building YQL queries programmatically.
+Utilities compose INSERT/SELECT statements with pragmas and escaped paths.
 """
 
 from yt_framework.yt.max_row_weight import build_max_row_weight_pragma
+
+_AGG_SPEC_TUPLE_LEN = 2
+_UNION_MIN_TABLES = 2
 
 
 def _escape_table_name(table: str) -> str:
@@ -112,7 +114,7 @@ def _format_aggregations(
     # Add aggregations
     for col, agg_spec in aggregations.items():
         # Handle tuple format: (function, column_name)
-        if isinstance(agg_spec, tuple) and len(agg_spec) == 2:
+        if isinstance(agg_spec, tuple) and len(agg_spec) == _AGG_SPEC_TUPLE_LEN:
             agg_func, column_ref = agg_spec
             agg_upper = str(agg_func).upper()
             if agg_upper == "COUNT":
@@ -185,6 +187,7 @@ def build_join_query(
         how: Join type - "inner", "left", "right", or "full"
         select_columns: Optional list of columns to select (with table aliases)
                        e.g., ["a.col1", "a.col2", "b.col3"]
+        max_row_weight: Optional value for the max-row-weight pragma prefix.
 
     Returns:
         YQL query string
@@ -288,6 +291,7 @@ def build_filter_query(
         output_table: Output table path
         condition: WHERE condition (e.g., "status = 'active' AND total > 100")
         columns: List of columns to select (required to avoid _other column issues)
+        max_row_weight: Optional value for the max-row-weight pragma prefix.
 
     Returns:
         YQL query string
@@ -315,6 +319,7 @@ def build_select_query(
         input_table: Input table path
         output_table: Output table path
         columns: List of column names to select
+        max_row_weight: Optional value for the max-row-weight pragma prefix.
 
     Returns:
         YQL query string
@@ -345,6 +350,7 @@ def build_group_by_query(
         aggregations: Dict mapping output column names to aggregation functions
                      - Simple format: {"order_count": "count", "total_amount": "sum"}
                      - Explicit column: {"total_amount": ("sum", "amount")} or {"total_amount": ("sum", "a.amount")}
+        max_row_weight: Optional value for the max-row-weight pragma prefix.
 
     Returns:
         YQL query string
@@ -383,12 +389,13 @@ def build_union_query(
         tables: List of table paths to union
         output_table: Output table path
         columns: List of columns to select (required to avoid _other column issues)
+        max_row_weight: Optional value for the max-row-weight pragma prefix.
 
     Returns:
         YQL query string
 
     """
-    if len(tables) < 2:
+    if len(tables) < _UNION_MIN_TABLES:
         msg = "UNION requires at least 2 tables"
         raise ValueError(msg)
 
@@ -416,6 +423,7 @@ def build_distinct_query(
         input_table: Input table path
         output_table: Output table path
         columns: Optional list of columns to select (if None, selects all)
+        max_row_weight: Optional value for the max-row-weight pragma prefix.
 
     Returns:
         YQL query string
@@ -449,6 +457,7 @@ def build_sort_query(
         order_by: Column(s) to sort by
         columns: List of columns to select (required to avoid _other column issues)
         ascending: Sort direction (True for ASC, False for DESC)
+        max_row_weight: Optional value for the max-row-weight pragma prefix.
 
     Returns:
         YQL query string
@@ -484,6 +493,7 @@ def build_limit_query(
         output_table: Output table path
         limit: Maximum number of rows to return
         columns: List of columns to select (required to avoid _other column issues)
+        max_row_weight: Optional value for the max-row-weight pragma prefix.
 
     Returns:
         YQL query string

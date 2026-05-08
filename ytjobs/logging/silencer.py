@@ -1,16 +1,20 @@
+"""Redirect or suppress process stdout/stderr for mapper-style jobs."""
+
 import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
-from typing import Any, TypeVar, cast
+from typing import Any, Literal, TypeVar, cast
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
 
-def manage_output(mode="redirect"):
-    """Decorator factory that either suppresses output or redirects stdout to stderr.
+def manage_output(
+    mode: Literal["suppress", "redirect"] = "redirect",
+) -> Callable[[_F], _F]:
+    """Return a decorator that suppresses output or redirects stdout to stderr.
 
     Args:
         mode: ``"suppress"`` for full silence, ``"redirect"`` to send stdout to stderr
@@ -40,7 +44,7 @@ def manage_output(mode="redirect"):
 
 
 @contextmanager
-def redirect_stdout_to_stderr():
+def redirect_stdout_to_stderr() -> Iterator[None]:
     """Context manager that redirects stdout to stderr.
 
     This is useful for YTsaurus mappers where you need clean JSON on stdout,
@@ -60,7 +64,7 @@ def redirect_stdout_to_stderr():
 
 
 @contextmanager
-def suppress_all_output():
+def suppress_all_output() -> Iterator[None]:
     """Context manager that suppresses ALL output: stdout, stderr, and warnings.
 
     This is useful when you need complete silence from noisy libraries

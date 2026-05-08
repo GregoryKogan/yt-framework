@@ -16,6 +16,7 @@ from typing import Any, TypeAlias, cast
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from yt_framework.core.dependencies import PipelineStageDependencies
+from yt_framework.core.discovery import discover_stages
 from yt_framework.core.registry import StageRegistry
 from yt_framework.operations.upload import upload_all_code
 from yt_framework.utils.env import load_secrets
@@ -152,7 +153,7 @@ class BasePipeline:
         self.setup()
 
     def setup(self) -> None:
-        """Hook for pipeline-specific initialization.
+        """Run pipeline-specific initialization.
 
         Override this method in subclasses to:
         1. Register stages using StageRegistry and set_stage_registry()
@@ -339,7 +340,7 @@ class BasePipeline:
             log_success(self.logger, f"Stage completed: {stage.name}")
 
     @classmethod
-    def main(cls, argv=None) -> None:
+    def main(cls, argv: list[str] | None = None) -> None:
         """CLI entry point for the pipeline.
 
         Handles:
@@ -453,8 +454,6 @@ class DefaultPipeline(BasePipeline):
             None
 
         """
-        from yt_framework.core.discovery import discover_stages
-
         # Automatically discover stages
         stage_classes = discover_stages(
             pipeline_dir=self.pipeline_dir,
