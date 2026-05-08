@@ -56,7 +56,7 @@ class YTIgnorePattern:
 
     """
 
-    def __init__(self, pattern: str, base_dir: Path, is_negation: bool = False) -> None:
+    def __init__(self, pattern: str, base_dir: Path, is_negation: bool = False) -> None:  # noqa: FBT001,FBT002
         """Initialize a pattern.
 
         Args:

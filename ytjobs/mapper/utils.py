@@ -33,7 +33,7 @@ def read_input_rows() -> Iterable[object]:
             sys.stderr.write(json.dumps(error_msg) + "\n")
 
 
-def parse_json_line(line: str) -> Any | None:
+def parse_json_line(line: str) -> object | None:
     """Parse a JSON line and log errors to stderr if parsing fails.
 
     Args:
@@ -63,9 +63,9 @@ def log_error(error_dict: dict[str, Any]) -> None:
 
 def process_and_write_results(
     processing_func: Callable[..., Iterator[Any]],
-    data: Any,
-    redirect_output: bool = True,
-    **kwargs: Any,
+    data: object,
+    redirect_output: bool = True,  # noqa: FBT001,FBT002
+    **kwargs: object,
 ) -> None:
     """Execute a processing function and write results as they're yielded.
 

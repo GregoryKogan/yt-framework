@@ -141,7 +141,7 @@ def _format_aggregations(
     return ",\n    ".join(select_parts)
 
 
-def _format_order_by_list(order_by: str | list[str], ascending: bool = True) -> str:
+def _format_order_by_list(order_by: str | list[str], ascending: bool = True) -> str:  # noqa: FBT001,FBT002
     """Format ORDER BY column list.
 
     Args:
@@ -215,7 +215,9 @@ def build_join_query(
             # When select_columns is not provided, use ON clause to avoid _other conflicts
             use_using = False
             join_conditions = _format_join_conditions(
-                on, left_alias="a", right_alias="b"
+                on,
+                left_alias="a",
+                right_alias="b",
             )
     elif isinstance(on, list):
         # Multiple columns with same names
@@ -227,7 +229,9 @@ def build_join_query(
             # When select_columns is not provided, use ON clause to avoid _other conflicts
             use_using = False
             join_conditions = _format_join_conditions(
-                on, left_alias="a", right_alias="b"
+                on,
+                left_alias="a",
+                right_alias="b",
             )
     elif isinstance(on, dict):
         # Different column names - must use ON clause
@@ -261,7 +265,7 @@ SELECT
     {select_clause}
 FROM {_escape_table_name(left_table)} AS a
 {join_type} JOIN {_escape_table_name(right_table)} AS b
-{using_clause};"""
+{using_clause};"""  # noqa: S608
     else:
         if join_conditions is None:
             msg = "join_conditions must be set when use_using is False"
@@ -272,7 +276,7 @@ SELECT
     {select_clause}
 FROM {_escape_table_name(left_table)} AS a
 {join_type} JOIN {_escape_table_name(right_table)} AS b
-ON {join_conditions};"""
+ON {join_conditions};"""  # noqa: S608
 
     return query
 
@@ -304,7 +308,7 @@ INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
 FROM {_escape_table_name(input_table)}
-WHERE {condition};"""
+WHERE {condition};"""  # noqa: S608
 
 
 def build_select_query(
@@ -331,7 +335,7 @@ def build_select_query(
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
-FROM {_escape_table_name(input_table)};"""
+FROM {_escape_table_name(input_table)};"""  # noqa: S608
 
 
 def build_group_by_query(
@@ -365,14 +369,14 @@ def build_group_by_query(
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
-FROM {_escape_table_name(input_table)};"""
+FROM {_escape_table_name(input_table)};"""  # noqa: S608
     else:
         query = f"""{_pragma_header(max_row_weight)}
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
 FROM {_escape_table_name(input_table)}
-GROUP BY {group_clause};"""
+GROUP BY {group_clause};"""  # noqa: S608
 
     return query
 
@@ -435,7 +439,7 @@ def build_distinct_query(
 INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT DISTINCT
     {select_clause}
-FROM {_escape_table_name(input_table)};"""
+FROM {_escape_table_name(input_table)};"""  # noqa: S608
 
 
 def build_sort_query(
@@ -443,7 +447,7 @@ def build_sort_query(
     output_table: str,
     order_by: str | list[str],
     columns: list[str],
-    ascending: bool = True,
+    ascending: bool = True,  # noqa: FBT001,FBT002
     max_row_weight: str | None = None,
 ) -> str:
     """Build a YQL ORDER BY query.
@@ -476,7 +480,7 @@ FROM (
     SELECT *
     FROM {_escape_table_name(input_table)}
     ORDER BY {order_clause}
-);"""
+);"""  # noqa: S608
 
 
 def build_limit_query(
@@ -506,4 +510,4 @@ INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 SELECT
     {select_clause}
 FROM {_escape_table_name(input_table)}
-LIMIT {limit};"""
+LIMIT {limit};"""  # noqa: S608

@@ -92,7 +92,11 @@ class BaseYTClient(ABC):
         self,
         path: str,
         node_type: Literal[
-            "table", "file", "map_node", "list_node", "document"
+            "table",
+            "file",
+            "map_node",
+            "list_node",
+            "document",
         ] = "map_node",
     ) -> None:
         """Create a path in YT.
@@ -120,6 +124,7 @@ class BaseYTClient(ABC):
         self,
         table_path: str,
         rows: list[dict[str, Any]],
+        *,
         append: bool = False,
         replication_factor: int = 1,
     ) -> None:
@@ -220,6 +225,7 @@ class BaseYTClient(ABC):
         on: str | list[str] | dict[str, str],
         how: Literal["inner", "left", "right", "full"] = "left",
         select_columns: list[str] | None = None,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -249,6 +255,7 @@ class BaseYTClient(ABC):
         input_table: str,
         output_table: str,
         condition: str,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -272,6 +279,7 @@ class BaseYTClient(ABC):
         input_table: str,
         output_table: str,
         columns: list[str],
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -296,6 +304,7 @@ class BaseYTClient(ABC):
         output_table: str,
         group_by: str | list[str],
         aggregations: dict[str, str | tuple[str, str]],
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -320,6 +329,7 @@ class BaseYTClient(ABC):
         self,
         tables: list[str],
         output_table: str,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -342,6 +352,7 @@ class BaseYTClient(ABC):
         input_table: str,
         output_table: str,
         columns: list[str] | None = None,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -365,6 +376,7 @@ class BaseYTClient(ABC):
         input_table: str,
         output_table: str,
         order_by: str | list[str],
+        *,
         ascending: bool = True,
         dry_run: bool = False,
         max_row_weight: str | None = None,
@@ -392,6 +404,7 @@ class BaseYTClient(ABC):
         input_table: str,
         output_table: str,
         limit: int,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -411,7 +424,11 @@ class BaseYTClient(ABC):
 
     @abstractmethod
     def upload_file(
-        self, local_path: Path, yt_path: str, create_parent_dir: bool = False
+        self,
+        local_path: Path,
+        yt_path: str,
+        *,
+        create_parent_dir: bool = False,
     ) -> None:
         """Upload a file to YT.
 
@@ -424,7 +441,10 @@ class BaseYTClient(ABC):
 
     @abstractmethod
     def upload_directory(
-        self, local_dir: Path, yt_dir: str, pattern: str = "*"
+        self,
+        local_dir: Path,
+        yt_dir: str,
+        pattern: str = "*",
     ) -> list[str]:
         """Upload a directory to YT.
 
@@ -444,7 +464,7 @@ class BaseYTClient(ABC):
     @abstractmethod
     def run_map(
         self,
-        command: Any,
+        command: object,
         input_table: str,
         output_table: str,
         files: list[tuple[str, str]],
@@ -453,9 +473,10 @@ class BaseYTClient(ABC):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: dict[str, str] | None = None,
-        job: Any = None,
+        job: object = None,
+        *,
         append: bool = False,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> Operation:
         """Run a map operation on YT.
 
@@ -478,8 +499,8 @@ class BaseYTClient(ABC):
     @abstractmethod
     def run_map_reduce(
         self,
-        mapper: Any,
-        reducer: Any,
+        mapper: object,
+        reducer: object,
         input_table: str,
         output_table: str,
         reduce_by: list[str],
@@ -490,9 +511,9 @@ class BaseYTClient(ABC):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: dict[str, str] | None = None,
-        map_job: Any = None,
-        reduce_job: Any = None,
-        **kwargs: Any,
+        map_job: object = None,
+        reduce_job: object = None,
+        **kwargs: object,
     ) -> Operation:
         """Run a map-reduce operation on YT.
 
@@ -518,7 +539,7 @@ class BaseYTClient(ABC):
     @abstractmethod
     def run_reduce(
         self,
-        reducer: Any,
+        reducer: object,
         input_table: str,
         output_table: str,
         reduce_by: list[str],
@@ -528,8 +549,8 @@ class BaseYTClient(ABC):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: dict[str, str] | None = None,
-        job: Any = None,
-        **kwargs: Any,
+        job: object = None,
+        **kwargs: object,
     ) -> Operation:
         """Run a reduce-only operation on YT.
 
@@ -556,7 +577,7 @@ class BaseYTClient(ABC):
         sort_by: list[str],
         pool: str | None = None,
         pool_tree: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> None:
         """Sort a table in place by the given columns.
 
@@ -572,12 +593,12 @@ class BaseYTClient(ABC):
     @abstractmethod
     def run_vanilla(
         self,
-        command: Any,
+        command: object,
         files: list[tuple[str, str]],
         env: dict[str, str],
         task_name: str,
-        job: Any = None,
-        **kwargs: Any,
+        job: object = None,
+        **kwargs: object,
     ) -> Operation:
         """Run a vanilla operation on YT.
 

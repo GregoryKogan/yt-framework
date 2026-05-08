@@ -27,7 +27,7 @@ def manage_output(
 
     def decorator(func: _F) -> _F:
         @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: object, **kwargs: object) -> object:
             if mode == "suppress":
                 with suppress_all_output():
                     return func(*args, **kwargs)

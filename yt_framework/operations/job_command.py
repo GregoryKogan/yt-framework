@@ -6,7 +6,7 @@ not only operation name.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 LegKind = Literal["typed", "command"]
 
@@ -21,7 +21,7 @@ def _ytsaurus_typed_job_type() -> type | None:
         return TypedJob
 
 
-def is_typed_job(obj: Any) -> bool:
+def is_typed_job(obj: object) -> bool:
     """Return True if ``obj`` is a YTsaurus ``TypedJob`` instance."""
     tj = _ytsaurus_typed_job_type()
     if tj is None:
@@ -29,7 +29,7 @@ def is_typed_job(obj: Any) -> bool:
     return isinstance(obj, tj)
 
 
-def map_reduce_leg_kind(obj: Any) -> LegKind:
+def map_reduce_leg_kind(obj: object) -> LegKind:
     """Classify a map-reduce leg as ``TypedJob`` or command ``str``."""
     if is_typed_job(obj):
         return "typed"
@@ -45,10 +45,10 @@ def map_reduce_leg_kind(obj: Any) -> LegKind:
 def resolve_aliased_job(
     *,
     legacy_name: str,
-    legacy_value: Any,
+    legacy_value: object,
     preferred_name: str,
-    preferred_value: Any,
-) -> Any:
+    preferred_value: object,
+) -> object:
     """Resolve legacy/preferred aliased job arguments with compatibility checks.
 
     Raises ``ValueError`` when both are set to different values, so callers
@@ -69,7 +69,7 @@ def resolve_aliased_job(
     return legacy_value
 
 
-def require_consistent_map_reduce_legs(mapper: Any, reducer: Any) -> None:
+def require_consistent_map_reduce_legs(mapper: object, reducer: object) -> None:
     """Mapper and reducer must both use the same wire protocol: both TypedJob or both str.
 
     Mixing TypedJob on one leg and a shell/Python command string on the other is

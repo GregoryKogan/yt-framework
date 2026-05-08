@@ -6,7 +6,6 @@ Formats log records as plain text on stderr.
 import datetime
 import logging
 import sys
-from typing import Any
 
 _LOG_STRING_PREVIEW_MAX_LEN = 100
 _LOG_STRING_ELLIPSIS_LEN = 3
@@ -27,7 +26,8 @@ class TextFormatter(logging.Formatter):
         """
         # Format timestamp
         timestamp = datetime.datetime.fromtimestamp(
-            record.created, tz=datetime.UTC
+            record.created,
+            tz=datetime.UTC,
         ).strftime("%Y-%m-%d %H:%M:%S")
 
         # Format level
@@ -83,7 +83,7 @@ class TextFormatter(logging.Formatter):
 
         return log_line
 
-    def _format_value(self, value: Any) -> str:
+    def _format_value(self, value: object) -> str:
         """Format a value for readable output."""
         if value is None:
             return "None"
@@ -135,7 +135,10 @@ def get_logger(name: str | None = None, level: int = logging.INFO) -> logging.Lo
 
 
 def log_with_extra(
-    logger: logging.Logger, level: int, message: str, **kwargs: Any
+    logger: logging.Logger,
+    level: int,
+    message: str,
+    **kwargs: object,
 ) -> None:
     """Log a message with extra context fields.
 

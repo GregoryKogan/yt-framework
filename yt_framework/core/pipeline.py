@@ -31,7 +31,7 @@ from yt_framework.yt.factory import create_yt_client
 DebugContext: TypeAlias = dict[str, Any]
 
 
-def _normalize_upload_modules(raw: Any) -> list[str]:
+def _normalize_upload_modules(raw: object) -> list[str]:
     """Normalize upload_modules config: accept list, tuple, or single string."""
     if raw is None:
         return []
@@ -44,7 +44,7 @@ def _normalize_upload_modules(raw: Any) -> list[str]:
     raise ValueError(msg)
 
 
-def _normalize_upload_paths(raw: Any) -> list[dict[str, str]]:
+def _normalize_upload_paths(raw: object) -> list[dict[str, str]]:
     """Normalize upload_paths config: must be a list of {source, target?} mappings."""
     if raw is None:
         return []
@@ -55,7 +55,7 @@ def _normalize_upload_paths(raw: Any) -> list[dict[str, str]]:
 
     normalized: list[dict[str, str]] = []
     for idx, element in enumerate(raw):
-        item: Any = element
+        item: object = element
         if isinstance(item, DictConfig):
             item = OmegaConf.to_container(item, resolve=True)
         if not isinstance(item, Mapping):
@@ -239,7 +239,7 @@ class BasePipeline:
         # Check if any stages need code execution
         if not self._stages_need_code_execution():
             self.logger.debug(
-                "No stages require code execution on YT - skipping code upload"
+                "No stages require code execution on YT - skipping code upload",
             )
             return
 
@@ -256,7 +256,7 @@ class BasePipeline:
 
         # Get upload_modules and upload_paths from config
         upload_modules = _normalize_upload_modules(
-            self.config.pipeline.get("upload_modules")
+            self.config.pipeline.get("upload_modules"),
         )
         upload_paths = _normalize_upload_paths(self.config.pipeline.get("upload_paths"))
 
@@ -301,7 +301,9 @@ class BasePipeline:
             raise ValueError(msg)
 
         log_header(
-            self.logger, "Pipeline", f"Starting execution | Stages: {enabled_stages}"
+            self.logger,
+            "Pipeline",
+            f"Starting execution | Stages: {enabled_stages}",
         )
 
         # Verify stage registry is set

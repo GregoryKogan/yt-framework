@@ -120,7 +120,8 @@ class S3Client:
 
     @staticmethod
     def create(
-        secrets: dict[str, str], client_type: Literal["download", "upload"] = "download"
+        secrets: dict[str, str],
+        client_type: Literal["download", "upload"] = "download",
     ) -> "S3Client":
         """Create S3 client from secrets dictionary.
 
@@ -268,7 +269,11 @@ class S3Client:
         return self.download(bucket, key)
 
     def upload(
-        self, data: bytes, bucket: str, key: str, content_type: str | None = None
+        self,
+        data: bytes,
+        bucket: str,
+        key: str,
+        content_type: str | None = None,
     ) -> None:
         """Upload bytes to ``s3://bucket/key`` via ``put_object``.
 

@@ -17,7 +17,7 @@ DEFAULT_PUBLIC_ENV_KEYS: frozenset[str] = frozenset(
         "TOKENIZER_ARTIFACT_FILE",
         "TOKENIZER_ARTIFACT_DIR",
         "TOKENIZER_ARTIFACT_NAME",
-    }
+    },
 )
 
 _SECURE_PREFIX = "YT_SECURE_VAULT_"

@@ -45,7 +45,7 @@ def init_checkpoint_directory(
 
     if not checkpoint_base:
         context.logger.warning(
-            "No checkpoint_base specified in checkpoint config, skipping checkpoint initialization"
+            "No checkpoint_base specified in checkpoint config, skipping checkpoint initialization",
         )
         return
 
@@ -75,17 +75,21 @@ def init_checkpoint_directory(
                     )
                     try:
                         context.deps.yt_client.upload_file(
-                            local_path, yt_checkpoint_path, create_parent_dir=True
+                            local_path,
+                            yt_checkpoint_path,
+                            create_parent_dir=True,
                         )
                         context.logger.debug(
-                            "Checkpoint uploaded: %s", yt_checkpoint_path
+                            "Checkpoint uploaded: %s",
+                            yt_checkpoint_path,
                         )
                     except Exception:
                         context.logger.exception("Failed to upload checkpoint")
                         raise
             else:
                 context.logger.warning(
-                    "Local checkpoint path does not exist: %s", local_path
+                    "Local checkpoint path does not exist: %s",
+                    local_path,
                 )
 
         # Validate that required checkpoint exists in YT
@@ -105,13 +109,14 @@ def init_checkpoint_directory(
             context.logger.debug("Required checkpoint verified: %s", yt_checkpoint_path)
         else:
             context.logger.debug(
-                "No model_name specified, skipping checkpoint validation"
+                "No model_name specified, skipping checkpoint validation",
             )
 
     except FileNotFoundError:
         raise  # Re-raise checkpoint validation errors
     except Exception:
         context.logger.exception(
-            "Could not initialize checkpoint directory %s", checkpoint_base
+            "Could not initialize checkpoint directory %s",
+            checkpoint_base,
         )
         raise

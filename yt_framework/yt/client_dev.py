@@ -94,7 +94,7 @@ class YTDevClient(BaseYTClient):
             else:
                 resolved_pipeline_dir = Path.cwd()
                 logger.warning(
-                    "mode=dev but pipeline_dir not set and YT_PIPELINE_DIR not set; using cwd as pipeline_dir"
+                    "mode=dev but pipeline_dir not set and YT_PIPELINE_DIR not set; using cwd as pipeline_dir",
                 )
 
         super().__init__(logger, pipeline_dir=resolved_pipeline_dir)
@@ -122,7 +122,11 @@ class YTDevClient(BaseYTClient):
         self,
         path: str,
         node_type: Literal[
-            "table", "file", "map_node", "list_node", "document"
+            "table",
+            "file",
+            "map_node",
+            "list_node",
+            "document",
         ] = "map_node",
     ) -> None:
         """Create a path in YT (no-op in dev mode).
@@ -154,6 +158,7 @@ class YTDevClient(BaseYTClient):
         self,
         table_path: str,
         rows: list[dict[str, Any]],
+        *,
         append: bool = False,
         replication_factor: int = 1,
     ) -> None:
@@ -247,7 +252,7 @@ class YTDevClient(BaseYTClient):
             rows = self.read_table(table_path)
             if not rows:
                 _raise_value_error(
-                    f"Table {table_path} is empty, cannot determine columns"
+                    f"Table {table_path} is empty, cannot determine columns",
                 )
             # Get column names from first row
             columns = list(rows[0].keys())
@@ -329,6 +334,7 @@ class YTDevClient(BaseYTClient):
         on: str | list[str] | dict[str, str],
         how: Literal["inner", "left", "right", "full"] = "left",
         select_columns: list[str] | None = None,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -354,6 +360,7 @@ class YTDevClient(BaseYTClient):
         input_table: str,
         output_table: str,
         condition: str,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -380,6 +387,7 @@ class YTDevClient(BaseYTClient):
         input_table: str,
         output_table: str,
         columns: list[str],
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -403,6 +411,7 @@ class YTDevClient(BaseYTClient):
         output_table: str,
         group_by: str | list[str],
         aggregations: dict[str, str | tuple[str, str]],
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -425,6 +434,7 @@ class YTDevClient(BaseYTClient):
         self,
         tables: list[str],
         output_table: str,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -451,6 +461,7 @@ class YTDevClient(BaseYTClient):
         input_table: str,
         output_table: str,
         columns: list[str] | None = None,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -473,6 +484,7 @@ class YTDevClient(BaseYTClient):
         input_table: str,
         output_table: str,
         order_by: str | list[str],
+        *,
         ascending: bool = True,
         dry_run: bool = False,
         max_row_weight: str | None = None,
@@ -501,6 +513,7 @@ class YTDevClient(BaseYTClient):
         input_table: str,
         output_table: str,
         limit: int,
+        *,
         dry_run: bool = False,
         max_row_weight: str | None = None,
     ) -> str | None:
@@ -523,7 +536,11 @@ class YTDevClient(BaseYTClient):
         return None
 
     def upload_file(
-        self, local_path: Path, yt_path: str, create_parent_dir: bool = False
+        self,
+        local_path: Path,
+        yt_path: str,
+        *,
+        create_parent_dir: bool = False,
     ) -> None:
         """Upload a file to YT (no-op in dev mode).
 
@@ -536,7 +553,10 @@ class YTDevClient(BaseYTClient):
         self.logger.debug("Dev: upload_file no-op %s → %s", local_path.name, yt_path)
 
     def upload_directory(
-        self, local_dir: Path, yt_dir: str, pattern: str = "*"
+        self,
+        local_dir: Path,
+        yt_dir: str,
+        pattern: str = "*",
     ) -> list[str]:
         """Upload a directory to YT (no-op in dev mode).
 
@@ -554,7 +574,7 @@ class YTDevClient(BaseYTClient):
 
     def run_map(
         self,
-        command: Any,
+        command: object,
         input_table: str,
         output_table: str,
         files: list[tuple[str, str]],
@@ -563,9 +583,10 @@ class YTDevClient(BaseYTClient):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: dict[str, str] | None = None,
-        job: Any = None,
+        job: object = None,
+        *,
         append: bool = False,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> Operation:
         """Run a map operation locally using subprocess.
 
@@ -619,7 +640,8 @@ class YTDevClient(BaseYTClient):
 
         # Prepare sandbox and input/output files
         sandbox_dir, sandbox_input, sandbox_output = self._prepare_map_sandbox(
-            input_table, output_table
+            input_table,
+            output_table,
         )
 
         # Copy files to sandbox
@@ -634,7 +656,7 @@ class YTDevClient(BaseYTClient):
             sandbox_output.open("w") as fout,
             logs_path.open("w") as ferr,
         ):
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: S603
                 ["/bin/bash", "-c", mapper_job],
                 stdin=fin,
                 stdout=fout,
@@ -664,7 +686,7 @@ class YTDevClient(BaseYTClient):
         env: dict[str, str],
         task_name: str = "main",
         job: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> Operation:
         """Run a vanilla operation locally using subprocess.
 
@@ -722,21 +744,26 @@ class YTDevClient(BaseYTClient):
                 # Replace the entire YT path with the local path
                 # Match pattern: //anything/build/local_path
                 yt_path_pattern = r"//[^/\s]+(?:/[^/\s]+)*/build/" + re.escape(
-                    local_path.split()[0]
+                    local_path.split()[0],
                 )
                 local_command = re.sub(
-                    yt_path_pattern, local_path.split()[0], vanilla_job
+                    yt_path_pattern,
+                    local_path.split()[0],
+                    vanilla_job,
                 )
                 if local_command != vanilla_job:
                     self.logger.debug(
-                        "  Dev: converted command: %s -> %s", vanilla_job, local_command
+                        "  Dev: converted command: %s -> %s",
+                        vanilla_job,
+                        local_command,
                     )
                 else:
                     # Fallback: simple string replacement
                     yt_full_path = "/build/".join(parts)
                     if yt_full_path in vanilla_job:
                         local_command = vanilla_job.replace(
-                            yt_full_path, local_path.split()[0]
+                            yt_full_path,
+                            local_path.split()[0],
                         )
                         self.logger.debug(
                             "  Dev: converted command (fallback): %s -> %s",
@@ -754,13 +781,14 @@ class YTDevClient(BaseYTClient):
             self.logger.debug("  Dev: JOB_CONFIG_PATH=%s", config_path_in_sandbox)
         else:
             self.logger.warning(
-                "  Dev: config file not found at %s", config_path_in_sandbox
+                "  Dev: config file not found at %s",
+                config_path_in_sandbox,
             )
 
         self.logger.info("  Dev: sandbox=%s", sandbox_dir)
         self.logger.info("  Dev: stderr=%s", logs_path)
         with logs_path.open("w") as ferr:
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: S603
                 ["/bin/bash", "-c", local_command],
                 stderr=ferr,
                 env=env_merged,
@@ -774,8 +802,8 @@ class YTDevClient(BaseYTClient):
 
     def run_map_reduce(
         self,
-        mapper: Any,
-        reducer: Any,
+        mapper: object,
+        reducer: object,
         input_table: str,
         output_table: str,
         reduce_by: list[str],
@@ -786,9 +814,9 @@ class YTDevClient(BaseYTClient):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: dict[str, str] | None = None,
-        map_job: Any = None,
-        reduce_job: Any = None,
-        **kwargs: Any,
+        map_job: object = None,
+        reduce_job: object = None,
+        **kwargs: object,
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
         _kw = dict(kwargs)
@@ -806,7 +834,7 @@ class YTDevClient(BaseYTClient):
             preferred_value=reduce_job,
         )
 
-        def _leg_desc(obj: Any) -> str:
+        def _leg_desc(obj: object) -> str:
             if is_typed_job(obj):
                 return "TypedJob"
             if isinstance(obj, str):
@@ -832,7 +860,7 @@ class YTDevClient(BaseYTClient):
 
     def run_reduce(
         self,
-        reducer: Any,
+        reducer: object,
         input_table: str,
         output_table: str,
         reduce_by: list[str],
@@ -842,8 +870,8 @@ class YTDevClient(BaseYTClient):
         output_schema: Optional["TableSchema"] = None,
         max_failed_jobs: int = 1,
         docker_auth: dict[str, str] | None = None,
-        job: Any = None,
-        **kwargs: Any,
+        job: object = None,
+        **kwargs: object,
     ) -> Operation:
         """Dev: no-op; copy input table to output table."""
         _kw = dict(kwargs)
@@ -879,7 +907,7 @@ class YTDevClient(BaseYTClient):
         sort_by: list[str],
         pool: str | None = None,
         pool_tree: str | None = None,
-        **kwargs: Any,
+        **kwargs: object,
     ) -> None:
         """Dev: no-op (table unchanged)."""
         self.logger.info("Dev: run_sort no-op for %s by %s", table_path, sort_by)
@@ -914,7 +942,8 @@ class YTDevClient(BaseYTClient):
         local_checkpoint_path = self._get_local_checkpoint_path()
         if local_checkpoint_path:
             self.logger.debug(
-                "  Dev: local_checkpoint_path available: %s", local_checkpoint_path
+                "  Dev: local_checkpoint_path available: %s",
+                local_checkpoint_path,
             )
 
         for file_info in files:
@@ -942,7 +971,8 @@ class YTDevClient(BaseYTClient):
                         copied = True
                     else:
                         self.logger.warning(
-                            "  Dev: checkpoint path does not exist: %s", checkpoint_path
+                            "  Dev: checkpoint path does not exist: %s",
+                            checkpoint_path,
                         )
 
             # Handle build files (source.tar.gz, etc.)
@@ -957,7 +987,9 @@ class YTDevClient(BaseYTClient):
                         dest_file = sandbox_dir / local_name
                         dest_file.parent.mkdir(parents=True, exist_ok=True)
                         self.logger.debug(
-                            "  Dev: copying %s -> %s", source_file, dest_file
+                            "  Dev: copying %s -> %s",
+                            source_file,
+                            dest_file,
                         )
                         shutil.copy2(source_file, dest_file)
                         copied = True
@@ -1004,7 +1036,9 @@ class YTDevClient(BaseYTClient):
                 )
 
     def _prepare_map_sandbox(
-        self, input_table: str, output_table: str
+        self,
+        input_table: str,
+        output_table: str,
     ) -> tuple[Path, Path, Path]:
         """Prepare sandbox directory and input/output file paths."""
         self._pipeline_dir_or_raise()
@@ -1063,7 +1097,8 @@ class YTDevClient(BaseYTClient):
         """
         # First, try legacy path
         local_checkpoint = OmegaConf.select(
-            stage_config, "client.local_checkpoint_path"
+            stage_config,
+            "client.local_checkpoint_path",
         )
         if local_checkpoint:
             return str(local_checkpoint)
@@ -1100,7 +1135,7 @@ class YTDevClient(BaseYTClient):
                         try:
                             stage_config = OmegaConf.load(stage_config_path)
                             local_checkpoint = self._find_checkpoint_in_config(
-                                stage_config
+                                stage_config,
                             )
                             if local_checkpoint:
                                 checkpoint_path = Path(local_checkpoint).resolve()
@@ -1113,7 +1148,9 @@ class YTDevClient(BaseYTClient):
                         except Exception as e:  # noqa: BLE001
                             # Continue to next stage config
                             self.logger.debug(
-                                "  Dev: error reading %s: %s", stage_config_path, e
+                                "  Dev: error reading %s: %s",
+                                stage_config_path,
+                                e,
                             )
                             continue
         except Exception as e:  # noqa: BLE001
@@ -1146,11 +1183,12 @@ class YTDevClient(BaseYTClient):
                             stage_config = OmegaConf.load(stage_config_path)
                             # Find checkpoint path dynamically (searches all operations)
                             local_checkpoint = self._find_checkpoint_in_config(
-                                stage_config
+                                stage_config,
                             )
                             # Get model_name from job.model_name (used as checkpoint filename)
                             model_name = OmegaConf.select(
-                                stage_config, "job.model_name"
+                                stage_config,
+                                "job.model_name",
                             )
 
                             if local_checkpoint:
@@ -1174,7 +1212,8 @@ class YTDevClient(BaseYTClient):
                                     )
                         except Exception as e:  # noqa: BLE001
                             self.logger.warning(
-                                "  Dev: failed to load checkpoint config: %s", e
+                                "  Dev: failed to load checkpoint config: %s",
+                                e,
                             )
 
                         # Only use first found config as fallback

@@ -371,7 +371,8 @@ def _copy_stage_to_build_dir(
                 logger.debug("Skipping invalid config %s: %s", config_path, exc)
         else:
             logger.debug(
-                "  Ignoring config: %s/config.yaml (matched .ytignore)", stage_name
+                "  Ignoring config: %s/config.yaml (matched .ytignore)",
+                stage_name,
             )
             ignored_count += 1
 
@@ -410,7 +411,9 @@ def _copy_stage_to_build_dir(
 
 
 def _bash_wrapper_script_body(
-    stage_name: str, python_script_relative: str, label: str
+    stage_name: str,
+    python_script_relative: str,
+    label: str,
 ) -> str:
     """Shared body for operation wrappers (map, vanilla, map-reduce legs, reduce)."""
     requirements_path = f"stages/{stage_name}/requirements.txt"
@@ -510,7 +513,8 @@ def _resolve_map_reduce_command_scripts(
 
 
 def _resolve_reduce_command_script(
-    stage_dir: Path, logger: logging.Logger
+    stage_dir: Path,
+    logger: logging.Logger,
 ) -> str | None:
     """Reducer entrypoint for reduce-only command mode (``job.reduce_command``)."""
     job = _load_stage_job_section(stage_dir, logger)
@@ -570,7 +574,9 @@ def _create_unified_wrapper_script(
         script_path = f"stages/{stage_name}/src/vanilla.py"
 
     body = _bash_wrapper_script_body(
-        stage_name, script_path, f"{operation_type} operation"
+        stage_name,
+        script_path,
+        f"{operation_type} operation",
     )
     _write_wrapper_file(
         build_dir,
@@ -592,7 +598,9 @@ def _create_map_reduce_command_wrappers(
         return
     m_rel = f"stages/{stage_name}/src/{mapper_f}"
     body_m = _bash_wrapper_script_body(
-        stage_name, m_rel, "map-reduce mapper (command mode)"
+        stage_name,
+        m_rel,
+        "map-reduce mapper (command mode)",
     )
     _write_wrapper_file(
         build_dir,
@@ -603,7 +611,9 @@ def _create_map_reduce_command_wrappers(
     if reducer_f:
         r_rel = f"stages/{stage_name}/src/{reducer_f}"
         body_r = _bash_wrapper_script_body(
-            stage_name, r_rel, "map-reduce reducer (command mode)"
+            stage_name,
+            r_rel,
+            "map-reduce reducer (command mode)",
         )
         _write_wrapper_file(
             build_dir,
@@ -664,7 +674,7 @@ def _create_wrappers_for_stage(
 
     # Check which operation types this stage supports
     has_mapper = (src_dir / "mapper.py").is_file() or bool(
-        list(src_dir.glob("partition_*.py"))
+        list(src_dir.glob("partition_*.py")),
     )
     has_vanilla = (src_dir / "vanilla.py").exists()
 
@@ -704,7 +714,7 @@ def build_code_locally(
     build_dir: Path,
     pipeline_dir: Path,
     logger: logging.Logger,
-    create_wrappers: bool = False,
+    create_wrappers: bool = False,  # noqa: FBT001,FBT002
     upload_modules: list[str] | None = None,
     upload_paths: list[dict[str, str]] | None = None,
 ) -> int:
@@ -917,7 +927,9 @@ def upload_all_code(
 
     """
     log_header(
-        logger, "Code Upload", f"Tar archive mode | Build folder: {build_folder}"
+        logger,
+        "Code Upload",
+        f"Tar archive mode | Build folder: {build_folder}",
     )
 
     # Resolve build directory path

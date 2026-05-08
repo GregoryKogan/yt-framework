@@ -49,7 +49,9 @@ class ColoredFormatter(logging.Formatter):
 
 
 def setup_logging(
-    level: int = logging.INFO, name: str | None = None, use_colors: bool = True
+    level: int = logging.INFO,
+    name: str | None = None,
+    use_colors: bool = True,  # noqa: FBT001,FBT002
 ) -> logging.Logger:
     """Configure logging with consistent formatting.
 
@@ -80,11 +82,13 @@ def setup_logging(
     # Formatter with timestamp
     if use_colors and sys.stdout.isatty():
         formatter = ColoredFormatter(
-            "%(asctime)s | %(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+            "%(asctime)s | %(levelname)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
     else:
         formatter = logging.Formatter(
-            "%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+            "%(asctime)s | %(levelname)-8s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
 
     console_handler.setFormatter(formatter)
@@ -131,7 +135,9 @@ def log_success(logger: logging.Logger, message: str) -> None:
 
 
 def log_config(
-    logger: logging.Logger, config_dict: dict, title: str = "Configuration"
+    logger: logging.Logger,
+    config_dict: dict,
+    title: str = "Configuration",
 ) -> None:
     """Log configuration in a readable format.
 
