@@ -69,7 +69,7 @@ Contributions come in many forms:
 
    If `which pip` points outside the Conda env (for example Homebrew), use `python -m pip install -e ".[dev,docs]"` instead. The same applies to one-off commands with `conda run -n yt-framework -- python -m pip ...`.
 
-   This installs runtime dependencies plus `ruff`, `pytest`, `pytest-cov`, `pre-commit`, and the Sphinx stack needed for `make -C docs html`. You do not need a separate `pip install -e ".[docs]"` step.
+   This installs runtime dependencies plus `ruff`, `pyright`, `pytest`, `pytest-cov`, `pre-commit`, and the Sphinx stack needed for `make -C docs html`. You do not need a separate `pip install -e ".[docs]"` step.
 
    **Without Conda:** use a Python 3.11+ virtual environment, then `pip install -e ".[dev,docs]"` (or `pip install -e .` and `pip install -e ".[dev]"` if you will not build docs locally).
 
@@ -82,14 +82,15 @@ Contributions come in many forms:
    pre-commit install --hook-type pre-push
    ```
 
-   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Ruff](https://docs.astral.sh/ruff/) (`ruff check --fix` and `ruff format`) on staged Python files via [.pre-commit-config.yaml](.pre-commit-config.yaml). A failing check blocks the commit. On each **push**, the pre-push hook runs the full test suite via `conda run -n yt-framework -- pytest` (requires Conda and the `yt-framework` env on your `PATH`, as when pushing from a normal shell). To skip the hook in an emergency, use `git push --no-verify`. To lint and format the whole repository (for example before a large change), run:
+   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Ruff](https://docs.astral.sh/ruff/) (`ruff check --fix` and `ruff format`) and strict [Pyright](https://microsoft.github.io/pyright/) on the repository via [.pre-commit-config.yaml](.pre-commit-config.yaml). A failing check blocks the commit. On each **push**, the pre-push hook runs the full test suite via `conda run -n yt-framework -- pytest` (requires Conda and the `yt-framework` env on your `PATH`, as when pushing from a normal shell). To skip hooks in an emergency, use `git commit --no-verify` or `git push --no-verify`. To run checks manually before commit, use:
 
    ```bash
    pre-commit run ruff-check --all-files
    pre-commit run ruff-format --all-files
+   pre-commit run pyright --all-files
    ```
 
-   Or directly: `ruff check .` and `ruff format .` (with the dev extra installed).
+   Or directly (same Conda env): `conda run -n yt-framework -- ruff check .`, `conda run -n yt-framework -- ruff format .`, and `conda run -n yt-framework -- pyright`.
 
 6. **Set up YT credentials** (for production mode testing):
 
@@ -179,7 +180,8 @@ This helps ensure you haven't broken existing functionality.
 ### Python Style
 
 - Follow **PEP 8** style guidelines
-- Use **Ruff** for formatting and linting (line length 88, Python 3.11; see `[tool.ruff]` in `pyproject.toml`). Lint uses `select = ["ALL"]` with a small documented `ignore` list. With `pre-commit install`, Ruff runs on commit; fix reported issues before committing.
+- Use **Ruff** for formatting and linting (line length 88, Python 3.11; see `[tool.ruff]` in `pyproject.toml`). Lint uses `select = ["ALL"]` with a small documented `ignore` list.
+- Use **Pyright** for strict static typing (`pyrightconfig.json`). The current required scope is `yt_framework` and `ytjobs`; unresolved legacy modules are tracked via the explicit `ignore` list in that config.
 - Use type hints where appropriate
 
 ### Naming Conventions
@@ -278,7 +280,7 @@ If you keep `yt-cluster-test.env` in your clone, **pre-push** still runs the ful
 
 ### CI (GitHub Actions)
 
-The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `pytest -m "not yt_cluster"` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). Real YT cluster tests are excluded because the runner has no cell access. To require a green check before merging, configure branch protection on GitHub and add the `test` job as a required status check.
+The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs Ruff, strict Pyright, and `pytest -m "not yt_cluster"` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). Real YT cluster tests are excluded because the runner has no cell access. To require a green check before merging, configure branch protection on GitHub and add `lint`, `typecheck`, and `test` as required status checks.
 
 ### Coverage badge (maintainers)
 
