@@ -1,6 +1,7 @@
 """Minimal boto3 wrapper for job-side list/get/put helpers."""
 
 import logging
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 from urllib.parse import urlparse
 
@@ -45,6 +46,52 @@ def _decode_http_chunked_if_present(data: bytes, logger: logging.Logger) -> byte
     return data
 
 
+@dataclass(frozen=True)
+class S3ClientOptions:
+    """Optional runtime knobs for `S3Client` construction."""
+
+    max_retries: int = 30
+    timeout: int = 360
+    logger: logging.Logger | None = None
+    region_name: str | None = None
+    boto_config: BotoConfig | None = None
+
+
+def _options_from_legacy_kwargs(
+    options: S3ClientOptions | None,
+    legacy_kwargs: dict[str, object],
+) -> S3ClientOptions:
+    """Build options from explicit object plus backward-compatible kwargs."""
+    merged_options = options or S3ClientOptions()
+    if not legacy_kwargs:
+        return merged_options
+
+    unknown = set(legacy_kwargs) - {
+        "max_retries",
+        "timeout",
+        "logger",
+        "region_name",
+        "boto_config",
+    }
+    if unknown:
+        msg = f"Unknown S3Client init option(s): {sorted(unknown)}"
+        raise TypeError(msg)
+
+    return replace(
+        merged_options,
+        max_retries=int(legacy_kwargs.get("max_retries", merged_options.max_retries)),
+        timeout=int(legacy_kwargs.get("timeout", merged_options.timeout)),
+        logger=legacy_kwargs.get("logger", merged_options.logger),
+        region_name=(
+            str(legacy_kwargs["region_name"])
+            if "region_name" in legacy_kwargs
+            and legacy_kwargs["region_name"] is not None
+            else merged_options.region_name
+        ),
+        boto_config=legacy_kwargs.get("boto_config", merged_options.boto_config),
+    )
+
+
 class S3Client:
     """Thin boto3 S3 wrapper for job code (list, download, upload, head)."""
 
@@ -53,12 +100,9 @@ class S3Client:
         endpoint: str,
         access_key: str,
         secret_key: str,
-        max_retries: int = 30,
-        timeout: int = 360,
-        logger: logging.Logger | None = None,
         *,
-        region_name: str | None = None,
-        boto_config: BotoConfig | None = None,
+        options: S3ClientOptions | None = None,
+        **legacy_kwargs: object,
     ) -> None:
         """Build a boto3 S3 client for the given endpoint and credentials.
 
@@ -66,24 +110,26 @@ class S3Client:
             endpoint: S3 API endpoint URL (e.g. from ``S3_ENDPOINT``).
             access_key: Access key id for this client.
             secret_key: Secret access key for this client.
-            max_retries: Boto3 retry ``max_attempts`` when ``boto_config`` is omitted.
-            timeout: Read timeout in seconds when ``boto_config`` is omitted.
-            logger: Optional logger; defaults to the module logger.
-            region_name: Optional AWS region passed to ``boto3.client``.
-            boto_config: If set, used as-is instead of the default ``BotoConfig``.
+            options: Optional strongly-typed client options.
+            **legacy_kwargs: Backward-compatible aliases for old init kwargs
+                (``max_retries``, ``timeout``, ``logger``, ``region_name``, ``boto_config``).
 
         """
-        self.logger = logger or logging.getLogger(__name__)
+        resolved_options = _options_from_legacy_kwargs(options, legacy_kwargs)
+        self.logger = resolved_options.logger or logging.getLogger(__name__)
 
-        if boto_config is None:
+        if resolved_options.boto_config is None:
             config = BotoConfig(
                 s3={"addressing_style": "virtual"},
-                retries={"max_attempts": max_retries, "mode": "standard"},
-                read_timeout=timeout,
+                retries={
+                    "max_attempts": resolved_options.max_retries,
+                    "mode": "standard",
+                },
+                read_timeout=resolved_options.timeout,
                 max_pool_connections=1,
             )
         else:
-            config = boto_config
+            config = resolved_options.boto_config
 
         client_kwargs: dict[str, Any] = {
             "service_name": "s3",
@@ -92,8 +138,8 @@ class S3Client:
             "endpoint_url": endpoint,
             "config": config,
         }
-        if region_name is not None:
-            client_kwargs["region_name"] = region_name
+        if resolved_options.region_name is not None:
+            client_kwargs["region_name"] = resolved_options.region_name
         self.client = boto3.client(**client_kwargs)
 
         self.logger.debug("S3 client initialized: %s", endpoint)

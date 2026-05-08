@@ -26,6 +26,118 @@ if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
 
 
+def _validate_map_reduce_inputs(
+    operation_config: DictConfig,
+) -> tuple[str, str, list[str]]:
+    input_table = operation_config.get("input_table")
+    output_table = operation_config.get("output_table")
+    reduce_by = list(operation_config.get("reduce_by") or [])
+    if input_table and output_table and reduce_by:
+        return input_table, output_table, reduce_by
+    msg = (
+        "operation_config must set input_table, output_table, and reduce_by; "
+        "expected at client.operations.map_reduce.{input_table,output_table,reduce_by}"
+    )
+    raise ValueError(msg)
+
+
+def _resolve_map_reduce_legs(
+    mapper: object,
+    reducer: object,
+    map_job: object,
+    reduce_job: object,
+) -> tuple[object, object]:
+    if mapper is not None and map_job is not None and mapper != map_job:
+        msg = "Both 'mapper' and 'map_job' are set with different values; use only one"
+        raise ValueError(msg)
+    if reducer is not None and reduce_job is not None and reducer != reduce_job:
+        msg = "Both 'reducer' and 'reduce_job' are set with different values; use only one"
+        raise ValueError(msg)
+    resolved_mapper = map_job if map_job is not None else mapper
+    resolved_reducer = reduce_job if reduce_job is not None else reducer
+    require_consistent_map_reduce_legs(resolved_mapper, resolved_reducer)
+    return resolved_mapper, resolved_reducer
+
+
+def _prepare_map_reduce_dependencies(
+    context: "StageContext",
+    operation_config: DictConfig,
+    mapper: object,
+    reducer: object,
+) -> tuple[list[tuple[str, str]], object, object]:
+    builder = TarArchiveDependencyBuilder()
+    dep = builder.build_dependencies(
+        operation_type="map_reduce",
+        stage_dir=context.stage_dir,
+        archive_name="source.tar.gz",
+        build_folder=context.deps.pipeline_config.pipeline.build_folder,
+        operation_config=operation_config,
+        stage_config=context.config,
+        logger=context.logger,
+        mapper=mapper,
+        reducer=reducer,
+    )
+    if dep.mapper_command is not None and dep.reducer_command is not None:
+        context.logger.info(
+            "Using tar bootstrap commands for map-reduce mapper and reducer legs",
+        )
+        return dep.dependencies, dep.mapper_command, dep.reducer_command
+    if dep.mapper_command is None and dep.reducer_command is None:
+        return dep.dependencies, mapper, reducer
+    msg = (
+        "Internal error: partial map-reduce tar bootstrap (only one leg set); "
+        "expected both or neither."
+    )
+    raise RuntimeError(msg)
+
+
+def _build_map_reduce_spec_kwargs(
+    operation_config: DictConfig,
+    logger: object,
+) -> dict:
+    spec_kwargs: dict = {}
+    if operation_config.get("map_job_count") is not None:
+        spec_kwargs["map_job_count"] = operation_config.map_job_count
+
+    od = operation_config.get("operation_description")
+    if od:
+        if isinstance(od, str):
+            logger.info("Operation label: %s", od)
+            spec_kwargs["title"] = od
+        else:
+            spec_kwargs["operation_description"] = OmegaConf.to_container(
+                od,
+                resolve=True,
+            )
+
+    passthrough = collect_passthrough_kwargs(
+        operation_config,
+        reserved_keys={
+            "input_table",
+            "output_table",
+            "reduce_by",
+            "sort_by",
+            "resources",
+            "env",
+            "max_failed_job_count",
+            "file_paths",
+            "checkpoint",
+            "tokenizer_artifact",
+            "tar_command_bootstrap",
+            "map_job_count",
+            "operation_description",
+            # Legacy custom IO options are intentionally no longer consumed here.
+            "typed_reduce_row_iterator_io",
+            "reduce_job_io",
+            "map_job_io",
+            "environment_public_keys",
+            "use_plain_environment_for_secrets",
+        },
+    )
+    spec_kwargs.update(passthrough)
+    return spec_kwargs
+
+
 def run_map_reduce(
     context: "StageContext",
     operation_config: DictConfig,
@@ -77,15 +189,7 @@ def run_map_reduce(
         f"Input: {operation_config.get('input_table')} -> Output: {operation_config.get('output_table')}",
     )
 
-    input_table = operation_config.get("input_table")
-    output_table = operation_config.get("output_table")
-    reduce_by = list(operation_config.get("reduce_by") or [])
-    if not input_table or not output_table or not reduce_by:
-        msg = (
-            "operation_config must set input_table, output_table, and reduce_by; "
-            "expected at client.operations.map_reduce.{input_table,output_table,reduce_by}"
-        )
-        raise ValueError(msg)
+    input_table, output_table, reduce_by = _validate_map_reduce_inputs(operation_config)
 
     env = build_operation_environment(
         context=context,
@@ -96,88 +200,20 @@ def run_map_reduce(
     )
     resources = extract_operation_resources(operation_config, logger)
 
-    if mapper is not None and map_job is not None and mapper != map_job:
-        msg = "Both 'mapper' and 'map_job' are set with different values; use only one"
-        raise ValueError(msg)
-    if reducer is not None and reduce_job is not None and reducer != reduce_job:
-        msg = "Both 'reducer' and 'reduce_job' are set with different values; use only one"
-        raise ValueError(msg)
-    mapper = map_job if map_job is not None else mapper
-    reducer = reduce_job if reduce_job is not None else reducer
-
-    require_consistent_map_reduce_legs(mapper, reducer)
-
-    builder = TarArchiveDependencyBuilder()
-    dep = builder.build_dependencies(
-        operation_type="map_reduce",
-        stage_dir=context.stage_dir,
-        archive_name="source.tar.gz",
-        build_folder=context.deps.pipeline_config.pipeline.build_folder,
+    mapper, reducer = _resolve_map_reduce_legs(mapper, reducer, map_job, reduce_job)
+    dependencies, mapper, reducer = _prepare_map_reduce_dependencies(
+        context=context,
         operation_config=operation_config,
-        stage_config=context.config,
-        logger=logger,
         mapper=mapper,
         reducer=reducer,
     )
-    dependencies = dep.dependencies
-    if dep.mapper_command is not None and dep.reducer_command is not None:
-        mapper = dep.mapper_command
-        reducer = dep.reducer_command
-        logger.info(
-            "Using tar bootstrap commands for map-reduce mapper and reducer legs",
-        )
-    elif dep.mapper_command is not None or dep.reducer_command is not None:
-        msg = (
-            "Internal error: partial map-reduce tar bootstrap (only one leg set); "
-            "expected both or neither."
-        )
-        raise RuntimeError(msg)
 
     docker_auth = extract_docker_auth_from_operation_config(operation_config, env)
 
     sort_by = list(operation_config.get("sort_by") or [])
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
-    spec_kwargs: dict = {}
-    if operation_config.get("map_job_count") is not None:
-        spec_kwargs["map_job_count"] = operation_config.map_job_count
-
-    od = operation_config.get("operation_description")
-    if od:
-        if isinstance(od, str):
-            logger.info("Operation label: %s", od)
-            spec_kwargs["title"] = od
-        else:
-            spec_kwargs["operation_description"] = OmegaConf.to_container(
-                od,
-                resolve=True,
-            )
-
-    passthrough = collect_passthrough_kwargs(
-        operation_config,
-        reserved_keys={
-            "input_table",
-            "output_table",
-            "reduce_by",
-            "sort_by",
-            "resources",
-            "env",
-            "max_failed_job_count",
-            "file_paths",
-            "checkpoint",
-            "tokenizer_artifact",
-            "tar_command_bootstrap",
-            "map_job_count",
-            "operation_description",
-            # Legacy custom IO options are intentionally no longer consumed here.
-            "typed_reduce_row_iterator_io",
-            "reduce_job_io",
-            "map_job_io",
-            "environment_public_keys",
-            "use_plain_environment_for_secrets",
-        },
-    )
-    spec_kwargs.update(passthrough)
+    spec_kwargs = _build_map_reduce_spec_kwargs(operation_config, logger)
 
     operation = context.deps.yt_client.run_map_reduce(
         mapper=mapper,

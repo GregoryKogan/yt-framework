@@ -86,10 +86,15 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Dev client matches prod signatures; many parameters are intentionally unused.
 # Subprocess jobs run bash -c with pipeline-built commands (Bandit cannot verify).
-"yt_framework/yt/client_dev.py" = ["ARG002"]
-# Complexity: orchestration-heavy library code; refactor helpers incrementally.
-"yt_framework/**/*.py" = ["PLR0912", "PLR0913", "PLR0915", "C901"]
-"ytjobs/**/*.py" = ["PLR0912", "PLR0913", "PLR0915", "C901"]
+"yt_framework/yt/client_dev.py" = ["ARG002", "PLR0913"]
+# Complexity: remaining high-arity API surfaces are isolated to explicit modules.
+"yt_framework/operations/dependency_strategy.py" = ["PLR0913"]
+"yt_framework/operations/map_reduce.py" = ["PLR0913"]
+"yt_framework/operations/s3.py" = ["PLR0913"]
+"yt_framework/operations/upload.py" = ["PLR0913"]
+"yt_framework/yt/client_base.py" = ["PLR0913"]
+"yt_framework/yt/client_prod.py" = ["PLR0913"]
+"yt_framework/yt/yql_builder.py" = ["PLR0913"]
 # Tests: pydocstyle and strict try/except/annotation rules are intentionally relaxed.
 "tests/**" = [
     "INP001", # Pytest layout: tests/ on sys.path; not a package (import integration, conftest).
