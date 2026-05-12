@@ -57,25 +57,27 @@ def _format_join_conditions(
 
     """
     if isinstance(on, str):
-        # Same column name on both sides
         return f"{left_alias}.{on} = {right_alias}.{on}"
     if isinstance(on, dict):
-        # Different column names: {"left": "user_id", "right": "id"}
-        # or multiple pairs: {"left": ["user_id", "region"], "right": ["id", "region_code"]}
-        if isinstance(on.get("left"), list):
-            # Multiple column pairs
-            left_cols = on["left"]
-            right_cols = on["right"]
-            conditions = [
-                f"{left_alias}.{left_col} = {right_alias}.{right_col}"
-                for left_col, right_col in zip(left_cols, right_cols, strict=False)
-            ]
-            return " AND ".join(conditions)
-        # Single column pair
-        return f"{left_alias}.{on['left']} = {right_alias}.{on['right']}"
-    # List of column names - same on both sides
+        return _format_join_conditions_from_dict(on, left_alias, right_alias)
     conditions = [f"{left_alias}.{col} = {right_alias}.{col}" for col in on]
     return " AND ".join(conditions)
+
+
+def _format_join_conditions_from_dict(
+    on: dict[str, str],
+    left_alias: str,
+    right_alias: str,
+) -> str:
+    if isinstance(on.get("left"), list):
+        left_cols = on["left"]
+        right_cols = on["right"]
+        parts = [
+            f"{left_alias}.{left_col} = {right_alias}.{right_col}"
+            for left_col, right_col in zip(left_cols, right_cols, strict=False)
+        ]
+        return " AND ".join(parts)
+    return f"{left_alias}.{on['left']} = {right_alias}.{on['right']}"
 
 
 def _format_group_by_list(group_by: str | list[str]) -> str:
@@ -93,6 +95,35 @@ def _format_group_by_list(group_by: str | list[str]) -> str:
     return ", ".join(group_by)
 
 
+def _tuple_aggregation_sql(col: str, agg_spec: tuple[str, str]) -> str:
+    agg_func, column_ref = agg_spec
+    agg_upper = str(agg_func).upper()
+    if agg_upper == "COUNT":
+        return f"COUNT(*) AS {col}"
+    return f"{agg_upper}({column_ref}) AS {col}"
+
+
+def _string_aggregation_sql(col: str, agg_spec: str) -> str:
+    agg_upper = agg_spec.upper()
+    if agg_upper == "COUNT":
+        return f"COUNT(*) AS {col}"
+    base_col = col
+    for prefix in ["total_", "avg_", "min_", "max_", "count_"]:
+        if col.startswith(prefix):
+            base_col = col[len(prefix) :]
+            break
+    return f"{agg_upper}({base_col}) AS {col}"
+
+
+def _aggregation_select_fragment(
+    col: str,
+    agg_spec: str | tuple[str, str],
+) -> str:
+    if isinstance(agg_spec, tuple) and len(agg_spec) == _AGG_SPEC_TUPLE_LEN:
+        return _tuple_aggregation_sql(col, agg_spec)
+    return _string_aggregation_sql(col, str(agg_spec))
+
+
 def _format_aggregations(
     aggregations: dict[str, str | tuple[str, str]],
     group_by: str | list[str],
@@ -107,37 +138,10 @@ def _format_aggregations(
         group_by: Column(s) to group by
 
     """
-    # Include group by columns
     group_cols = [group_by] if isinstance(group_by, str) else group_by
-    select_parts = group_cols.copy()
-
-    # Add aggregations
+    select_parts = list(group_cols)
     for col, agg_spec in aggregations.items():
-        # Handle tuple format: (function, column_name)
-        if isinstance(agg_spec, tuple) and len(agg_spec) == _AGG_SPEC_TUPLE_LEN:
-            agg_func, column_ref = agg_spec
-            agg_upper = str(agg_func).upper()
-            if agg_upper == "COUNT":
-                select_parts.append(f"COUNT(*) AS {col}")
-            else:
-                select_parts.append(f"{agg_upper}({column_ref}) AS {col}")
-        else:
-            # Handle string format: "sum" -> extract column name from output name
-            agg_func = str(agg_spec)
-            agg_upper = agg_func.upper()
-            if agg_upper == "COUNT":
-                select_parts.append(f"COUNT(*) AS {col}")
-            else:
-                # For sum, avg, min, max - assume column name is part of the key
-                # User provides {"total_amount": "sum"} meaning SUM(amount) AS total_amount
-                # We'll extract base column name by removing common prefixes
-                base_col = col
-                for prefix in ["total_", "avg_", "min_", "max_", "count_"]:
-                    if col.startswith(prefix):
-                        base_col = col[len(prefix) :]
-                        break
-                select_parts.append(f"{agg_upper}({base_col}) AS {col}")
-
+        select_parts.append(_aggregation_select_fragment(col, agg_spec))
     return ",\n    ".join(select_parts)
 
 
@@ -179,6 +183,57 @@ def _resolve_join_strategy(
             return True, on, ""
         return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
     return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
+
+
+def _join_using_clause(using_columns: list[str]) -> str:
+    if len(using_columns) == 1:
+        return f"USING ({using_columns[0]})"
+    return f"USING ({', '.join(using_columns)})"
+
+
+def _join_query_using_branch(
+    *,
+    max_row_weight: str | None,
+    output_table: str,
+    select_clause: str,
+    left_table: str,
+    right_table: str,
+    join_type: str,
+    using_columns: list[str],
+) -> str:
+    if not using_columns:
+        msg = "using_columns must be set when use_using is True"
+        raise ValueError(msg)
+    using_clause = _join_using_clause(using_columns)
+    return f"""{_pragma_header(max_row_weight)}
+INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
+SELECT
+    {select_clause}
+FROM {_escape_table_name(left_table)} AS a
+{join_type} JOIN {_escape_table_name(right_table)} AS b
+{using_clause};"""  # noqa: S608
+
+
+def _join_query_on_branch(
+    *,
+    max_row_weight: str | None,
+    output_table: str,
+    select_clause: str,
+    left_table: str,
+    right_table: str,
+    join_type: str,
+    join_conditions: str,
+) -> str:
+    if not join_conditions:
+        msg = "join_conditions must be set when use_using is False"
+        raise ValueError(msg)
+    return f"""{_pragma_header(max_row_weight)}
+INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
+SELECT
+    {select_clause}
+FROM {_escape_table_name(left_table)} AS a
+{join_type} JOIN {_escape_table_name(right_table)} AS b
+ON {join_conditions};"""  # noqa: S608
 
 
 def build_join_query(
@@ -226,35 +281,24 @@ def build_join_query(
         select_clause = "a.*, b.*"
 
     if use_using:
-        # Format USING clause
-        if not using_columns:
-            msg = "using_columns must be set when use_using is True"
-            raise ValueError(msg)
-        if len(using_columns) == 1:
-            using_clause = f"USING ({using_columns[0]})"
-        else:
-            using_clause = f"USING ({', '.join(using_columns)})"
-
-        query = f"""{_pragma_header(max_row_weight)}
-INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
-SELECT
-    {select_clause}
-FROM {_escape_table_name(left_table)} AS a
-{join_type} JOIN {_escape_table_name(right_table)} AS b
-{using_clause};"""  # noqa: S608
-    else:
-        if not join_conditions:
-            msg = "join_conditions must be set when use_using is False"
-            raise ValueError(msg)
-        query = f"""{_pragma_header(max_row_weight)}
-INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
-SELECT
-    {select_clause}
-FROM {_escape_table_name(left_table)} AS a
-{join_type} JOIN {_escape_table_name(right_table)} AS b
-ON {join_conditions};"""  # noqa: S608
-
-    return query
+        return _join_query_using_branch(
+            max_row_weight=max_row_weight,
+            output_table=output_table,
+            select_clause=select_clause,
+            left_table=left_table,
+            right_table=right_table,
+            join_type=join_type,
+            using_columns=using_columns or [],
+        )
+    return _join_query_on_branch(
+        max_row_weight=max_row_weight,
+        output_table=output_table,
+        select_clause=select_clause,
+        left_table=left_table,
+        right_table=right_table,
+        join_type=join_type,
+        join_conditions=join_conditions,
+    )
 
 
 def build_filter_query(

@@ -9,13 +9,13 @@ import pytest
 from yt.wrapper import TypedJob  # pyright: ignore[reportMissingImports]
 from yt.wrapper import schema as yt_schema  # pyright: ignore[reportMissingImports]
 
-from yt_framework.yt.client_base import OperationResources
-from yt_framework.yt.client_prod import (
-    YTProdClient,
+from yt_framework.yt._client_prod_runtime import (
     _apply_command_leg_format,
     _apply_max_row_weight_to_spec_builder,
     _apply_spec_options_and_split_run_operation_kwargs,
 )
+from yt_framework.yt.client_base import OperationResources
+from yt_framework.yt.client_prod import YTProdClient
 
 
 def _null_logger(name: str) -> logging.Logger:
@@ -134,7 +134,7 @@ def _prod_client_with_run_operation_id(
 
 def _stub_split_run_operation_kwargs(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
+        "yt_framework.yt._client_prod_runtime._apply_spec_options_and_split_run_operation_kwargs",
         lambda sb, kw: (sb, {}),
     )
 
@@ -215,7 +215,9 @@ def test_yt_prod_client_run_map_configures_pool_tree_docker_and_secure_vault(
         getattr(mapper, name).return_value = mapper
     mapper.end_mapper.return_value = spec
 
-    monkeypatch.setattr("yt_framework.yt.client_prod.MapSpecBuilder", lambda: spec)
+    monkeypatch.setattr(
+        "yt_framework.yt._client_prod_runtime.MapSpecBuilder", lambda: spec
+    )
 
     client = YTProdClient(
         _null_logger("tests.client_prod.run_map_docker"),
@@ -280,9 +282,11 @@ def test_yt_prod_client_run_map_partitions_env_into_vault_and_wraps_string_comma
     ):
         getattr(mapper, name).return_value = mapper
     mapper.end_mapper.return_value = spec
-    monkeypatch.setattr("yt_framework.yt.client_prod.MapSpecBuilder", lambda: spec)
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
+        "yt_framework.yt._client_prod_runtime.MapSpecBuilder", lambda: spec
+    )
+    monkeypatch.setattr(
+        "yt_framework.yt._client_prod_runtime._apply_spec_options_and_split_run_operation_kwargs",
         lambda sb, kw: (sb, {}),
     )
 
@@ -369,7 +373,9 @@ def test_yt_prod_client_run_map_applies_default_max_row_weight_when_not_provided
         ),
     )
     mapper.end_mapper.return_value = spec
-    monkeypatch.setattr("yt_framework.yt.client_prod.MapSpecBuilder", lambda: spec)
+    monkeypatch.setattr(
+        "yt_framework.yt._client_prod_runtime.MapSpecBuilder", lambda: spec
+    )
     _stub_split_run_operation_kwargs(monkeypatch)
     client.run_map(
         "python3 mapper.py", "//tmp/in", "//tmp/out", [], OperationResources(), {}
@@ -415,7 +421,9 @@ def test_yt_prod_client_run_map_applies_custom_max_row_weight_as_bytes(
         ),
     )
     mapper.end_mapper.return_value = spec
-    monkeypatch.setattr("yt_framework.yt.client_prod.MapSpecBuilder", lambda: spec)
+    monkeypatch.setattr(
+        "yt_framework.yt._client_prod_runtime.MapSpecBuilder", lambda: spec
+    )
     _stub_split_run_operation_kwargs(monkeypatch)
     client.run_map(
         "python3 mapper.py",
@@ -472,10 +480,12 @@ def test_yt_prod_client_run_map_sets_output_table_path_append_when_requested(
         return spec
 
     spec.output_table_paths.side_effect = _otp
-    monkeypatch.setattr("yt_framework.yt.client_prod.MapSpecBuilder", lambda: spec)
+    monkeypatch.setattr(
+        "yt_framework.yt._client_prod_runtime.MapSpecBuilder", lambda: spec
+    )
 
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod._apply_spec_options_and_split_run_operation_kwargs",
+        "yt_framework.yt._client_prod_runtime._apply_spec_options_and_split_run_operation_kwargs",
         lambda sb, kw: (sb, {}),
     )
 
@@ -555,7 +565,9 @@ def test_yt_prod_client_run_vanilla_applies_default_max_row_weight_when_not_prov
             "end_task",
         ),
     )
-    monkeypatch.setattr("yt_framework.yt.client_prod.VanillaSpecBuilder", lambda: spec)
+    monkeypatch.setattr(
+        "yt_framework.yt._client_prod_runtime.VanillaSpecBuilder", lambda: spec
+    )
     _stub_split_run_operation_kwargs(monkeypatch)
     client.run_vanilla("bash -c true", [], {}, "task", resources=OperationResources())
     assert spec.table_writer.call_args == call({"max_row_weight": 134217728})
@@ -597,7 +609,9 @@ def test_yt_prod_client_run_vanilla_configures_pool_tree_docker_description_and_
     ):
         getattr(task, name).return_value = task
 
-    monkeypatch.setattr("yt_framework.yt.client_prod.VanillaSpecBuilder", lambda: spec)
+    monkeypatch.setattr(
+        "yt_framework.yt._client_prod_runtime.VanillaSpecBuilder", lambda: spec
+    )
 
     client = YTProdClient(
         _null_logger("tests.client_prod.vanilla_docker"),
@@ -699,7 +713,7 @@ def test_yt_prod_client_run_map_reduce_applies_default_max_row_weight_when_not_p
     mapper.end_mapper.return_value = spec
     reducer.end_reducer.return_value = spec
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.MapReduceSpecBuilder", lambda: spec
+        "yt_framework.yt._client_prod_runtime.MapReduceSpecBuilder", lambda: spec
     )
     _stub_split_run_operation_kwargs(monkeypatch)
     client.run_map_reduce(
@@ -770,7 +784,9 @@ def test_yt_prod_client_run_reduce_applies_default_max_row_weight_when_not_provi
         ),
     )
     reducer.end_reducer.return_value = spec
-    monkeypatch.setattr("yt_framework.yt.client_prod.ReduceSpecBuilder", lambda: spec)
+    monkeypatch.setattr(
+        "yt_framework.yt._client_prod_runtime.ReduceSpecBuilder", lambda: spec
+    )
     _stub_split_run_operation_kwargs(monkeypatch)
     client.run_reduce(
         "python3 reducer.py",
@@ -829,7 +845,7 @@ def test_yt_prod_client_run_map_reduce_wires_pool_tree_slots_description_sort_ma
     reducer.end_reducer.return_value = spec
 
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.MapReduceSpecBuilder", lambda: spec
+        "yt_framework.yt._client_prod_runtime.MapReduceSpecBuilder", lambda: spec
     )
 
     client = YTProdClient(
@@ -902,7 +918,7 @@ def test_yt_prod_client_run_map_reduce_applies_docker_secure_vault_on_mapper_and
     reducer.end_reducer.return_value = spec
 
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.MapReduceSpecBuilder", lambda: spec
+        "yt_framework.yt._client_prod_runtime.MapReduceSpecBuilder", lambda: spec
     )
 
     client = YTProdClient(
@@ -972,7 +988,9 @@ def test_yt_prod_client_run_reduce_wires_pool_tree_slots_description_docker_vaul
         getattr(reducer, name).return_value = reducer
     reducer.end_reducer.return_value = spec
 
-    monkeypatch.setattr("yt_framework.yt.client_prod.ReduceSpecBuilder", lambda: spec)
+    monkeypatch.setattr(
+        "yt_framework.yt._client_prod_runtime.ReduceSpecBuilder", lambda: spec
+    )
 
     client = YTProdClient(
         _null_logger("tests.client_prod.red_full"),

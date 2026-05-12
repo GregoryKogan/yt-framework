@@ -64,7 +64,8 @@ def log_error(error_dict: dict[str, Any]) -> None:
 def process_and_write_results(
     processing_func: Callable[..., Iterator[Any]],
     data: object,
-    redirect_output: bool = True,  # noqa: FBT001,FBT002
+    *,
+    redirect_output: bool = True,
     **kwargs: object,
 ) -> None:
     """Execute a processing function and write results as they're yielded.

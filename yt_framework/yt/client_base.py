@@ -15,6 +15,43 @@ if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema
 
 
+def _stderr_inner_text_from_job_stderr_entry(first: object) -> str | None:
+    if not isinstance(first, dict):
+        return None
+    err = first.get("error")
+    if not isinstance(err, dict):
+        return None
+    inner = err.get("attributes")
+    if not isinstance(inner, dict):
+        return None
+    text = inner.get("stderr", "")
+    return str(text) if text else None
+
+
+def _stderr_text_from_yt_exception_attrs(exception: Exception) -> str | None:
+    if not hasattr(exception, "attributes"):
+        return None
+    attrs = exception.attributes  # pyright: ignore[reportAttributeAccessIssue]
+    if "stderrs" not in attrs:
+        return None
+    stderrs = attrs["stderrs"]
+    if not stderrs or len(stderrs) == 0:
+        return None
+    return _stderr_inner_text_from_job_stderr_entry(stderrs[0])
+
+
+def _require_positive_resource(name: str, value: int) -> None:
+    if value <= 0:
+        msg = f"{name} must be set to a positive integer, got {value}"
+        raise ValueError(msg)
+
+
+def _require_non_negative_gpu(gpu_limit: int) -> None:
+    if gpu_limit < 0:
+        msg = f"gpu_limit must be set to a non-negative integer, got {gpu_limit}"
+        raise ValueError(msg)
+
+
 @dataclass
 class OperationResources:
     """Resource configuration for YT operations.
@@ -50,20 +87,10 @@ class OperationResources:
 
     def __post_init__(self) -> None:
         """Validate resource fields after initialization."""
-        if self.memory_gb <= 0:
-            msg = f"memory_gb must be set to a positive integer, got {self.memory_gb}"
-            raise ValueError(msg)
-        if self.cpu_limit <= 0:
-            msg = f"cpu_limit must be set to a positive integer, got {self.cpu_limit}"
-            raise ValueError(msg)
-        if self.gpu_limit < 0:
-            msg = (
-                f"gpu_limit must be set to a non-negative integer, got {self.gpu_limit}"
-            )
-            raise ValueError(msg)
-        if self.job_count <= 0:
-            msg = f"job_count must be set to a positive integer, got {self.job_count}"
-            raise ValueError(msg)
+        _require_positive_resource("memory_gb", self.memory_gb)
+        _require_positive_resource("cpu_limit", self.cpu_limit)
+        _require_non_negative_gpu(self.gpu_limit)
+        _require_positive_resource("job_count", self.job_count)
 
 
 class BaseYTClient(ABC):
@@ -655,26 +682,21 @@ class BaseYTClient(ABC):
         except (AttributeError, KeyError, TypeError) as exc:
             self.logger.debug("Failed to read operation error details: %s", exc)
 
+    def _stderr_text_from_yt_exception(self, exception: Exception) -> str | None:
+        return _stderr_text_from_yt_exception_attrs(exception)
+
+    def _log_stderr_lines_from_attributes(self, exception: Exception) -> None:
+        stderr = self._stderr_text_from_yt_exception(exception)
+        if not stderr:
+            return
+        self.logger.error("Job stderr:")
+        for line in stderr.replace("\\n", "\n").split("\n"):
+            if line.strip():
+                self.logger.error("  %s", line)
+
     def _log_error_from_exception(self, exception: Exception) -> None:
         """Extract and log error from exception."""
         try:
-            if (
-                hasattr(exception, "attributes") and "stderrs" in exception.attributes  # pyright: ignore[reportAttributeAccessIssue]
-            ):
-                stderrs = exception.attributes[  # pyright: ignore[reportAttributeAccessIssue]
-                    "stderrs"
-                ]
-                if stderrs and len(stderrs) > 0:
-                    stderr = (
-                        stderrs[0]
-                        .get("error", {})
-                        .get("attributes", {})
-                        .get("stderr", "")
-                    )
-                    if stderr:
-                        self.logger.error("Job stderr:")
-                        for line in stderr.replace("\\n", "\n").split("\n"):
-                            if line.strip():
-                                self.logger.error("  %s", line)
+            self._log_stderr_lines_from_attributes(exception)
         except Exception:
             self.logger.exception("Error: %s", exception)

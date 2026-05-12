@@ -4,6 +4,7 @@ import importlib
 import logging
 import shutil
 import tarfile
+import types
 from pathlib import Path
 from typing import Literal
 
@@ -50,28 +51,7 @@ def _copy_ytjobs_to_build_dir(
 
     logger.info("Copying ytjobs package to %s...", target_dir)
 
-    # Initialize .ytignore matcher for ytjobs directory
-    ignore_matcher = YTIgnoreMatcher(ytjobs_dir)
-
-    file_count = 0
-    ignored_count = 0
-
-    for source_file in ytjobs_dir.rglob("*"):
-        if source_file.is_file():
-            # Check if file should be ignored
-            if ignore_matcher.should_ignore(source_file):
-                logger.debug(
-                    "Ignoring file (matched .ytignore): %s",
-                    source_file.relative_to(ytjobs_dir),
-                )
-                ignored_count += 1
-                continue
-
-            rel_path = source_file.relative_to(ytjobs_dir)
-            target_file = target_dir / rel_path
-            target_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_file, target_file)
-            file_count += 1
+    file_count, ignored_count = _copy_tree_with_ytignore(ytjobs_dir, target_dir, logger)
 
     log_success(logger, f"Copied {file_count} ytjobs files")
     if ignored_count > 0:
@@ -96,6 +76,55 @@ def _resolve_upload_target(source: str, target: str | None, _pipeline_dir: Path)
     return Path(source).name
 
 
+def _copy_tree_with_ytignore(
+    source_dir: Path,
+    target_dir: Path,
+    logger: logging.Logger,
+) -> tuple[int, int]:
+    """Copy all files under ``source_dir`` to ``target_dir``, honoring ``.ytignore``."""
+    ignore_matcher = YTIgnoreMatcher(source_dir)
+    file_count = 0
+    ignored_count = 0
+    for source_file in source_dir.rglob("*"):
+        if not source_file.is_file():
+            continue
+        if ignore_matcher.should_ignore(source_file):
+            logger.debug(
+                "Ignoring file (matched .ytignore): %s",
+                source_file.relative_to(source_dir),
+            )
+            ignored_count += 1
+            continue
+        rel_path = source_file.relative_to(source_dir)
+        target_file = target_dir / rel_path
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_file, target_file)
+        file_count += 1
+    return file_count, ignored_count
+
+
+def _append_targets_from_upload_path(
+    i: int,
+    entry: dict[str, str],
+    pipeline_dir: Path,
+    pipeline_dir_resolved: Path,
+) -> tuple[str, str]:
+    if "source" not in entry:
+        msg = "upload_paths entry missing required 'source' key."
+        raise ValueError(msg)
+    source = entry.get("source", "")
+    resolved_path = (pipeline_dir / source).resolve()
+    if not resolved_path.is_relative_to(pipeline_dir_resolved):
+        msg = (
+            f"upload_paths[{i}] source must be within pipeline directory: "
+            f"{resolved_path} (pipeline: {pipeline_dir_resolved})."
+        )
+        raise ValueError(msg)
+    target = entry.get("target")
+    resolved_target = _resolve_upload_target(source, target, pipeline_dir)
+    return resolved_target, f"upload_paths[{source}]"
+
+
 def _collect_upload_targets(
     upload_modules: list[str] | None,
     upload_paths: list[dict[str, str]] | None,
@@ -109,20 +138,14 @@ def _collect_upload_targets(
 
     pipeline_dir_resolved = pipeline_dir.resolve()
     for i, entry in enumerate(upload_paths or []):
-        if "source" not in entry:
-            msg = "upload_paths entry missing required 'source' key."
-            raise ValueError(msg)
-        source = entry.get("source", "")
-        resolved_path = (pipeline_dir / source).resolve()
-        if not resolved_path.is_relative_to(pipeline_dir_resolved):
-            msg = (
-                f"upload_paths[{i}] source must be within pipeline directory: "
-                f"{resolved_path} (pipeline: {pipeline_dir_resolved})."
-            )
-            raise ValueError(msg)
-        target = entry.get("target")
-        resolved_target = _resolve_upload_target(source, target, pipeline_dir)
-        targets.append((resolved_target, f"upload_paths[{source}]"))
+        targets.append(
+            _append_targets_from_upload_path(
+                i,
+                entry,
+                pipeline_dir,
+                pipeline_dir_resolved,
+            ),
+        )
     return targets
 
 
@@ -168,6 +191,58 @@ def _validate_upload_config(
     _raise_if_upload_target_conflicts(targets)
 
 
+def _import_top_level_module_for_upload(
+    module_name: str, top_level: str
+) -> types.ModuleType:
+    try:
+        return importlib.import_module(top_level)
+    except ImportError as e:
+        msg = f"Failed to import module '{module_name}' (top-level: {top_level}): {e}."
+        raise ValueError(msg) from e
+
+
+def _package_source_dir_for_upload(module: types.ModuleType, module_name: str) -> Path:
+    if getattr(module, "__file__", None) is None:
+        msg = (
+            f"Module '{module_name}' has no __file__ (namespace or non-file package). "
+            "Only file-based packages are supported."
+        )
+        raise ValueError(msg)
+    if not hasattr(module, "__path__"):
+        msg = (
+            f"Module '{module_name}' is a single-file module, not a package. "
+            "upload_modules supports only packages (directories with __init__.py). "
+            "Single-file modules would copy the entire containing directory."
+        )
+        raise ValueError(msg)
+    source_dir = Path(module.__path__[0]).resolve()
+    if not source_dir.is_dir():
+        msg = f"Module '{module_name}' has invalid __path__: {source_dir} is not a directory."
+        raise ValueError(msg)
+    return source_dir
+
+
+def _require_upload_path_directory(
+    source_path: str,
+    pipeline_dir: Path,
+    pipeline_dir_resolved: Path,
+) -> Path:
+    resolved = (pipeline_dir / source_path).resolve()
+    if not resolved.is_relative_to(pipeline_dir_resolved):
+        msg = (
+            f"Upload path source must be within pipeline directory: {resolved} "
+            f"(pipeline: {pipeline_dir_resolved}). Paths like '../foo' are not allowed."
+        )
+        raise ValueError(msg)
+    if not resolved.exists():
+        msg = f"Upload path source does not exist: {resolved}."
+        raise FileNotFoundError(msg)
+    if not resolved.is_dir():
+        msg = f"Upload path source must be a directory: {resolved}."
+        raise ValueError(msg)
+    return resolved
+
+
 def _copy_module_to_build_dir(
     module_name: str,
     target_dir: Path,
@@ -192,57 +267,14 @@ def _copy_module_to_build_dir(
 
     """
     top_level = module_name.split(".", maxsplit=1)[0]
-    try:
-        module = importlib.import_module(top_level)
-    except ImportError as e:
-        msg = f"Failed to import module '{module_name}' (top-level: {top_level}): {e}."
-        raise ValueError(msg) from e
-
-    if getattr(module, "__file__", None) is None:
-        msg = (
-            f"Module '{module_name}' has no __file__ (namespace or non-file package). "
-            "Only file-based packages are supported."
-        )
-        raise ValueError(msg)
-
-    # Use __path__ for packages; reject single-file modules (which would copy
-    # the entire containing directory, e.g. site-packages)
-    if hasattr(module, "__path__"):
-        source_dir = Path(module.__path__[0]).resolve()
-        if not source_dir.is_dir():
-            msg = f"Module '{module_name}' has invalid __path__: {source_dir} is not a directory."
-            raise ValueError(msg)
-    else:
-        msg = (
-            f"Module '{module_name}' is a single-file module, not a package. "
-            "upload_modules supports only packages (directories with __init__.py). "
-            "Single-file modules would copy the entire containing directory."
-        )
-        raise ValueError(msg)
+    module = _import_top_level_module_for_upload(module_name, top_level)
+    source_dir = _package_source_dir_for_upload(module, module_name)
 
     target_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Copying module %s to %s...", module_name, target_dir)
 
-    ignore_matcher = YTIgnoreMatcher(source_dir)
-    file_count = 0
-    ignored_count = 0
-
-    for source_file in source_dir.rglob("*"):
-        if source_file.is_file():
-            if ignore_matcher.should_ignore(source_file):
-                logger.debug(
-                    "Ignoring file (matched .ytignore): %s",
-                    source_file.relative_to(source_dir),
-                )
-                ignored_count += 1
-                continue
-
-            rel_path = source_file.relative_to(source_dir)
-            target_file = target_dir / rel_path
-            target_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_file, target_file)
-            file_count += 1
+    file_count, ignored_count = _copy_tree_with_ytignore(source_dir, target_dir, logger)
 
     log_success(logger, f"Copied {file_count} {module_name} files")
     if ignored_count > 0:
@@ -277,47 +309,18 @@ def _copy_path_to_build_dir(
 
     """
     pipeline_dir_resolved = pipeline_dir.resolve()
-    resolved = (pipeline_dir / source_path).resolve()
-
-    if not resolved.is_relative_to(pipeline_dir_resolved):
-        msg = (
-            f"Upload path source must be within pipeline directory: {resolved} "
-            f"(pipeline: {pipeline_dir_resolved}). Paths like '../foo' are not allowed."
-        )
-        raise ValueError(msg)
-
-    if not resolved.exists():
-        msg = f"Upload path source does not exist: {resolved}."
-        raise FileNotFoundError(msg)
-
-    if not resolved.is_dir():
-        msg = f"Upload path source must be a directory: {resolved}."
-        raise ValueError(msg)
+    resolved = _require_upload_path_directory(
+        source_path,
+        pipeline_dir,
+        pipeline_dir_resolved,
+    )
 
     target_dir = build_dir / target_name
     target_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Copying %s to %s...", resolved, target_dir)
 
-    ignore_matcher = YTIgnoreMatcher(resolved)
-    file_count = 0
-    ignored_count = 0
-
-    for source_file in resolved.rglob("*"):
-        if source_file.is_file():
-            if ignore_matcher.should_ignore(source_file):
-                logger.debug(
-                    "Ignoring file (matched .ytignore): %s",
-                    source_file.relative_to(resolved),
-                )
-                ignored_count += 1
-                continue
-
-            rel_path = source_file.relative_to(resolved)
-            target_file = target_dir / rel_path
-            target_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_file, target_file)
-            file_count += 1
+    file_count, ignored_count = _copy_tree_with_ytignore(resolved, target_dir, logger)
 
     log_success(logger, f"Copied {file_count} files from {source_path}")
     if ignored_count > 0:
@@ -541,6 +544,20 @@ def _first_existing_reducer_script(src: Path) -> str | None:
     return None
 
 
+def _map_reduce_command_section(job: dict[str, object]) -> dict[str, object]:
+    mrc = job.get("map_reduce_command") or {}
+    return mrc if isinstance(mrc, dict) else {}
+
+
+def _normalize_reducer_script_name(
+    reducer: object | None,
+    src: Path,
+) -> str | None:
+    if reducer is not None:
+        return str(reducer)
+    return _first_existing_reducer_script(src)
+
+
 def _resolve_map_reduce_command_scripts(
     stage_dir: Path,
     logger: logging.Logger,
@@ -550,16 +567,10 @@ def _resolve_map_reduce_command_scripts(
     Looks under ``stages/<name>/src/`` and uses ``job.map_reduce_command`` when set.
     """
     job = _load_stage_job_section(stage_dir, logger)
-    mrc = job.get("map_reduce_command") or {}
-    if not isinstance(mrc, dict):
-        mrc = {}
+    mrc = _map_reduce_command_section(job)
     mapper = str(mrc.get("mapper_script") or "mapper.py")
-    reducer = mrc.get("reducer_script")
-    if reducer is not None:
-        reducer = str(reducer)
     src = stage_dir / "src"
-    if reducer is None:
-        reducer = _first_existing_reducer_script(src)
+    reducer = _normalize_reducer_script_name(mrc.get("reducer_script"), src)
     if not (src / mapper).is_file():
         logger.debug("No %s at %s — skipping map_reduce_mapper wrapper", mapper, src)
         return None, None
@@ -569,35 +580,57 @@ def _resolve_map_reduce_command_scripts(
     return mapper, reducer
 
 
+_REDUCE_ONLY_SCRIPT_CANDIDATES = (
+    "reducer.py",
+    "reducer_index.py",
+    "reducer_mds.py",
+    "reducer_main.py",
+)
+
+
+def _reduce_command_section(job: dict[str, object]) -> dict[str, object]:
+    rc = job.get("reduce_command") or {}
+    return rc if isinstance(rc, dict) else {}
+
+
+def _explicit_reduce_script_or_warn(
+    rc: dict[str, object],
+    src: Path,
+    logger: logging.Logger,
+) -> str | None:
+    explicit = rc.get("reducer_script")
+    if not explicit:
+        return None
+    name = str(explicit)
+    if (src / name).is_file():
+        return name
+    logger.warning(
+        "reduce_command.reducer_script %s not found under %s",
+        name,
+        src,
+    )
+    return None
+
+
+def _first_reduce_only_candidate(src: Path) -> str | None:
+    for candidate in _REDUCE_ONLY_SCRIPT_CANDIDATES:
+        if (src / candidate).is_file():
+            return candidate
+    return None
+
+
 def _resolve_reduce_command_script(
     stage_dir: Path,
     logger: logging.Logger,
 ) -> str | None:
     """Reducer entrypoint for reduce-only command mode (``job.reduce_command``)."""
     job = _load_stage_job_section(stage_dir, logger)
-    rc = job.get("reduce_command") or {}
-    if not isinstance(rc, dict):
-        rc = {}
-    explicit = rc.get("reducer_script")
-    if explicit:
-        name = str(explicit)
-        if (stage_dir / "src" / name).is_file():
-            return name
-        logger.warning(
-            "reduce_command.reducer_script %s not found under %s",
-            name,
-            stage_dir / "src",
-        )
+    rc = _reduce_command_section(job)
     src = stage_dir / "src"
-    for candidate in (
-        "reducer.py",
-        "reducer_index.py",
-        "reducer_mds.py",
-        "reducer_main.py",
-    ):
-        if (src / candidate).is_file():
-            return candidate
-    return None
+    found = _explicit_reduce_script_or_warn(rc, src, logger)
+    if found:
+        return found
+    return _first_reduce_only_candidate(src)
 
 
 def _create_unified_wrapper_script(
@@ -705,6 +738,12 @@ def _create_reduce_command_wrapper(
     )
 
 
+def _stage_has_mapper_entrypoints(src_dir: Path) -> bool:
+    if (src_dir / "mapper.py").is_file():
+        return True
+    return bool(list(src_dir.glob("partition_*.py")))
+
+
 def _create_wrappers_for_stage(
     stage_name: str,
     stage_dir: Path,
@@ -728,10 +767,7 @@ def _create_wrappers_for_stage(
     if not src_dir.exists():
         return
 
-    # Check which operation types this stage supports
-    has_mapper = (src_dir / "mapper.py").is_file() or bool(
-        list(src_dir.glob("partition_*.py")),
-    )
+    has_mapper = _stage_has_mapper_entrypoints(src_dir)
     has_vanilla = (src_dir / "vanilla.py").exists()
 
     # Create wrapper for each operation type found
@@ -764,6 +800,68 @@ def _create_wrappers_for_stage(
             build_dir=build_dir,
             logger=logger,
         )
+
+
+def _copy_all_upload_modules(
+    *,
+    build_dir: Path,
+    upload_modules: list[str] | None,
+    logger: logging.Logger,
+) -> int:
+    total = 0
+    for mod in upload_modules or []:
+        top_level = mod.split(".", maxsplit=1)[0]
+        total += _copy_module_to_build_dir(
+            module_name=mod,
+            target_dir=build_dir / top_level,
+            logger=logger,
+        )
+    return total
+
+
+def _copy_all_upload_paths(
+    *,
+    build_dir: Path,
+    upload_paths: list[dict[str, str]] | None,
+    pipeline_dir: Path,
+    logger: logging.Logger,
+) -> int:
+    total = 0
+    for entry in upload_paths or []:
+        source = entry["source"]
+        target = _resolve_upload_target(
+            source=source,
+            target=entry.get("target"),
+            _pipeline_dir=pipeline_dir,
+        )
+        total += _copy_path_to_build_dir(
+            source_path=source,
+            target_name=target,
+            build_dir=build_dir,
+            pipeline_dir=pipeline_dir,
+            logger=logger,
+        )
+    return total
+
+
+def _copy_all_stages_to_build(
+    *,
+    build_dir: Path,
+    stages_dir: Path,
+    logger: logging.Logger,
+) -> tuple[int, list[tuple[str, Path]]]:
+    stage_files = 0
+    stage_dirs_list: list[tuple[str, Path]] = []
+    for stage_dir in stages_dir.iterdir():
+        if not stage_dir.is_dir() or not (stage_dir / "src").exists():
+            continue
+        stage_dirs_list.append((stage_dir.name, stage_dir))
+        stage_files += _copy_stage_to_build_dir(
+            build_dir=build_dir,
+            stage_dir=stage_dir,
+            logger=logger,
+        )
+    return stage_files, stage_dirs_list
 
 
 def build_code_locally(
@@ -803,55 +901,31 @@ def build_code_locally(
         pipeline_dir=pipeline_dir,
     )
 
-    # Copy ytjobs package (implicit, always)
     ytjobs_files = _copy_ytjobs_to_build_dir(
         build_dir=build_dir,
         logger=logger,
     )
 
-    # Copy upload_modules (use top-level package name for target; dotted paths
-    # e.g. my_package.submodule become build_dir/my_package/ with full tree)
-    module_files = 0
-    for mod in upload_modules or []:
-        top_level = mod.split(".")[0]
-        module_files += _copy_module_to_build_dir(
-            module_name=mod,
-            target_dir=build_dir / top_level,
-            logger=logger,
-        )
+    module_files = _copy_all_upload_modules(
+        build_dir=build_dir,
+        upload_modules=upload_modules,
+        logger=logger,
+    )
 
-    # Copy upload_paths
-    path_files = 0
-    for entry in upload_paths or []:
-        source = entry["source"]
-        target = _resolve_upload_target(
-            source=source,
-            target=entry.get("target"),
-            _pipeline_dir=pipeline_dir,
-        )
-        path_files += _copy_path_to_build_dir(
-            source_path=source,
-            target_name=target,
-            build_dir=build_dir,
-            pipeline_dir=pipeline_dir,
-            logger=logger,
-        )
+    path_files = _copy_all_upload_paths(
+        build_dir=build_dir,
+        upload_paths=upload_paths,
+        pipeline_dir=pipeline_dir,
+        logger=logger,
+    )
 
     # Copy all stages
     stages_dir = pipeline_dir / "stages"
-    stage_files = 0
-    stage_dirs_list = []
-
-    for stage_dir in stages_dir.iterdir():
-        if stage_dir.is_dir() and (stage_dir / "src").exists():
-            stage_name = stage_dir.name
-            stage_dirs_list.append((stage_name, stage_dir))
-            files_copied = _copy_stage_to_build_dir(
-                build_dir=build_dir,
-                stage_dir=stage_dir,
-                logger=logger,
-            )
-            stage_files += files_copied
+    stage_files, stage_dirs_list = _copy_all_stages_to_build(
+        build_dir=build_dir,
+        stages_dir=stages_dir,
+        logger=logger,
+    )
 
     # Create wrapper scripts if requested (for tar archive mode)
     if create_wrappers:

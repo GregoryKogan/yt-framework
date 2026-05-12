@@ -224,6 +224,43 @@ def collect_passthrough_kwargs(
     return out
 
 
+def _merge_tokenizer_keys_into_env(
+    env: dict[str, str],
+    context: "StageContext",
+    tokenizer_cfg_raw: DictConfig,
+) -> None:
+    init_tokenizer_artifact_directory(
+        context=context,
+        tokenizer_artifact_config=tokenizer_cfg_raw,
+    )
+    if not tokenizer_cfg_raw.get("artifact_base"):
+        return
+    artifact_name = resolve_tokenizer_artifact_name(
+        stage_config=context.config,
+        tokenizer_artifact_config=tokenizer_cfg_raw,
+    )
+    if not artifact_name:
+        return
+    archive_name = resolve_tokenizer_archive_name(artifact_name)
+    env.setdefault("TOKENIZER_ARTIFACT_FILE", archive_name)
+    env.setdefault(
+        "TOKENIZER_ARTIFACT_DIR",
+        f"tokenizer_artifacts/{artifact_name}",
+    )
+    env.setdefault("TOKENIZER_ARTIFACT_NAME", artifact_name)
+
+
+def _merge_operation_env_block(
+    env: dict[str, str],
+    operation_config: DictConfig,
+) -> None:
+    env_block = operation_config.get("env")
+    env_pairs: Mapping[str, Any] = env_block if isinstance(env_block, Mapping) else {}
+    for k, v in env_pairs.items():
+        if v is not None:
+            env[str(k)] = str(v)
+
+
 def build_operation_environment(
     context: "StageContext",
     operation_config: DictConfig,
@@ -233,32 +270,12 @@ def build_operation_environment(
 ) -> dict[str, str]:
     """Build operation environment from secrets + explicit env config + optional helpers."""
     env = build_environment(configs_dir=context.deps.configs_dir, logger=logger)
-    env_block = operation_config.get("env")
-    env_pairs: Mapping[str, Any] = env_block if isinstance(env_block, Mapping) else {}
-    for k, v in env_pairs.items():
-        if v is not None:
-            env[str(k)] = str(v)
+    _merge_operation_env_block(env, operation_config)
 
     if include_tokenizer_artifact:
         tokenizer_cfg_raw = operation_config.get("tokenizer_artifact")
         if isinstance(tokenizer_cfg_raw, DictConfig):
-            init_tokenizer_artifact_directory(
-                context=context,
-                tokenizer_artifact_config=tokenizer_cfg_raw,
-            )
-            if tokenizer_cfg_raw.get("artifact_base"):
-                artifact_name = resolve_tokenizer_artifact_name(
-                    stage_config=context.config,
-                    tokenizer_artifact_config=tokenizer_cfg_raw,
-                )
-                if artifact_name:
-                    archive_name = resolve_tokenizer_archive_name(artifact_name)
-                    env.setdefault("TOKENIZER_ARTIFACT_FILE", archive_name)
-                    env.setdefault(
-                        "TOKENIZER_ARTIFACT_DIR",
-                        f"tokenizer_artifacts/{artifact_name}",
-                    )
-                    env.setdefault("TOKENIZER_ARTIFACT_NAME", artifact_name)
+            _merge_tokenizer_keys_into_env(env, context, tokenizer_cfg_raw)
 
     if include_stage_name:
         env.setdefault("YT_STAGE_NAME", context.name)

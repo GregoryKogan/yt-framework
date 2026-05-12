@@ -163,6 +163,18 @@ def _filter_checkpoint_names(
     return sorted(checkpoints)
 
 
+def _list_checkpoint_names_in_dir(
+    checkpoint_dir: str,
+    pattern: str | None,
+    log: logging.Logger,
+) -> list[str]:
+    raw_files = yt.list(checkpoint_dir)
+    files = [str(f) for f in raw_files]
+    checkpoints = _filter_checkpoint_names(files, pattern)
+    log.debug("Found %s checkpoints in %s", len(checkpoints), checkpoint_dir)
+    return checkpoints
+
+
 def list_checkpoints(
     base_path: str | None = None,
     pattern: str | None = None,
@@ -188,15 +200,10 @@ def list_checkpoints(
         return []
 
     try:
-        raw_files = yt.list(checkpoint_dir)
-        files = [str(f) for f in raw_files]
-        checkpoints = _filter_checkpoint_names(files, pattern)
-        log.debug("Found %s checkpoints in %s", len(checkpoints), checkpoint_dir)
+        return _list_checkpoint_names_in_dir(checkpoint_dir, pattern, log)
     except Exception:
         log.exception("Failed to list checkpoints in %s", checkpoint_dir)
         return []
-    else:
-        return checkpoints
 
 
 def delete_checkpoint(

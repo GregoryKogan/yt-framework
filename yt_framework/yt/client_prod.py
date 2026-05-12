@@ -3,17 +3,14 @@
 import contextlib
 import logging
 import uuid
-from collections.abc import Collection, Mapping
+from collections.abc import Collection
 from pathlib import Path
-from typing import Any, Literal, NoReturn, cast
+from typing import Any, Literal, cast
 
 from yt.wrapper import (
     FilePath,
-    MapSpecBuilder,
     Operation,
     TablePath,
-    TypedJob,
-    VanillaSpecBuilder,
     YtClient,
 )
 from yt.wrapper import (
@@ -23,20 +20,34 @@ from yt.wrapper import (
     schema as yt_schema,
 )
 from yt.wrapper.schema import TableSchema
-from yt.wrapper.spec_builders import (
-    MapReduceSpecBuilder,
-    ReduceSpecBuilder,
-)
 
 from yt_framework.operations.job_command import (
     resolve_aliased_job as _resolve_aliased_job,
 )
 from yt_framework.utils.ignore import YTIgnoreMatcher
+from yt_framework.yt._client_prod_runtime import (
+    _apply_command_leg_format,
+    _optional_str_kw,
+    _raise_runtime_error,
+    _spec_builder_secure_vault,
+    disable_yt_proxy_discovery_best_effort,
+    prod_assemble_map_spec_with_vault,
+    prod_assemble_vanilla_spec_with_vault,
+    prod_map_reduce_after_legs,
+    prod_map_reduce_open_spec_builder,
+    prod_maybe_create_parent_for_table_path,
+    prod_merge_sort_spec_into_kwargs,
+    prod_reduce_finish_reducer_leg,
+    prod_reduce_open_spec_builder,
+    prod_submit_operation_with_kwargs,
+    prod_upload_directory_files,
+    prod_write_table_create_or_replace_if_needed,
+    read_required_yt_secret,
+)
 from yt_framework.yt.client_base import BaseYTClient, OperationResources
 from yt_framework.yt.max_row_weight import (
     build_max_row_weight_pragma,
     ensure_max_row_weight_pragma,
-    parse_max_row_weight_to_bytes,
     validate_max_row_weight,
 )
 from yt_framework.yt.operation_secure_env import (
@@ -57,11 +68,6 @@ from yt_framework.yt.yql_builder import (
 )
 
 
-def _raise_runtime_error(message: str) -> NoReturn:
-    """Raise RuntimeError from a nested function (TRY301)."""
-    raise RuntimeError(message)
-
-
 def _raise_value_error(message: str) -> None:
     raise ValueError(message)
 
@@ -76,12 +82,6 @@ def _public_env_keys_for_partition(raw: object) -> Collection[str] | None:
     if isinstance(raw, (list, tuple, set, frozenset)):
         return [str(x) for x in raw]
     return [str(raw)]
-
-
-def _optional_str_kw(raw: object) -> str | None:
-    if raw is None:
-        return None
-    return str(raw)
 
 
 def _maybe_wrap_string_command_for_vault(
@@ -110,88 +110,6 @@ def _partition_and_maybe_wrap_leg(
     return public_env, secure_flat, leg
 
 
-def _spec_builder_secure_vault(
-    spec_builder: object, vault: Mapping[str, Any]
-) -> object:
-    if not vault:
-        return spec_builder
-    sec = cast("Any", getattr(spec_builder, "secure_vault", None))
-    if callable(sec):
-        return sec(dict(vault))
-    return spec_builder
-
-
-# YtClient.run_operation() only accepts these keyword args; everything else must be
-# applied via SpecBuilder chain methods (weight, title, description, …).
-_RUN_OPERATION_KWARGS = frozenset(
-    {"enable_optimizations", "run_operation_mutation_id", "sync"},
-)
-
-
-def _apply_spec_options_and_split_run_operation_kwargs(
-    spec_builder: object,
-    kwargs: dict[str, Any],
-) -> tuple[Any, dict[str, Any]]:
-    """Apply SpecBuilder kwargs and split out ``run_operation`` options.
-
-    Keys matching SpecBuilder chain methods (e.g. ``weight``, ``title``, ``alias``)
-    stay on the builder. Remaining keys must be only those accepted by
-    ``YtClient.run_operation`` (see ``_RUN_OPERATION_KWARGS``).
-    """
-    kwargs = dict(kwargs)
-    run_op: dict[str, Any] = {}
-    for k in list(kwargs.keys()):
-        if k in _RUN_OPERATION_KWARGS:
-            run_op[k] = kwargs.pop(k)
-    for k, v in list(kwargs.items()):
-        if k == "max_row_weight":
-            del kwargs[k]
-            continue
-        meth = getattr(spec_builder, k, None)
-        if meth is not None and callable(meth):
-            spec_builder = cast("Any", meth)(v)
-            del kwargs[k]
-        else:
-            msg = (
-                f"Unknown YT operation option {k!r}: not a SpecBuilder method on "
-                f"{type(spec_builder).__name__} and not one of "
-                f"{sorted(_RUN_OPERATION_KWARGS)}."
-            )
-            raise ValueError(msg)
-    return spec_builder, run_op
-
-
-def _apply_command_leg_format(
-    leg_builder: object,
-    leg: object,
-) -> object:
-    """Configure wire format for command legs only.
-
-    TypedJob legs keep their native typed protocol; command string legs use JSON.
-    """
-    if isinstance(leg, TypedJob):
-        return leg_builder
-    return cast("Any", leg_builder).format(yt_format.JsonFormat(encode_utf8=False))
-
-
-def _apply_max_row_weight_to_spec_builder(
-    spec_builder: object,
-    max_row_weight: str | None,
-) -> object:
-    """Apply max row weight to spec builder when supported."""
-    if max_row_weight is None:
-        return spec_builder
-    max_row_weight_bytes = parse_max_row_weight_to_bytes(max_row_weight)
-    sb = cast("Any", spec_builder)
-    table_writer = getattr(sb, "table_writer", None)
-    if callable(table_writer):
-        return table_writer({"max_row_weight": max_row_weight_bytes})
-    job_io = getattr(sb, "job_io", None)
-    if callable(job_io):
-        return job_io({"table_writer": {"max_row_weight": max_row_weight_bytes}})
-    return spec_builder
-
-
 class YTProdClient(BaseYTClient):
     """Production YT client implementation.
 
@@ -216,34 +134,20 @@ class YTProdClient(BaseYTClient):
         """
         super().__init__(logger)
 
-        yt_proxy = secrets.get("YT_PROXY")
-        if not yt_proxy:
-            msg = "YT_PROXY is not set (check secrets.env or environment variables)"
-            raise ValueError(msg)
-
-        yt_token = secrets.get("YT_TOKEN")
-        if not yt_token:
-            msg = "YT_TOKEN is not set (check secrets.env or environment variables)"
-            raise ValueError(msg)
+        yt_proxy = read_required_yt_secret(
+            secrets,
+            key="YT_PROXY",
+            missing_message="YT_PROXY is not set (check secrets.env or environment variables)",
+        )
+        yt_token = read_required_yt_secret(
+            secrets,
+            key="YT_TOKEN",
+            missing_message="YT_TOKEN is not set (check secrets.env or environment variables)",
+        )
 
         self.client = YtClient(proxy=yt_proxy, token=yt_token)
         self._apply_pickling_config(pickling or {})
-        try:
-            if "proxy" in self.client.config:
-                self.client.config["proxy"]["enable_proxy_discovery"] = False  # type: ignore[index]
-                self.logger.debug(
-                    "YT Client initialized with proxy: %s (proxy discovery disabled)",
-                    yt_proxy,
-                )
-            else:
-                self.logger.debug("YT Client initialized with proxy: %s", yt_proxy)
-        except Exception as e:  # noqa: BLE001
-            # YT client config shape varies by version; best-effort disable only.
-            self.logger.warning(
-                "Could not disable proxy discovery: %s. Continuing with default settings.",
-                e,
-            )
-            self.logger.debug("YT Client initialized with proxy: %s", yt_proxy)
+        disable_yt_proxy_discovery_best_effort(self.client, self.logger, yt_proxy)
 
     def _apply_pickling_config(self, pickling: dict[str, Any]) -> None:
         """Apply pickling flags from pipeline config to the YT client.
@@ -344,26 +248,18 @@ class YTProdClient(BaseYTClient):
         self.logger.info("Writing %s rows → %s (%s)", len(rows), table_path, mode_str)
 
         try:
-            # Create parent directories if they don't exist
-            if make_parents and "/" in table_path:
-                parent_dir = "/".join(table_path.rstrip("/").split("/")[:-1])
-                if parent_dir:
-                    self.logger.debug(
-                        "Ensuring parent directory exists: %s",
-                        parent_dir,
-                    )
-                    self.create_path(parent_dir, node_type="map_node")
-
-            # Create table with replication factor if it doesn't exist
-            if not append:
-                if self.client.exists(table_path):
-                    self.client.remove(table_path, force=True)
-                self.client.create(
-                    "table",
-                    table_path,
-                    attributes={"replication_factor": replication_factor},
-                    ignore_existing=True,
-                )
+            prod_maybe_create_parent_for_table_path(
+                make_parents=make_parents,
+                table_path=table_path,
+                create_path=self.create_path,
+                logger=self.logger,
+            )
+            prod_write_table_create_or_replace_if_needed(
+                self.client,
+                append=append,
+                table_path=table_path,
+                replication_factor=replication_factor,
+            )
 
             self.client.write_table(
                 TablePath(table_path, append=append),
@@ -976,45 +872,16 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             "Uploading directory %s → %s",
             local_dir,
             yt_dir,
-        )  # Create YT directory
-        self.create_path(yt_dir, node_type="map_node")
-
-        # Initialize .ytignore matcher
-        ignore_matcher = YTIgnoreMatcher(local_dir)
-
-        uploaded = []
-        ignored_count = 0
-        for local_file in local_dir.rglob(pattern):
-            if local_file.is_file():
-                # Check if file should be ignored
-                if ignore_matcher.should_ignore(local_file):
-                    self.logger.debug(
-                        "Ignoring file (matched .ytignore): %s",
-                        local_file,
-                    )
-                    ignored_count += 1
-                    continue
-
-                # Compute relative path
-                rel_path = local_file.relative_to(local_dir)
-                yt_path = f"{yt_dir}/{rel_path}".replace("\\", "/")
-
-                # Create parent directories if needed
-                parent = "/".join(yt_path.split("/")[:-1])
-                if parent:
-                    self.create_path(parent, node_type="map_node")
-
-                # Upload file
-                self.upload_file(local_file, yt_path)
-                uploaded.append(yt_path)
-
-        self.logger.info("Uploaded %s files", len(uploaded))
-        if ignored_count > 0:
-            self.logger.info(
-                "Ignored %s files (matched .ytignore patterns)",
-                ignored_count,
-            )
-        return uploaded
+        )
+        return prod_upload_directory_files(
+            local_dir=local_dir,
+            yt_dir=yt_dir,
+            pattern=pattern,
+            ignore_matcher=YTIgnoreMatcher(local_dir),
+            create_path=self.create_path,
+            upload_file=self.upload_file,
+            logger=self.logger,
+        )
 
     def run_map(
         self,
@@ -1101,53 +968,25 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             )
 
             output_path = TablePath(output_table, append=append, schema=output_schema)
-            msb: Any = MapSpecBuilder()
-            spec_builder = (
-                msb.pool(resources.pool)
-                .resource_limits({"user_slots": resources.user_slots})
-                .max_failed_job_count(max_failed_jobs)
-                .job_count(resources.job_count)
-                .input_table_paths([input_table])
-                .output_table_paths([output_path])
+            spec_builder = prod_assemble_map_spec_with_vault(
+                input_table=input_table,
+                output_path=output_path,
+                resources=resources,
+                max_failed_jobs=max_failed_jobs,
+                mapper_job=mapper_job,
+                file_paths=file_paths,
+                public_env=public_env,
+                merged_vault=merged_vault,
+                logger=self.logger,
             )
-
-            # Set pool tree if specified
-            if resources.pool_tree:
-                spec_builder = spec_builder.pool_trees([resources.pool_tree])
-                self.logger.debug("Set pool tree to %s", resources.pool_tree)
-
-            mapper_builder: Any = (
-                spec_builder.begin_mapper()
-                .command(mapper_job)
-                .file_paths(file_paths)
-                .environment(public_env)
-                .memory_limit(resources.memory_gb * 1024**3)
-                .cpu_limit(resources.cpu_limit)
-                .gpu_limit(resources.gpu_limit)
-            )
-            mapper_builder = _apply_command_leg_format(mapper_builder, mapper_job)
-
-            if resources.docker_image:
-                mapper_builder = mapper_builder.docker_image(resources.docker_image)
-
-            mapper_builder = mapper_builder.end_mapper()
-            spec_builder = _spec_builder_secure_vault(spec_builder, merged_vault)
-            spec_builder = _apply_max_row_weight_to_spec_builder(
-                spec_builder,
-                _optional_str_kw(kwargs.get("max_row_weight")),
-            )
-
-            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+            operation = prod_submit_operation_with_kwargs(
+                self.client,
+                self.logger,
                 spec_builder,
                 kwargs,
+                none_message="Failed to submit operation: run_operation returned None",
+                log_message="Operation submitted: %s",
             )
-            run_op.setdefault("sync", False)
-            operation = self.client.run_operation(spec_builder, **run_op)
-            if operation is None:
-                _raise_runtime_error(
-                    "Failed to submit operation: run_operation returned None",
-                )
-            self.logger.info("Operation submitted: %s", operation.id)
         except Exception:
             self.logger.exception("Failed to submit operation")
             raise
@@ -1221,7 +1060,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
             ]
 
-            od = kwargs.pop("operation_description", None)
+            operation_description = kwargs.pop("operation_description", None)
 
             public_env, secure_flat, vanilla_job = _partition_and_maybe_wrap_leg(
                 vanilla_job,
@@ -1236,53 +1075,25 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 user_secure_vault=user_secure_vault,
             )
 
-            vsb: Any = VanillaSpecBuilder()
-            spec_builder = (
-                vsb.pool(resources.pool)
-                .resource_limits({"user_slots": resources.user_slots})
-                .max_failed_job_count(max_failed_jobs)
+            spec_builder = prod_assemble_vanilla_spec_with_vault(
+                resources=resources,
+                max_failed_jobs=max_failed_jobs,
+                task_name=task_name,
+                vanilla_job=vanilla_job,
+                file_paths=file_paths,
+                public_env=public_env,
+                merged_vault=merged_vault,
+                logger=self.logger,
+                operation_description=operation_description,
             )
-
-            if isinstance(od, dict):
-                spec_builder = spec_builder.description(od)
-
-            # Set pool tree if specified
-            if resources.pool_tree:
-                spec_builder = spec_builder.pool_trees([resources.pool_tree])
-                self.logger.debug("Set pool tree to %s", resources.pool_tree)
-
-            task_builder = (
-                spec_builder.begin_task(task_name)
-                .command(vanilla_job)
-                .file_paths(file_paths)
-                .environment(public_env)
-                .memory_limit(resources.memory_gb * 1024**3)
-                .cpu_limit(resources.cpu_limit)
-                .gpu_limit(resources.gpu_limit)
-                .job_count(resources.job_count)
-            )
-
-            if resources.docker_image:
-                task_builder = task_builder.docker_image(resources.docker_image)
-
-            task_builder.end_task()
-            spec_builder = _spec_builder_secure_vault(spec_builder, merged_vault)
-            spec_builder = _apply_max_row_weight_to_spec_builder(
-                spec_builder,
-                _optional_str_kw(kwargs.get("max_row_weight")),
-            )
-
-            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+            operation = prod_submit_operation_with_kwargs(
+                self.client,
+                self.logger,
                 spec_builder,
                 kwargs,
+                none_message="Failed to submit operation: run_operation returned None",
+                log_message="Operation submitted: %s",
             )
-            run_op.setdefault("sync", False)
-            operation = self.client.run_operation(spec_builder, **run_op)
-            if operation is None:
-                _raise_runtime_error(
-                    "Failed to submit operation: run_operation returned None",
-                )
-            self.logger.info("Operation submitted: %s", operation.id)
         except Exception:
             self.logger.exception("Failed to submit vanilla operation")
             raise
@@ -1337,23 +1148,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 kwargs=dict(cast("Any", kwargs)),
             )
 
-            mrsb: Any = MapReduceSpecBuilder()
-            spec_builder = (
-                mrsb.input_table_paths([source_table])
-                .output_table_paths([dest_table])
-                .pool(resources.pool)
-                .max_failed_job_count(max_failed_jobs)
+            spec_builder = prod_map_reduce_open_spec_builder(
+                source_table=source_table,
+                dest_table=dest_table,
+                resources=resources,
+                max_failed_jobs=max_failed_jobs,
+                kwargs=kwargs,
             )
-            if resources.pool_tree:
-                spec_builder = spec_builder.pool_trees([resources.pool_tree])
-            if resources.user_slots:
-                spec_builder = spec_builder.resource_limits(
-                    {"user_slots": resources.user_slots},
-                )
-
-            od = kwargs.pop("operation_description", None)
-            if isinstance(od, dict):
-                spec_builder = spec_builder.description(od)
 
             spec_builder = cast(
                 "Any",
@@ -1378,29 +1179,21 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 ),
             )
 
-            spec_builder = cast(
-                "Any", _spec_builder_secure_vault(spec_builder, merged_vault)
-            )
-            spec_builder = spec_builder.reduce_by(reduce_by)
-            if sort_by:
-                spec_builder = spec_builder.sort_by(sort_by)
-            map_job_count = kwargs.pop("map_job_count", None)
-            if map_job_count is not None:
-                spec_builder = spec_builder.map_job_count(map_job_count)
-            spec_builder = _apply_max_row_weight_to_spec_builder(
+            spec_builder = prod_map_reduce_after_legs(
                 spec_builder,
-                _optional_str_kw(kwargs.get("max_row_weight")),
-            )
-
-            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
-                spec_builder,
+                merged_vault,
+                reduce_by,
+                sort_by,
                 kwargs,
             )
-            run_op.setdefault("sync", False)
-            operation = self.client.run_operation(spec_builder, **run_op)
-            if operation is None:
-                _raise_runtime_error("Failed to submit map-reduce operation")
-            self.logger.info("Map-reduce operation submitted: %s", operation.id)
+            operation = prod_submit_operation_with_kwargs(
+                self.client,
+                self.logger,
+                spec_builder,
+                kwargs,
+                none_message="Failed to submit map-reduce operation",
+                log_message="Map-reduce operation submitted: %s",
+            )
         except Exception:
             self.logger.exception("Failed to submit map-reduce operation")
             raise
@@ -1564,56 +1357,32 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             source_table = TablePath(input_table)
             dest_table = TablePath(output_table, append=False, schema=output_schema)
 
-            rsb: Any = ReduceSpecBuilder()
-            spec_builder = (
-                rsb.input_table_paths([source_table])
-                .output_table_paths([dest_table])
-                .pool(resources.pool)
-                .max_failed_job_count(max_failed_jobs)
+            spec_builder = prod_reduce_open_spec_builder(
+                source_table=source_table,
+                dest_table=dest_table,
+                resources=resources,
+                max_failed_jobs=max_failed_jobs,
+                kwargs=kwargs,
             )
-            if resources.pool_tree:
-                spec_builder = spec_builder.pool_trees([resources.pool_tree])
-            if resources.user_slots:
-                spec_builder = spec_builder.resource_limits(
-                    {"user_slots": resources.user_slots},
-                )
-
-            rod = kwargs.pop("operation_description", None)
-            if isinstance(rod, dict):
-                spec_builder = spec_builder.description(rod)
-
-            reducer_builder: Any = (
-                spec_builder.begin_reducer()
-                .command(reducer_leg)
-                .file_paths(file_paths)
-                .environment(public_env)
-                .memory_limit(resources.memory_gb * 1024**3)
-                .cpu_limit(resources.cpu_limit)
-                .gpu_limit(resources.gpu_limit)
+            spec_builder = prod_reduce_finish_reducer_leg(
+                spec_builder,
+                reducer_leg=reducer_leg,
+                file_paths=file_paths,
+                public_env=public_env,
+                resources=resources,
             )
-            reducer_builder = _apply_command_leg_format(reducer_builder, reducer_leg)
-            if resources.docker_image:
-                reducer_builder = reducer_builder.docker_image(resources.docker_image)
-            reducer_builder.end_reducer()
-
             spec_builder = cast(
                 "Any", _spec_builder_secure_vault(spec_builder, merged_vault)
             )
             spec_builder = spec_builder.reduce_by(reduce_by)
-            spec_builder = _apply_max_row_weight_to_spec_builder(
-                spec_builder,
-                _optional_str_kw(kwargs.get("max_row_weight")),
-            )
-
-            spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+            operation = prod_submit_operation_with_kwargs(
+                self.client,
+                self.logger,
                 spec_builder,
                 kwargs,
+                none_message="Failed to submit reduce operation",
+                log_message="Reduce operation submitted: %s",
             )
-            run_op.setdefault("sync", False)
-            operation = self.client.run_operation(spec_builder, **run_op)
-            if operation is None:
-                _raise_runtime_error("Failed to submit reduce operation")
-            self.logger.info("Reduce operation submitted: %s", operation.id)
         except Exception:
             self.logger.exception("Failed to submit reduce operation")
             raise
@@ -1634,14 +1403,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             sort_columns = [
                 yt_schema.SortColumn(col, sort_order="ascending") for col in sort_by
             ]
-            spec: dict[str, Any] = dict(cast("Any", kwargs.pop("spec", None)) or {})
-            if pool:
-                spec["pool"] = pool
-            if pool_tree:
-                spec["pool_tree"] = pool_tree
-            if spec:
-                kwargs["spec"] = spec
-            self.client.run_sort(table_path, sort_by=sort_columns, **kwargs)
+            call_kw = prod_merge_sort_spec_into_kwargs(
+                dict(cast("Any", kwargs)),
+                pool=pool,
+                pool_tree=pool_tree,
+            )
+            self.client.run_sort(table_path, sort_by=sort_columns, **call_kw)
             self.logger.info("Sort completed")
         except Exception:
             self.logger.exception("Failed to sort table")

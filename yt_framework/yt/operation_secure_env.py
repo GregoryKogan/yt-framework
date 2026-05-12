@@ -85,7 +85,7 @@ def wrap_shell_command_with_secure_vault_promotion(inner: str) -> str:
 
 def pop_secure_env_client_kwargs(
     kwargs: MutableMapping[str, Any],
-) -> tuple[Any, bool, Any]:
+) -> tuple[Collection[str] | None, bool, Mapping[str, Any] | None]:
     """Remove framework-only kwargs before YT SpecBuilder or dev subprocess paths."""
     environment_public_keys = kwargs.pop("environment_public_keys", None)
     use_plain = bool(kwargs.pop("use_plain_environment_for_secrets", False))
@@ -112,14 +112,22 @@ def merge_secure_vault(
     if not user_secure_vault:
         return out
     for k, v in user_secure_vault.items():
-        if k == "docker_auth" and isinstance(v, Mapping):
-            base = out.get("docker_auth")
-            if isinstance(base, Mapping):
-                merged = dict(base)
-                merged.update(dict(v))
-                out["docker_auth"] = merged
-            else:
-                out["docker_auth"] = dict(v)
-        else:
-            out[k] = v
+        _merge_one_secure_vault_key(out, k, v)
     return out
+
+
+def _merge_one_secure_vault_key(
+    out: dict[str, Any],
+    k: str,
+    v: object,
+) -> None:
+    if k == "docker_auth" and isinstance(v, Mapping):
+        base = out.get("docker_auth")
+        if isinstance(base, Mapping):
+            merged = dict(base)
+            merged.update(dict(v))
+            out["docker_auth"] = merged
+        else:
+            out["docker_auth"] = dict(v)
+    else:
+        out[k] = v

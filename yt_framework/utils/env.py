@@ -4,6 +4,13 @@ import warnings
 from pathlib import Path
 
 
+def _parse_env_kv_line(line: str) -> tuple[str, str] | None:
+    if not line or line.startswith("#") or "=" not in line:
+        return None
+    key, value = line.split("=", 1)
+    return key.strip(), value.strip()
+
+
 def load_env_file(env_path: Path) -> dict[str, str]:
     """Load environment variables from a .env file.
 
@@ -35,12 +42,9 @@ def load_env_file(env_path: Path) -> dict[str, str]:
     try:
         with env_path.open() as f:
             for raw_line in f:
-                line = raw_line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, value = line.split("=", 1)
-                    key = key.strip()
-                    value = value.strip()
-                    env_vars[key] = value
+                kv = _parse_env_kv_line(raw_line.strip())
+                if kv:
+                    env_vars[kv[0]] = kv[1]
     except OSError as e:
         warnings.warn(f"Could not load {env_path}: {e}", UserWarning, stacklevel=2)
 

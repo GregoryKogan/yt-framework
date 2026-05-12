@@ -10,6 +10,20 @@ from typing import Any
 from .utils import log_error, parse_json_line, process_and_write_results
 
 
+def _json_row_from_stdin_line(raw_line: str) -> object | None:
+    line = raw_line.strip()
+    if not line:
+        return None
+    return parse_json_line(line)
+
+
+def _iter_nonempty_json_rows_from_stdin() -> Iterator[object]:
+    for raw_line in sys.stdin:
+        row_data = _json_row_from_stdin_line(raw_line)
+        if row_data is not None:
+            yield row_data
+
+
 class StreamMapper:
     """Mapper that processes stdin one line at a time.
 
@@ -21,7 +35,8 @@ class StreamMapper:
     def map(
         self,
         processing_func: Callable[[Any], Iterator[Any]],
-        redirect_processing_output: bool = True,  # noqa: FBT001,FBT002
+        *,
+        redirect_processing_output: bool = True,
         **kwargs: object,
     ) -> None:
         """Read stdin line-by-line, process each, write results to stdout.
@@ -33,26 +48,34 @@ class StreamMapper:
 
         """
         for raw_line in sys.stdin:
-            line = raw_line.strip()
-            if not line:
-                continue
+            self._process_stdin_line(
+                raw_line,
+                processing_func,
+                redirect_processing_output=redirect_processing_output,
+                **kwargs,
+            )
 
-            # Parse input row
-            row_data = parse_json_line(line)
-            if row_data is None:
-                continue
-
-            # Process row and write results as they're yielded
-            try:
-                process_and_write_results(
-                    processing_func,
-                    row_data,
-                    redirect_processing_output,
-                    **kwargs,
-                )
-            except Exception as e:
-                log_error({"error": f"Processing failed: {e!s}", "row": line})
-                raise
+    def _process_stdin_line(
+        self,
+        raw_line: str,
+        processing_func: Callable[[Any], Iterator[Any]],
+        *,
+        redirect_processing_output: bool,
+        **kwargs: object,
+    ) -> None:
+        row_data = _json_row_from_stdin_line(raw_line)
+        if row_data is None:
+            return
+        try:
+            process_and_write_results(
+                processing_func,
+                row_data,
+                redirect_output=redirect_processing_output,
+                **kwargs,
+            )
+        except Exception as e:
+            log_error({"error": f"Processing failed: {e!s}", "row": raw_line.strip()})
+            raise
 
 
 class BatchMapper:
@@ -76,7 +99,8 @@ class BatchMapper:
     def map(
         self,
         processing_func: Callable[..., Iterator[Any]],
-        redirect_processing_output: bool = True,  # noqa: FBT001,FBT002
+        *,
+        redirect_processing_output: bool = True,
         **kwargs: object,
     ) -> None:
         """Read stdin in batches, process each batch, write results to stdout.
@@ -90,20 +114,21 @@ class BatchMapper:
         if self.batch_size is None:
             self._process_all_rows(
                 processing_func,
-                redirect_processing_output,
+                redirect_processing_output=redirect_processing_output,
                 **kwargs,
             )
         else:
             self._process_in_batches(
                 processing_func,
-                redirect_processing_output,
+                redirect_processing_output=redirect_processing_output,
                 **kwargs,
             )
 
     def _process_all_rows(
         self,
         processing_func: Callable[..., Iterator[Any]],
-        redirect_processing_output: bool,  # noqa: FBT001
+        *,
+        redirect_processing_output: bool,
         **kwargs: object,
     ) -> None:
         """Process all rows from stdin at once."""
@@ -114,7 +139,7 @@ class BatchMapper:
                 process_and_write_results(
                     processing_func,
                     rows,
-                    redirect_processing_output,
+                    redirect_output=redirect_processing_output,
                     **kwargs,
                 )
             except Exception as e:
@@ -126,50 +151,60 @@ class BatchMapper:
                 )
                 raise
 
+    def _flush_batch_if_at_capacity(
+        self,
+        batch: list[Any],
+        batch_count: int,
+        batch_size: int,
+        processing_func: Callable[..., Iterator[Any]],
+        *,
+        redirect_processing_output: bool,
+        **kwargs: object,
+    ) -> tuple[list[Any], int]:
+        if len(batch) < batch_size:
+            return batch, batch_count
+        self._process_batch(
+            batch,
+            batch_count,
+            processing_func,
+            redirect_processing_output=redirect_processing_output,
+            **kwargs,
+        )
+        return [], batch_count + 1
+
     def _process_in_batches(
         self,
         processing_func: Callable[..., Iterator[Any]],
-        redirect_processing_output: bool,  # noqa: FBT001
+        *,
+        redirect_processing_output: bool,
         **kwargs: object,
     ) -> None:
         """Process rows from stdin in batches."""
-        if self.batch_size is None:
+        bs = self.batch_size
+        if bs is None:
             msg = "Batch size must be set"
             raise ValueError(msg)
 
-        batch = []
+        batch: list[Any] = []
         batch_count = 0
 
-        for raw_line in sys.stdin:
-            line = raw_line.strip()
-            if not line:
-                continue
-
-            row_data = parse_json_line(line)
-            if row_data is None:
-                continue
-
+        for row_data in _iter_nonempty_json_rows_from_stdin():
             batch.append(row_data)
+            batch, batch_count = self._flush_batch_if_at_capacity(
+                batch,
+                batch_count,
+                bs,
+                processing_func,
+                redirect_processing_output=redirect_processing_output,
+                **kwargs,
+            )
 
-            # Process batch when it reaches batch_size
-            if len(batch) >= self.batch_size:
-                self._process_batch(
-                    batch,
-                    batch_count,
-                    processing_func,
-                    redirect_processing_output,
-                    **kwargs,
-                )
-                batch = []
-                batch_count += 1
-
-        # Process remaining rows
         if batch:
             self._process_batch(
                 batch,
                 batch_count,
                 processing_func,
-                redirect_processing_output,
+                redirect_processing_output=redirect_processing_output,
                 **kwargs,
             )
 
@@ -177,11 +212,7 @@ class BatchMapper:
         """Read all rows from stdin."""
         rows = []
         for raw_line in sys.stdin:
-            line = raw_line.strip()
-            if not line:
-                continue
-
-            row_data = parse_json_line(line)
+            row_data = _json_row_from_stdin_line(raw_line)
             if row_data is not None:
                 rows.append(row_data)
 
@@ -192,7 +223,8 @@ class BatchMapper:
         batch: list[Any],
         batch_number: int,
         processing_func: Callable[..., Iterator[Any]],
-        redirect_processing_output: bool,  # noqa: FBT001
+        *,
+        redirect_processing_output: bool,
         **kwargs: object,
     ) -> None:
         """Process a single batch."""
@@ -200,7 +232,7 @@ class BatchMapper:
             process_and_write_results(
                 processing_func,
                 batch,
-                redirect_processing_output,
+                redirect_output=redirect_processing_output,
                 **kwargs,
             )
         except Exception as e:
