@@ -9,10 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
-from yt.wrapper import Operation  # pyright: ignore[reportMissingImports]
+from yt.wrapper import Operation
 
 if TYPE_CHECKING:
-    from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
+    from yt.wrapper.schema import TableSchema
 
 
 @dataclass

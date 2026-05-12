@@ -14,7 +14,7 @@ LegKind = Literal["typed", "command"]
 def _ytsaurus_typed_job_type() -> type | None:
     """Resolve ``yt.wrapper.TypedJob`` lazily so import hooks/tests can simulate failure."""
     try:
-        from yt.wrapper import TypedJob  # noqa: PLC0415, I001  # pyright: ignore[reportMissingImports]
+        from yt.wrapper import TypedJob  # noqa: PLC0415
     except ImportError:
         return None
     else:

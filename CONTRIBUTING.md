@@ -181,7 +181,7 @@ This helps ensure you haven't broken existing functionality.
 
 - Follow **PEP 8** style guidelines
 - Use **Ruff** for formatting and linting (line length 88, Python 3.11; see `[tool.ruff]` in `pyproject.toml`). Lint uses `select = ["ALL"]` with a small documented `ignore` list.
-- Use **BasedPyright** for strict static typing (`pyrightconfig.json`). The current required scope is `yt_framework` and `ytjobs`; unresolved legacy modules are tracked via the explicit `ignore` list in that config.
+- Use **BasedPyright** for strict static typing (`pyrightconfig.json`). The checked tree is `yt_framework` and `ytjobs` (see `include` / `exclude` there); tests and `examples/` are excluded from that pass.
 - Use type hints where appropriate
 
 ### Naming Conventions

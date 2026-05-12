@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from omegaconf import DictConfig, OmegaConf
-from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
+from yt.wrapper.schema import TableSchema
 
 from yt_framework.utils.logging import log_header, log_success
 

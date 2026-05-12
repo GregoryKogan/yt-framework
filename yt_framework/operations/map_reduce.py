@@ -4,10 +4,11 @@ Builds archives plus optional file dependencies; cluster credentials still come
 from `configs/secrets.env` like other operations.
 """
 
+import logging
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from yt_framework.utils.logging import log_header, log_success
 
@@ -23,15 +24,25 @@ from .dependency_strategy import TarArchiveDependencyBuilder
 from .job_command import require_consistent_map_reduce_legs
 
 if TYPE_CHECKING:
+    from yt.wrapper.schema import TableSchema
+
     from yt_framework.core.stage import StageContext
+
+
+def _str_list_from_config(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, ListConfig)):
+        return [str(x) for x in value]
+    return [str(value)]
 
 
 def _validate_map_reduce_inputs(
     operation_config: DictConfig,
 ) -> tuple[str, str, list[str]]:
-    input_table = operation_config.get("input_table")
-    output_table = operation_config.get("output_table")
-    reduce_by = list(operation_config.get("reduce_by") or [])
+    input_table = str(operation_config.get("input_table") or "")
+    output_table = str(operation_config.get("output_table") or "")
+    reduce_by = _str_list_from_config(operation_config.get("reduce_by"))
     if input_table and output_table and reduce_by:
         return input_table, output_table, reduce_by
     msg = (
@@ -93,9 +104,9 @@ def _prepare_map_reduce_dependencies(
 
 def _build_map_reduce_spec_kwargs(
     operation_config: DictConfig,
-    logger: object,
-) -> dict:
-    spec_kwargs: dict = {}
+    logger: logging.Logger,
+) -> dict[str, Any]:
+    spec_kwargs: dict[str, Any] = {}
     if operation_config.get("map_job_count") is not None:
         spec_kwargs["map_job_count"] = operation_config.map_job_count
 
@@ -143,7 +154,7 @@ def run_map_reduce(
     operation_config: DictConfig,
     mapper: object = None,
     reducer: object = None,
-    output_schema: object | None = None,
+    output_schema: "TableSchema | None" = None,
     map_job: object = None,
     reduce_job: object = None,
 ) -> bool:
@@ -210,7 +221,7 @@ def run_map_reduce(
 
     docker_auth = extract_docker_auth_from_operation_config(operation_config, env)
 
-    sort_by = list(operation_config.get("sort_by") or [])
+    sort_by = _str_list_from_config(operation_config.get("sort_by"))
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
     spec_kwargs = _build_map_reduce_spec_kwargs(operation_config, logger)
@@ -244,7 +255,7 @@ def run_reduce(
     context: "StageContext",
     operation_config: DictConfig,
     reducer: object = None,
-    output_schema: object | None = None,
+    output_schema: "TableSchema | None" = None,
     job: object = None,
 ) -> bool:
     """Run a YT reduce-only operation and wait for completion.
@@ -271,9 +282,9 @@ def run_reduce(
         f"Input: {operation_config.get('input_table')} -> Output: {operation_config.get('output_table')}",
     )
 
-    input_table = operation_config.get("input_table")
-    output_table = operation_config.get("output_table")
-    reduce_by = list(operation_config.get("reduce_by") or [])
+    input_table = str(operation_config.get("input_table") or "")
+    output_table = str(operation_config.get("output_table") or "")
+    reduce_by = _str_list_from_config(operation_config.get("reduce_by"))
     if not input_table or not output_table or not reduce_by:
         msg = (
             "operation_config must set input_table, output_table, and reduce_by; "
@@ -315,7 +326,7 @@ def run_reduce(
 
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
-    reduce_kw: dict = {}
+    reduce_kw: dict[str, Any] = {}
     rod = operation_config.get("operation_description")
     if rod:
         if isinstance(rod, str):

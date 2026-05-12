@@ -151,6 +151,6 @@ def test_run_vanilla_true(yt_case_prefix: str, yt_client, op_resources) -> None:
         [],
         {},
         "yt_cluster_vanilla_smoke",
-        op_resources,
+        resources=op_resources,
     )
     assert yt_client.wait_for_operation(op), "vanilla no-op must succeed"

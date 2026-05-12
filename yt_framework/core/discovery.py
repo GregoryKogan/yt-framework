@@ -8,6 +8,13 @@ from pathlib import Path
 from yt_framework.core.stage import BaseStage
 
 
+def _purge_stages_modules_from_sys() -> None:
+    """Drop cached ``stages`` package tree so imports resolve the current ``pipeline_dir``."""
+    for key in list(sys.modules):
+        if key == "stages" or key.startswith("stages."):
+            sys.modules.pop(key, None)
+
+
 def discover_stages(
     pipeline_dir: Path,
     logger: logging.Logger,
@@ -36,6 +43,8 @@ def discover_stages(
 
     discovered_stages: list[type[BaseStage]] = []
 
+    _purge_stages_modules_from_sys()
+
     # Iterate through each subdirectory in stages/
     for stage_dir in sorted(stages_dir.iterdir()):  # Sort for consistent order
         if not stage_dir.is_dir():
@@ -55,7 +64,6 @@ def discover_stages(
             if str(pipeline_dir) not in sys.path:
                 sys.path.insert(0, str(pipeline_dir))
 
-            # Import the module
             module = importlib.import_module(module_name)
 
             # Find all BaseStage subclasses in the module
@@ -76,7 +84,13 @@ def discover_stages(
                     )
                     break  # Only take first BaseStage subclass per module
 
-        except (AttributeError, ImportError, ModuleNotFoundError, OSError) as e:
+        except (
+            AttributeError,
+            ImportError,
+            ModuleNotFoundError,
+            OSError,
+            SyntaxError,
+        ) as e:
             logger.warning("Failed to import stage from %s: %s", stage_file, e)
             continue
 

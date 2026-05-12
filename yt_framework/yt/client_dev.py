@@ -9,10 +9,10 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional, cast
 
-from omegaconf import DictConfig, OmegaConf
-from yt.wrapper import Operation  # pyright: ignore[reportMissingImports]
+from omegaconf import DictConfig, ListConfig, OmegaConf
+from yt.wrapper import Operation
 
 import yt_framework
 import ytjobs
@@ -37,7 +37,7 @@ from yt_framework.yt.yql_builder import (
 )
 
 if TYPE_CHECKING:
-    from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
+    from yt.wrapper.schema import TableSchema
 
 _DEV_BUILD_SPLIT_PARTS = 2
 
@@ -312,7 +312,7 @@ class YTDevClient(BaseYTClient):
             results, _ = simulator.execute_yql(query_with_max_row_weight)
 
             # Save results if output table specified
-            if output_table and results is not None:
+            if output_table and results:
                 self.write_table(output_table, results, append=False)
                 self.logger.info("Wrote %s rows to %s", len(results), output_table)
 
@@ -677,17 +677,17 @@ class YTDevClient(BaseYTClient):
                 shutil.copy2(sandbox_output, output_path)
 
         err_hint = f"Stderr written to {logs_path}" if proc.returncode != 0 else ""
-        return _DevOperation(proc.returncode, err_hint)  # type: ignore[return-value]
+        return cast("Operation", _DevOperation(proc.returncode, err_hint))
 
     def run_vanilla(
         self,
-        command: str,
+        command: object,
         files: list[tuple[str, str]],
         env: dict[str, str],
         task_name: str = "main",
-        job: str | None = None,
+        job: object = None,
         **kwargs: object,
-    ) -> Operation:
+    ) -> Operation | None:
         """Run a vanilla operation locally using subprocess.
 
         In dev mode, executes the vanilla script locally in a temporary sandbox
@@ -708,7 +708,7 @@ class YTDevClient(BaseYTClient):
         self.logger.info("Submitting vanilla operation")
         _kw = dict(kwargs)
         pop_secure_env_client_kwargs(_kw)
-        vanilla_job = job if job is not None else command
+        vanilla_job = str(job) if job is not None else str(command)
         self.logger.info("  Command: %s", vanilla_job)
         self.logger.info("  Task: %s", task_name)
 
@@ -721,7 +721,8 @@ class YTDevClient(BaseYTClient):
 
         # Copy config.yaml to the correct location in sandbox if it exists
         # config.yaml dependency has local_name="config.yaml" but should be at stages/{task_name}/config.yaml
-        stage_config_source = self.pipeline_dir / "stages" / task_name / "config.yaml"
+        pd = self._pipeline_dir_or_raise()
+        stage_config_source = pd / "stages" / task_name / "config.yaml"
         if stage_config_source.exists():
             stage_config_dest = sandbox_dir / "stages" / task_name / "config.yaml"
             stage_config_dest.parent.mkdir(parents=True, exist_ok=True)
@@ -798,7 +799,7 @@ class YTDevClient(BaseYTClient):
             )
 
         err_hint = f"Output written to {logs_path}" if proc.returncode != 0 else ""
-        return _DevOperation(proc.returncode, err_hint)  # type: ignore[return-value]
+        return cast("Operation", _DevOperation(proc.returncode, err_hint))
 
     def run_map_reduce(
         self,
@@ -856,7 +857,7 @@ class YTDevClient(BaseYTClient):
         else:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("")
-        return _DevOperation(0)  # type: ignore[return-value]
+        return cast("Operation", _DevOperation(0))
 
     def run_reduce(
         self,
@@ -899,7 +900,7 @@ class YTDevClient(BaseYTClient):
         else:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("")
-        return _DevOperation(0)  # type: ignore[return-value]
+        return cast("Operation", _DevOperation(0))
 
     def run_sort(
         self,
@@ -916,7 +917,7 @@ class YTDevClient(BaseYTClient):
         """Build environment variables for subprocess."""
         # Set PYTHONPATH to include pipeline dir
         env_merged = {**os.environ, **(env or {})}
-        pp_parts = [str(self.pipeline_dir)]
+        pp_parts = [str(self._pipeline_dir_or_raise())]
 
         # Add yt_framework to PYTHONPATH
         yt_framework_dir = Path(yt_framework.__file__).parent
@@ -974,7 +975,7 @@ class YTDevClient(BaseYTClient):
     ) -> bool:
         if not yt_path.endswith(".tar.gz"):
             return False
-        local_build = self.pipeline_dir / ".build"
+        local_build = self._pipeline_dir_or_raise() / ".build"
         if not local_build.exists():
             return False
         source_file = local_build / Path(yt_path).name
@@ -1014,9 +1015,10 @@ class YTDevClient(BaseYTClient):
                 yj_mod = importlib.import_module("ytjobs")
             except ImportError:
                 return None
-        if not getattr(yj_mod, "__file__", None):
+        yj_file = getattr(yj_mod, "__file__", None)
+        if not yj_file:
             return None
-        ytjobs_dir = Path(yj_mod.__file__).parent
+        ytjobs_dir = Path(yj_file).parent
         ytjobs_rel_path = local_name.replace("ytjobs/", "")
         source_file = ytjobs_dir / ytjobs_rel_path
         if source_file.exists():
@@ -1029,7 +1031,7 @@ class YTDevClient(BaseYTClient):
         local_name: str,
         sandbox_dir: Path,
     ) -> bool:
-        source_file = self.pipeline_dir / local_name
+        source_file = self._pipeline_dir_or_raise() / local_name
         sandbox_file = sandbox_dir / local_name
         if source_file.exists():
             self._copy_file_to_sandbox(source_file, sandbox_file)
@@ -1128,7 +1130,9 @@ class YTDevClient(BaseYTClient):
 
         return env_merged
 
-    def _find_checkpoint_in_config(self, stage_config: DictConfig) -> str | None:
+    def _find_checkpoint_in_config(
+        self, stage_config: DictConfig | ListConfig
+    ) -> str | None:
         """Find checkpoint local_checkpoint_path in stage config.
 
         Searches through all operations in client.operations dynamically,
@@ -1141,6 +1145,8 @@ class YTDevClient(BaseYTClient):
             Local checkpoint path string if found, None otherwise
 
         """
+        if not isinstance(stage_config, DictConfig):
+            return None
         # First, try legacy path
         local_checkpoint = OmegaConf.select(
             stage_config,
@@ -1151,7 +1157,7 @@ class YTDevClient(BaseYTClient):
 
         # Then, iterate over all operations dynamically
         operations = OmegaConf.select(stage_config, "client.operations")
-        if operations:
+        if operations and isinstance(operations, (DictConfig, dict)):
             for op_name in operations:
                 checkpoint_path = (
                     f"client.operations.{op_name}.checkpoint.local_checkpoint_path"
@@ -1167,7 +1173,7 @@ class YTDevClient(BaseYTClient):
         self._pipeline_dir_or_raise()
 
         # Try to find stage config by scanning stages directory
-        stages_dir = self.pipeline_dir / "stages"
+        stages_dir = self._pipeline_dir_or_raise() / "stages"
         if not stages_dir.exists():
             return None
 
@@ -1179,9 +1185,11 @@ class YTDevClient(BaseYTClient):
                     stage_config_path = stage_dir / "config.yaml"
                     if stage_config_path.exists():
                         try:
-                            stage_config = OmegaConf.load(stage_config_path)
+                            stage_cfg = OmegaConf.load(stage_config_path)
+                            if not isinstance(stage_cfg, DictConfig):
+                                continue
                             local_checkpoint = self._find_checkpoint_in_config(
-                                stage_config,
+                                stage_cfg,
                             )
                             if local_checkpoint:
                                 checkpoint_path = Path(local_checkpoint).resolve()
@@ -1210,7 +1218,7 @@ class YTDevClient(BaseYTClient):
 
         # Try to find stage config by scanning stages directory
         # This is a best-effort approach since we no longer have mapper_script path
-        stages_dir = self.pipeline_dir / "stages"
+        stages_dir = self._pipeline_dir_or_raise() / "stages"
         if not stages_dir.exists():
             return
 
@@ -1226,14 +1234,15 @@ class YTDevClient(BaseYTClient):
                         env_merged["JOB_CONFIG_PATH"] = str(stage_config_path)
 
                         try:
-                            stage_config = OmegaConf.load(stage_config_path)
-                            # Find checkpoint path dynamically (searches all operations)
+                            stage_cfg = OmegaConf.load(stage_config_path)
+                            if not isinstance(stage_cfg, DictConfig):
+                                continue
                             local_checkpoint = self._find_checkpoint_in_config(
-                                stage_config,
+                                stage_cfg,
                             )
                             # Get model_name from job.model_name (used as checkpoint filename)
                             model_name = OmegaConf.select(
-                                stage_config,
+                                stage_cfg,
                                 "job.model_name",
                             )
 
@@ -1243,7 +1252,9 @@ class YTDevClient(BaseYTClient):
                                     # Set CHECKPOINT_FILE to the filename (not full path) since the file
                                     # will be copied to the sandbox directory and processor expects it there
                                     checkpoint_filename = (
-                                        model_name or checkpoint_path.name
+                                        str(model_name)
+                                        if model_name not in (None, "")
+                                        else checkpoint_path.name
                                     )
                                     env_merged["CHECKPOINT_FILE"] = checkpoint_filename
                                     self.logger.info(
