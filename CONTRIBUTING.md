@@ -69,7 +69,7 @@ Contributions come in many forms:
 
    If `which pip` points outside the Conda env (for example Homebrew), use `python -m pip install -e ".[dev,docs]"` instead. The same applies to one-off commands with `conda run -n yt-framework -- python -m pip ...`.
 
-   This installs runtime dependencies plus `ruff`, `basedpyright`, `pytest`, `pytest-cov`, `pre-commit`, and the Sphinx stack needed for `make -C docs html`. You do not need a separate `pip install -e ".[docs]"` step.
+   This installs runtime dependencies plus `ruff`, `basedpyright`, `vulture`, `pytest`, `pytest-cov`, `pre-commit`, and the Sphinx stack needed for `make -C docs html`. You do not need a separate `pip install -e ".[docs]"` step.
 
    **Without Conda:** use a Python 3.11+ virtual environment, then `pip install -e ".[dev,docs]"` (or `pip install -e .` and `pip install -e ".[dev]"` if you will not build docs locally).
 
@@ -82,15 +82,16 @@ Contributions come in many forms:
    pre-commit install --hook-type pre-push
    ```
 
-   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Ruff](https://docs.astral.sh/ruff/) (`ruff check --fix` and `ruff format`) and strict [BasedPyright](https://docs.basedpyright.com/) on the repository via [.pre-commit-config.yaml](.pre-commit-config.yaml). The type checker runs in pre-commit’s own Python environment and does not require Conda. On each **push**, the pre-push hook runs the full test suite via `conda run -n yt-framework -- pytest` (requires Conda and the `yt-framework` env on your `PATH`, as when pushing from a normal shell). To skip hooks in an emergency, use `git commit --no-verify` or `git push --no-verify`. To run checks manually before commit, use:
+   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Ruff](https://docs.astral.sh/ruff/) (`ruff check --fix` and `ruff format`), strict [BasedPyright](https://docs.basedpyright.com/), and [Vulture](https://github.com/jendrikseipp/vulture) (dead-code scan for `yt_framework` and `ytjobs`; see `[tool.vulture]` in `pyproject.toml`) via [.pre-commit-config.yaml](.pre-commit-config.yaml). The type checker runs in pre-commit’s own Python environment and does not require Conda. On each **push**, the pre-push hook runs the full test suite via `conda run -n yt-framework -- pytest` (requires Conda and the `yt-framework` env on your `PATH`, as when pushing from a normal shell). To skip hooks in an emergency, use `git commit --no-verify` or `git push --no-verify`. To run checks manually before commit, use:
 
    ```bash
    pre-commit run ruff-check --all-files
    pre-commit run ruff-format --all-files
    pre-commit run basedpyright --all-files
+   pre-commit run vulture --all-files
    ```
 
-   Or directly (same Conda env): `conda run -n yt-framework -- ruff check .`, `conda run -n yt-framework -- ruff format .`, and `conda run -n yt-framework -- basedpyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`.
+   Or directly (same Conda env): `conda run -n yt-framework -- ruff check .`, `conda run -n yt-framework -- ruff format .`, `conda run -n yt-framework -- basedpyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`, and `conda run -n yt-framework -- vulture`.
 
 6. **Set up YT credentials** (for production mode testing):
 
@@ -182,6 +183,7 @@ This helps ensure you haven't broken existing functionality.
 - Follow **PEP 8** style guidelines
 - Use **Ruff** for formatting and linting (line length 88, Python 3.11; see `[tool.ruff]` in `pyproject.toml`). Lint uses `select = ["ALL"]` with a small documented `ignore` list.
 - Use **BasedPyright** for strict static typing (`pyrightconfig.json`). The checked tree is `yt_framework` and `ytjobs` (see `include` / `exclude` there); tests and `examples/` are excluded from that pass.
+- Use **Vulture** for unused code at 100% confidence (`[tool.vulture]` in `pyproject.toml`). If static analysis flags code that is used dynamically, add a small whitelist module and list it under `[tool.vulture]` `paths` (see [Vulture’s docs](https://github.com/jendrikseipp/vulture#handling-false-positives)).
 - Use type hints where appropriate
 
 ### Naming Conventions
@@ -280,7 +282,7 @@ If you keep `yt-cluster-test.env` in your clone, **pre-push** still runs the ful
 
 ### CI (GitHub Actions)
 
-The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs Ruff, strict BasedPyright, and `pytest -m "not yt_cluster"` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). Real YT cluster tests are excluded because the runner has no cell access. To require a green check before merging, configure branch protection on GitHub and add `lint`, `typecheck`, and `test` as required status checks.
+The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs Ruff, Vulture, strict BasedPyright, and `pytest -m "not yt_cluster"` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). Real YT cluster tests are excluded because the runner has no cell access. To require a green check before merging, configure branch protection on GitHub and add `lint`, `typecheck`, and `test` as required status checks.
 
 ### Coverage badge (maintainers)
 
