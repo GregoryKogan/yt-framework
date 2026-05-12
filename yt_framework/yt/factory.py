@@ -9,6 +9,23 @@ from yt_framework.yt.client_dev import YTDevClient
 from yt_framework.yt.client_prod import YTProdClient
 
 
+def _coerce_pipeline_dir(pipeline_dir: Path | str | None) -> Path | None:
+    if pipeline_dir is None:
+        return None
+    return Path(pipeline_dir) if isinstance(pipeline_dir, str) else pipeline_dir
+
+
+def _create_prod_client(
+    _logger: logging.Logger,
+    secrets: dict[str, str] | None,
+    pickling: dict[str, Any] | None,
+) -> YTProdClient:
+    if secrets is None:
+        msg = "secrets are required for prod mode"
+        raise ValueError(msg)
+    return YTProdClient(logger=_logger, secrets=secrets, pickling=pickling or {})
+
+
 def create_yt_client(
     logger: logging.Logger | None = None,
     mode: Literal["prod", "dev"] | None = "dev",
@@ -45,13 +62,5 @@ def create_yt_client(
     """
     _logger = logger or logging.getLogger(__name__)
     if mode == "prod":
-        if secrets is None:
-            msg = "secrets are required for prod mode"
-            raise ValueError(msg)
-        return YTProdClient(logger=_logger, secrets=secrets, pickling=pickling or {})
-    _pipeline_dir: Path | None = None
-    if pipeline_dir is not None:
-        _pipeline_dir = (
-            Path(pipeline_dir) if isinstance(pipeline_dir, str) else pipeline_dir
-        )
-    return YTDevClient(logger=_logger, pipeline_dir=_pipeline_dir)
+        return _create_prod_client(_logger, secrets, pickling)
+    return YTDevClient(logger=_logger, pipeline_dir=_coerce_pipeline_dir(pipeline_dir))

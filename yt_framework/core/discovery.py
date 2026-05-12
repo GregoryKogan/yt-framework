@@ -15,6 +15,47 @@ def _purge_stages_modules_from_sys() -> None:
             sys.modules.pop(key, None)
 
 
+def _ensure_pipeline_on_sys_path(pipeline_dir: Path) -> None:
+    if str(pipeline_dir) not in sys.path:
+        sys.path.insert(0, str(pipeline_dir))
+
+
+def _first_stage_subclass(
+    module: object,
+    stage_name: str,
+    logger: logging.Logger,
+) -> type[BaseStage] | None:
+    for attr_name in dir(module):
+        attr = getattr(module, attr_name)
+        if not isinstance(attr, type):
+            continue
+        if not issubclass(attr, BaseStage) or attr is BaseStage:
+            continue
+        logger.debug("Discovered stage: %s -> %s", stage_name, attr.__name__)
+        return attr
+    return None
+
+
+def _import_stage_module(
+    module_name: str,
+    stage_file: Path,
+    stage_name: str,
+    logger: logging.Logger,
+) -> type[BaseStage] | None:
+    try:
+        module = importlib.import_module(module_name)
+    except (
+        AttributeError,
+        ImportError,
+        ModuleNotFoundError,
+        OSError,
+        SyntaxError,
+    ) as e:
+        logger.warning("Failed to import stage from %s: %s", stage_file, e)
+        return None
+    return _first_stage_subclass(module, stage_name, logger)
+
+
 def discover_stages(
     pipeline_dir: Path,
     logger: logging.Logger,
@@ -59,40 +100,10 @@ def discover_stages(
         stage_name = stage_dir.name
         module_name = f"stages.{stage_name}.stage"
 
-        try:
-            # Add pipeline_dir to sys.path temporarily if needed
-            if str(pipeline_dir) not in sys.path:
-                sys.path.insert(0, str(pipeline_dir))
-
-            module = importlib.import_module(module_name)
-
-            # Find all BaseStage subclasses in the module
-            for attr_name in dir(module):
-                attr = getattr(module, attr_name)
-
-                # Check if it's a class, inherits from BaseStage, and isn't BaseStage itself
-                if (
-                    isinstance(attr, type)
-                    and issubclass(attr, BaseStage)
-                    and attr is not BaseStage
-                ):
-                    discovered_stages.append(attr)
-                    logger.debug(
-                        "Discovered stage: %s -> %s",
-                        stage_name,
-                        attr.__name__,
-                    )
-                    break  # Only take first BaseStage subclass per module
-
-        except (
-            AttributeError,
-            ImportError,
-            ModuleNotFoundError,
-            OSError,
-            SyntaxError,
-        ) as e:
-            logger.warning("Failed to import stage from %s: %s", stage_file, e)
-            continue
+        _ensure_pipeline_on_sys_path(pipeline_dir)
+        found = _import_stage_module(module_name, stage_file, stage_name, logger)
+        if found is not None:
+            discovered_stages.append(found)
 
     if discovered_stages:
         stage_names = [sc.__name__ for sc in discovered_stages]

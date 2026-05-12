@@ -143,6 +143,36 @@ class YTIgnorePattern:
 
         self._regex = re.compile(pattern)
 
+    def _relative_path_str(self, file_path: Path) -> str | None:
+        try:
+            rel_path = file_path.relative_to(self.base_dir)
+        except ValueError:
+            return None
+        return str(rel_path).replace("\\", "/")
+
+    def _rooted_blocks_match(self, path_str: str) -> bool:
+        return bool(self.is_rooted and "/" in path_str)
+
+    def _directory_pattern_matches(self, path_str: str) -> bool:
+        parts = path_str.split("/")
+        for i in range(len(parts)):
+            parent_path = "/".join(parts[: i + 1])
+            if self._regex.match(parent_path):
+                return True
+            if not self.is_rooted and i < len(parts) - 1:
+                dir_name = parts[i]
+                if self._regex.match(dir_name):
+                    return True
+        return False
+
+    def _file_pattern_matches(self, path_str: str) -> bool:
+        filename_match = (
+            "/" not in self.pattern
+            and "**" not in self.pattern
+            and bool(self._regex.match(Path(path_str).name))
+        )
+        return bool(self._regex.match(path_str)) or filename_match
+
     def matches(self, file_path: Path) -> bool:
         """Check if a file path matches this pattern.
 
@@ -153,47 +183,17 @@ class YTIgnorePattern:
             True if the path matches
 
         """
-        # Patterns should always be matched relative to their own base_dir
-        # (where the .ytignore file is located), not the upload base_dir
-        try:
-            rel_path = file_path.relative_to(self.base_dir)
-        except ValueError:
-            # file_path is not under pattern's base_dir, cannot match
+        path_str = self._relative_path_str(file_path)
+        if path_str is None:
             return False
 
-        # Convert to string with forward slashes
-        path_str = str(rel_path).replace("\\", "/")
-
-        # If pattern is rooted, only match paths at root level (no subdirectories)
-        if self.is_rooted and "/" in path_str:
-            # Rooted patterns should not match in subdirectories
+        if self._rooted_blocks_match(path_str):
             return False
 
-        # For directory patterns, only match if path is a directory
-        # Since we're checking files, directory patterns match if any parent matches
         if self.is_directory:
-            # Check if any parent directory matches
-            parts = path_str.split("/")
-            for i in range(len(parts)):
-                parent_path = "/".join(parts[: i + 1])
-                # Try matching the parent path
-                if self._regex.match(parent_path):
-                    return True
-                # Also try matching just the directory name for non-rooted patterns
-                # This allows "build/" to match "subdir/build/"
-                if not self.is_rooted and i < len(parts) - 1:
-                    dir_name = parts[i]
-                    if self._regex.match(dir_name):
-                        return True
-            return False
+            return self._directory_pattern_matches(path_str)
 
-        # For file patterns, check full path first, then filename-only fallback.
-        filename_match = (
-            "/" not in self.pattern
-            and "**" not in self.pattern
-            and bool(self._regex.match(Path(path_str).name))
-        )
-        return bool(self._regex.match(path_str)) or filename_match
+        return self._file_pattern_matches(path_str)
 
 
 class YTIgnoreMatcher:

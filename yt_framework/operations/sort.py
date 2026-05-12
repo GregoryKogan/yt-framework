@@ -12,6 +12,30 @@ if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
 
 
+def _sort_input_table(operation_config: DictConfig) -> str:
+    raw = operation_config.get("input_table")
+    return str(raw).strip() if isinstance(raw, str) and raw.strip() else ""
+
+
+def _sort_columns(operation_config: DictConfig) -> list[str]:
+    return [str(column) for column in operation_config.get("sort_by", [])]
+
+
+def _require_sort_inputs(table_path: str, sort_by: list[str]) -> None:
+    if not table_path:
+        msg = (
+            "operation_config must set input_table; "
+            "expected at client.operations.sort.input_table"
+        )
+        raise ValueError(msg)
+    if not sort_by:
+        msg = (
+            "operation_config must set sort_by; "
+            "expected at client.operations.sort.sort_by"
+        )
+        raise ValueError(msg)
+
+
 def run_sort(
     context: "StageContext",
     operation_config: DictConfig,
@@ -51,27 +75,9 @@ def run_sort(
 
     """
     logger = context.logger
-    input_table_value = operation_config.get("input_table")
-    table_path = (
-        str(input_table_value)
-        if isinstance(input_table_value, str) and input_table_value.strip()
-        else ""
-    )
-    sort_by_value = operation_config.get("sort_by", [])
-    sort_by = [str(column) for column in sort_by_value]
-
-    if not table_path:
-        msg = (
-            "operation_config must set input_table; "
-            "expected at client.operations.sort.input_table"
-        )
-        raise ValueError(msg)
-    if not sort_by:
-        msg = (
-            "operation_config must set sort_by; "
-            "expected at client.operations.sort.sort_by"
-        )
-        raise ValueError(msg)
+    table_path = _sort_input_table(operation_config)
+    sort_by = _sort_columns(operation_config)
+    _require_sort_inputs(table_path, sort_by)
 
     resources = extract_operation_resources(operation_config, logger)
 

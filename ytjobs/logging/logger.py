@@ -6,13 +6,69 @@ Formats log records as plain text on stderr.
 import datetime
 import logging
 import sys
+from typing import ClassVar
 
 _LOG_STRING_PREVIEW_MAX_LEN = 100
 _LOG_STRING_ELLIPSIS_LEN = 3
 
+_EXCLUDED_LOG_FIELDS: frozenset[str] = frozenset(
+    {
+        "name",
+        "msg",
+        "args",
+        "created",
+        "filename",
+        "funcName",
+        "levelname",
+        "levelno",
+        "lineno",
+        "module",
+        "msecs",
+        "message",
+        "pathname",
+        "process",
+        "processName",
+        "relativeCreated",
+        "thread",
+        "threadName",
+        "exc_info",
+        "exc_text",
+        "stack_info",
+        "taskName",
+    },
+)
+
 
 class TextFormatter(logging.Formatter):
     """Formatter that outputs logs as human-readable text."""
+
+    _excluded: ClassVar[frozenset[str]] = _EXCLUDED_LOG_FIELDS
+
+    def _timestamp_str(self, record: logging.LogRecord) -> str:
+        return datetime.datetime.fromtimestamp(
+            record.created,
+            tz=datetime.UTC,
+        ).strftime("%Y-%m-%d %H:%M:%S")
+
+    def _context_fragments(self, record: logging.LogRecord) -> list[str]:
+        parts: list[str] = []
+        for key, value in record.__dict__.items():
+            if key in self._excluded or key.startswith("_"):
+                continue
+            formatted_value = self._format_value(value)
+            parts.append(f"{key}={formatted_value}")
+        return parts
+
+    def _base_message_line(
+        self,
+        record: logging.LogRecord,
+        timestamp: str,
+        level: str,
+        message: str,
+    ) -> str:
+        if hasattr(record, "name"):
+            return f"[{timestamp}] [{record.name}] {level}: {message}"
+        return f"[{timestamp}] {level}: {message}"
 
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as human-readable text.
@@ -24,63 +80,15 @@ class TextFormatter(logging.Formatter):
             Formatted log string
 
         """
-        # Format timestamp
-        timestamp = datetime.datetime.fromtimestamp(
-            record.created,
-            tz=datetime.UTC,
-        ).strftime("%Y-%m-%d %H:%M:%S")
-
-        # Format level
+        timestamp = self._timestamp_str(record)
         level = record.levelname
-
-        # Get message
         message = record.getMessage()
-
-        # Collect context fields
-        excluded_fields = {
-            "name",
-            "msg",
-            "args",
-            "created",
-            "filename",
-            "funcName",
-            "levelname",
-            "levelno",
-            "lineno",
-            "module",
-            "msecs",
-            "message",
-            "pathname",
-            "process",
-            "processName",
-            "relativeCreated",
-            "thread",
-            "threadName",
-            "exc_info",
-            "exc_text",
-            "stack_info",
-            "taskName",
-        }
-
-        context_parts = []
-        for key, value in record.__dict__.items():
-            if key not in excluded_fields and not key.startswith("_"):
-                # Format value readably
-                formatted_value = self._format_value(value)
-                context_parts.append(f"{key}={formatted_value}")
-
-        # Build log line
-        log_line = f"[{timestamp}] {level}: {message}"
-        if hasattr(record, "name"):
-            log_line = f"[{timestamp}] [{record.name}] {level}: {message}"
-
+        log_line = self._base_message_line(record, timestamp, level, message)
+        context_parts = self._context_fragments(record)
         if context_parts:
             log_line += " | " + " ".join(context_parts)
-
-        # Add exception info if present
         if record.exc_info:
             log_line += "\n" + self.formatException(record.exc_info)
-
         return log_line
 
     def _format_value(self, value: object) -> str:
@@ -93,7 +101,6 @@ class TextFormatter(logging.Formatter):
             items = ", ".join(f"{k}={self._format_value(v)}" for k, v in value.items())
             return "{" + items + "}"
         if isinstance(value, str):
-            # Truncate very long strings
             if len(value) > _LOG_STRING_PREVIEW_MAX_LEN:
                 tail = _LOG_STRING_PREVIEW_MAX_LEN - _LOG_STRING_ELLIPSIS_LEN
                 return value[:tail] + "..."

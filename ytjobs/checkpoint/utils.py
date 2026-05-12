@@ -31,6 +31,33 @@ def get_checkpoint_path(checkpoint_name: str, base_path: str | None = None) -> s
     return f"{base_path}/{checkpoint_name}"
 
 
+def _mkdir_checkpoint_parent(checkpoint_path: str, log: logging.Logger) -> None:
+    base_dir = "/".join(checkpoint_path.split("/")[:-1])
+    try:
+        yt.create("map_node", base_dir, recursive=True, ignore_existing=True)
+    except Exception as e:  # noqa: BLE001
+        log.warning("Could not create checkpoint directory %s: %s", base_dir, e)
+
+
+def _write_checkpoint_metadata(
+    checkpoint_path: str,
+    metadata: dict[str, Any],
+    log: logging.Logger,
+) -> None:
+    metadata_path = f"{checkpoint_path}.meta"
+    try:
+        metadata_json = json.dumps(metadata, indent=2)
+        yt.write_file(
+            metadata_path,
+            metadata_json.encode("utf-8"),
+            force_create=True,
+            compute_md5=True,
+        )
+        log.debug("Saved checkpoint metadata: %s", metadata_path)
+    except (OSError, TypeError, ValueError) as e:
+        log.warning("Failed to save checkpoint metadata: %s", e)
+
+
 def save_checkpoint(
     data: bytes,
     checkpoint_name: str,
@@ -55,14 +82,8 @@ def save_checkpoint(
 
     checkpoint_path = get_checkpoint_path(checkpoint_name, base_path)
 
-    # Ensure directory exists
-    base_dir = "/".join(checkpoint_path.split("/")[:-1])
-    try:
-        yt.create("map_node", base_dir, recursive=True, ignore_existing=True)
-    except Exception as e:  # noqa: BLE001
-        log.warning("Could not create checkpoint directory %s: %s", base_dir, e)
+    _mkdir_checkpoint_parent(checkpoint_path, log)
 
-    # Save checkpoint
     try:
         yt.write_file(checkpoint_path, data, force_create=True, compute_md5=True)
         log.info("Saved checkpoint: %s (%s bytes)", checkpoint_path, len(data))
@@ -70,22 +91,26 @@ def save_checkpoint(
         log.exception("Failed to save checkpoint %s", checkpoint_path)
         raise
 
-    # Save metadata if provided
     if metadata:
-        metadata_path = f"{checkpoint_path}.meta"
-        try:
-            metadata_json = json.dumps(metadata, indent=2)
-            yt.write_file(
-                metadata_path,
-                metadata_json.encode("utf-8"),
-                force_create=True,
-                compute_md5=True,
-            )
-            log.debug("Saved checkpoint metadata: %s", metadata_path)
-        except (OSError, TypeError, ValueError) as e:
-            log.warning("Failed to save checkpoint metadata: %s", e)
+        _write_checkpoint_metadata(checkpoint_path, metadata, log)
 
     return checkpoint_path
+
+
+def _load_metadata_dict(
+    metadata_path: str, log: logging.Logger
+) -> dict[str, Any] | None:
+    if not yt.exists(metadata_path):
+        return None
+    try:
+        metadata_json = yt.read_file(metadata_path).read().decode("utf-8")
+        meta = json.loads(metadata_json)
+        log.debug("Loaded checkpoint metadata: %s", metadata_path)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as e:
+        log.warning("Failed to load checkpoint metadata: %s", e)
+        return None
+    else:
+        return meta
 
 
 def load_checkpoint(
@@ -113,26 +138,29 @@ def load_checkpoint(
         return None, None
 
     try:
-        # Load checkpoint data
         data = yt.read_file(checkpoint_path).read()
         log.info("Loaded checkpoint: %s (%s bytes)", checkpoint_path, len(data))
-
-        # Load metadata if exists
-        metadata = None
-        metadata_path = f"{checkpoint_path}.meta"
-        if yt.exists(metadata_path):
-            try:
-                metadata_json = yt.read_file(metadata_path).read().decode("utf-8")
-                metadata = json.loads(metadata_json)
-                log.debug("Loaded checkpoint metadata: %s", metadata_path)
-            except (OSError, TypeError, ValueError, json.JSONDecodeError) as e:
-                log.warning("Failed to load checkpoint metadata: %s", e)
-
     except Exception:
         log.exception("Failed to load checkpoint %s", checkpoint_path)
         return None, None
-    else:
-        return data, metadata
+
+    metadata_path = f"{checkpoint_path}.meta"
+    metadata = _load_metadata_dict(metadata_path, log)
+    return data, metadata
+
+
+def _filter_checkpoint_names(
+    files: list[str],
+    pattern: str | None,
+) -> list[str]:
+    checkpoints: list[str] = []
+    for file in files:
+        if file.endswith(".meta"):
+            continue
+        if pattern and pattern not in file:
+            continue
+        checkpoints.append(file)
+    return sorted(checkpoints)
 
 
 def list_checkpoints(
@@ -160,22 +188,15 @@ def list_checkpoints(
         return []
 
     try:
-        files = yt.list(checkpoint_dir)
-        # Filter out metadata files and apply pattern if provided
-        checkpoints = []
-        for file in files:
-            if file.endswith(".meta"):
-                continue
-            if pattern and pattern not in file:
-                continue
-            checkpoints.append(file)
-
+        raw_files = yt.list(checkpoint_dir)
+        files = [str(f) for f in raw_files]
+        checkpoints = _filter_checkpoint_names(files, pattern)
         log.debug("Found %s checkpoints in %s", len(checkpoints), checkpoint_dir)
-        return sorted(checkpoints)
-
     except Exception:
         log.exception("Failed to list checkpoints in %s", checkpoint_dir)
         return []
+    else:
+        return checkpoints
 
 
 def delete_checkpoint(
@@ -203,7 +224,6 @@ def delete_checkpoint(
             yt.remove(checkpoint_path, force=True)
             log.info("Deleted checkpoint: %s", checkpoint_path)
 
-        # Delete metadata if exists
         metadata_path = f"{checkpoint_path}.meta"
         if yt.exists(metadata_path):
             yt.remove(metadata_path, force=True)
@@ -212,8 +232,7 @@ def delete_checkpoint(
     except Exception:
         log.exception("Failed to delete checkpoint %s", checkpoint_path)
         return False
-    else:
-        return True
+    return True
 
 
 def save_processing_state(

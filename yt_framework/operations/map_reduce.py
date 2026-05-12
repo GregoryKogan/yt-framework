@@ -149,6 +149,74 @@ def _build_map_reduce_spec_kwargs(
     return spec_kwargs
 
 
+def _parse_reduce_io(operation_config: DictConfig) -> tuple[str, str, list[str]]:
+    input_table = str(operation_config.get("input_table") or "")
+    output_table = str(operation_config.get("output_table") or "")
+    reduce_by = _str_list_from_config(operation_config.get("reduce_by"))
+    return input_table, output_table, reduce_by
+
+
+def _require_reduce_tables(
+    input_table: str,
+    output_table: str,
+    reduce_by: list[str],
+) -> None:
+    if input_table and output_table and reduce_by:
+        return
+    msg = (
+        "operation_config must set input_table, output_table, and reduce_by; "
+        "expected at client.operations.reduce.{input_table,output_table,reduce_by}"
+    )
+    raise ValueError(msg)
+
+
+def _reduce_description_kwargs(
+    operation_config: DictConfig,
+    logger: logging.Logger,
+) -> dict[str, Any]:
+    reduce_kw: dict[str, Any] = {}
+    rod = operation_config.get("operation_description")
+    if not rod:
+        return reduce_kw
+    if isinstance(rod, str):
+        logger.info("Operation label: %s", rod)
+        reduce_kw["title"] = rod
+        return reduce_kw
+    reduce_kw["operation_description"] = OmegaConf.to_container(rod, resolve=True)
+    return reduce_kw
+
+
+def _resolve_reduce_leg(reducer: object, job: object) -> object:
+    if reducer is not None and job is not None and reducer != job:
+        msg = "Both 'reducer' and 'job' are set with different values; use only one"
+        raise ValueError(msg)
+    return job if job is not None else reducer
+
+
+def _tar_reduce_dependencies(
+    context: "StageContext",
+    operation_config: DictConfig,
+    reducer: object,
+    logger: logging.Logger,
+) -> tuple[list[tuple[str, str]], object]:
+    builder = TarArchiveDependencyBuilder()
+    dep = builder.build_dependencies(
+        operation_type="reduce",
+        stage_dir=context.stage_dir,
+        archive_name="source.tar.gz",
+        build_folder=context.deps.pipeline_config.pipeline.build_folder,
+        operation_config=operation_config,
+        stage_config=context.config,
+        logger=logger,
+        reducer=reducer,
+    )
+    dependencies = dep.dependencies
+    if dep.reducer_command is not None:
+        logger.info("Using tar bootstrap command for reduce leg")
+        reducer = dep.reducer_command
+    return dependencies, reducer
+
+
 def run_map_reduce(
     context: "StageContext",
     operation_config: DictConfig,
@@ -282,15 +350,8 @@ def run_reduce(
         f"Input: {operation_config.get('input_table')} -> Output: {operation_config.get('output_table')}",
     )
 
-    input_table = str(operation_config.get("input_table") or "")
-    output_table = str(operation_config.get("output_table") or "")
-    reduce_by = _str_list_from_config(operation_config.get("reduce_by"))
-    if not input_table or not output_table or not reduce_by:
-        msg = (
-            "operation_config must set input_table, output_table, and reduce_by; "
-            "expected at client.operations.reduce.{input_table,output_table,reduce_by}"
-        )
-        raise ValueError(msg)
+    input_table, output_table, reduce_by = _parse_reduce_io(operation_config)
+    _require_reduce_tables(input_table, output_table, reduce_by)
 
     env = build_operation_environment(
         context=context,
@@ -301,42 +362,19 @@ def run_reduce(
     )
     resources = extract_operation_resources(operation_config, logger)
 
-    if reducer is not None and job is not None and reducer != job:
-        msg = "Both 'reducer' and 'job' are set with different values; use only one"
-        raise ValueError(msg)
-    reducer = job if job is not None else reducer
-
-    builder = TarArchiveDependencyBuilder()
-    dep = builder.build_dependencies(
-        operation_type="reduce",
-        stage_dir=context.stage_dir,
-        archive_name="source.tar.gz",
-        build_folder=context.deps.pipeline_config.pipeline.build_folder,
-        operation_config=operation_config,
-        stage_config=context.config,
-        logger=logger,
-        reducer=reducer,
+    reducer = _resolve_reduce_leg(reducer, job)
+    dependencies, reducer = _tar_reduce_dependencies(
+        context,
+        operation_config,
+        reducer,
+        logger,
     )
-    dependencies = dep.dependencies
-    if dep.reducer_command is not None:
-        reducer = dep.reducer_command
-        logger.info("Using tar bootstrap command for reduce leg")
 
     docker_auth = extract_docker_auth_from_operation_config(operation_config, env)
 
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
-    reduce_kw: dict[str, Any] = {}
-    rod = operation_config.get("operation_description")
-    if rod:
-        if isinstance(rod, str):
-            logger.info("Operation label: %s", rod)
-            reduce_kw["title"] = rod
-        else:
-            reduce_kw["operation_description"] = OmegaConf.to_container(
-                rod,
-                resolve=True,
-            )
+    reduce_kw = _reduce_description_kwargs(operation_config, logger)
 
     passthrough = collect_passthrough_kwargs(
         operation_config,
