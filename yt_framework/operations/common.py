@@ -1,10 +1,11 @@
 """Shared helpers for map/vanilla/map-reduce (resources, secrets, tokenizer wiring)."""
 
 import logging
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from yt_framework.utils.env import load_secrets
 from yt_framework.yt.client_base import OperationResources
@@ -17,6 +18,21 @@ from .tokenizer_artifact import (
 
 if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
+
+
+def _dict_config_or(node: object, *, fallback: DictConfig) -> DictConfig:
+    return node if isinstance(node, DictConfig) else fallback
+
+
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s or None
+
+
+def _int_from_config_value(value: object) -> int:
+    return int(cast("Any", value))
 
 
 def _get_config_value_with_default(
@@ -111,34 +127,54 @@ def extract_operation_resources(
     logger: logging.Logger,
 ) -> OperationResources:
     """Extract OperationResources from operation config with fallback defaults."""
-    resources_config = operation_config.get("resources") or operation_config
-    pool = _get_config_value_with_default(resources_config, "pool", "default", logger)
-    pool_tree = _get_config_value_with_default(
-        resources_config,
-        "pool_tree",
-        None,
-        logger,
+    resources_config = _dict_config_or(
+        operation_config.get("resources"),
+        fallback=operation_config,
     )
-    docker_image = _get_config_value_with_default(
-        resources_config,
-        "docker_image",
-        None,
-        logger,
+    pool = str(
+        _get_config_value_with_default(resources_config, "pool", "default", logger),
     )
-    memory_gb = _get_config_value_with_default(
-        resources_config,
-        "memory_limit_gb",
-        4,
-        logger,
+    pool_tree = _optional_str(
+        _get_config_value_with_default(
+            resources_config,
+            "pool_tree",
+            None,
+            logger,
+        ),
     )
-    cpu_limit = _get_config_value_with_default(resources_config, "cpu_limit", 2, logger)
-    gpu_limit = _get_config_value_with_default(resources_config, "gpu_limit", 0, logger)
-    job_count = _get_config_value_with_default(resources_config, "job_count", 1, logger)
-    user_slots = _get_config_value_with_default(
+    docker_image = _optional_str(
+        _get_config_value_with_default(
+            resources_config,
+            "docker_image",
+            None,
+            logger,
+        ),
+    )
+    memory_gb = _int_from_config_value(
+        _get_config_value_with_default(
+            resources_config,
+            "memory_limit_gb",
+            4,
+            logger,
+        ),
+    )
+    cpu_limit = _int_from_config_value(
+        _get_config_value_with_default(resources_config, "cpu_limit", 2, logger),
+    )
+    gpu_limit = _int_from_config_value(
+        _get_config_value_with_default(resources_config, "gpu_limit", 0, logger),
+    )
+    job_count = _int_from_config_value(
+        _get_config_value_with_default(resources_config, "job_count", 1, logger),
+    )
+    user_slots_raw = _get_config_value_with_default(
         resources_config,
         "user_slots",
         None,
         logger,
+    )
+    user_slots = (
+        _int_from_config_value(user_slots_raw) if user_slots_raw is not None else None
     )
     return OperationResources(
         pool=pool,
@@ -157,7 +193,10 @@ def extract_secure_env_client_kwargs(operation_config: DictConfig) -> dict[str, 
     out: dict[str, Any] = {}
     epk = operation_config.get("environment_public_keys")
     if epk is not None:
-        out["environment_public_keys"] = [str(x) for x in list(epk)]
+        if isinstance(epk, (list, tuple, ListConfig)):
+            out["environment_public_keys"] = [str(x) for x in epk]
+        else:
+            out["environment_public_keys"] = [str(epk)]
     if operation_config.get("use_plain_environment_for_secrets"):
         out["use_plain_environment_for_secrets"] = True
     return out
@@ -194,21 +233,23 @@ def build_operation_environment(
 ) -> dict[str, str]:
     """Build operation environment from secrets + explicit env config + optional helpers."""
     env = build_environment(configs_dir=context.deps.configs_dir, logger=logger)
-    for k, v in (operation_config.get("env") or {}).items():
+    env_block = operation_config.get("env")
+    env_pairs: Mapping[str, Any] = env_block if isinstance(env_block, Mapping) else {}
+    for k, v in env_pairs.items():
         if v is not None:
             env[str(k)] = str(v)
 
     if include_tokenizer_artifact:
-        tokenizer_cfg = operation_config.get("tokenizer_artifact")
-        if tokenizer_cfg:
+        tokenizer_cfg_raw = operation_config.get("tokenizer_artifact")
+        if isinstance(tokenizer_cfg_raw, DictConfig):
             init_tokenizer_artifact_directory(
                 context=context,
-                tokenizer_artifact_config=tokenizer_cfg,
+                tokenizer_artifact_config=tokenizer_cfg_raw,
             )
-            if tokenizer_cfg.get("artifact_base"):
+            if tokenizer_cfg_raw.get("artifact_base"):
                 artifact_name = resolve_tokenizer_artifact_name(
                     stage_config=context.config,
-                    tokenizer_artifact_config=tokenizer_cfg,
+                    tokenizer_artifact_config=tokenizer_cfg_raw,
                 )
                 if artifact_name:
                     archive_name = resolve_tokenizer_archive_name(artifact_name)
@@ -230,9 +271,11 @@ def extract_docker_auth_from_operation_config(
     env: dict[str, str],
 ) -> dict[str, str] | None:
     """Resolve docker image from config and return auth payload if credentials exist."""
-    docker_image = (operation_config.get("resources") or {}).get(
-        "docker_image",
-    ) or operation_config.get("docker_image")
+    res_raw = operation_config.get("resources")
+    res_map: Mapping[str, Any] = res_raw if isinstance(res_raw, Mapping) else {}
+    docker_image = _optional_str(
+        res_map.get("docker_image") or operation_config.get("docker_image"),
+    )
     return prepare_docker_auth(
         docker_image=docker_image,
         docker_username=env.get("DOCKER_AUTH_USERNAME"),
@@ -245,9 +288,11 @@ def extract_max_failed_jobs(
     logger: logging.Logger,
 ) -> int:
     """Extract max_failed_job_count with default."""
-    return _get_config_value_with_default(
-        operation_config,
-        "max_failed_job_count",
-        1,
-        logger,
+    return _int_from_config_value(
+        _get_config_value_with_default(
+            operation_config,
+            "max_failed_job_count",
+            1,
+            logger,
+        ),
     )

@@ -3,11 +3,11 @@
 import contextlib
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, NoReturn, cast
 
-from yt.wrapper import (  # pyright: ignore[reportMissingImports]
+from yt.wrapper import (
     FilePath,
     MapSpecBuilder,
     Operation,
@@ -22,8 +22,8 @@ from yt.wrapper import (
 from yt.wrapper import (
     schema as yt_schema,
 )
-from yt.wrapper.schema import TableSchema  # pyright: ignore[reportMissingImports]
-from yt.wrapper.spec_builders import (  # pyright: ignore[reportMissingImports]
+from yt.wrapper.schema import TableSchema
+from yt.wrapper.spec_builders import (
     MapReduceSpecBuilder,
     ReduceSpecBuilder,
 )
@@ -57,7 +57,7 @@ from yt_framework.yt.yql_builder import (
 )
 
 
-def _raise_runtime_error(message: str) -> None:
+def _raise_runtime_error(message: str) -> NoReturn:
     """Raise RuntimeError from a nested function (TRY301)."""
     raise RuntimeError(message)
 
@@ -68,6 +68,20 @@ def _raise_value_error(message: str) -> None:
 
 def _raise_value_error_from(cause: BaseException, message: str) -> None:
     raise ValueError(message) from cause
+
+
+def _public_env_keys_for_partition(raw: object) -> Collection[str] | None:
+    if raw is None:
+        return None
+    if isinstance(raw, (list, tuple, set, frozenset)):
+        return [str(x) for x in raw]
+    return [str(raw)]
+
+
+def _optional_str_kw(raw: object) -> str | None:
+    if raw is None:
+        return None
+    return str(raw)
 
 
 def _maybe_wrap_string_command_for_vault(
@@ -90,7 +104,7 @@ def _partition_and_maybe_wrap_leg(
     else:
         public_env, secure_flat = partition_env_for_yt_spec(
             env,
-            environment_public_keys,
+            _public_env_keys_for_partition(environment_public_keys),
         )
     leg = _maybe_wrap_string_command_for_vault(leg, secure_flat)
     return public_env, secure_flat, leg
@@ -101,7 +115,10 @@ def _spec_builder_secure_vault(
 ) -> object:
     if not vault:
         return spec_builder
-    return spec_builder.secure_vault(dict(vault))
+    sec = cast("Any", getattr(spec_builder, "secure_vault", None))
+    if callable(sec):
+        return sec(dict(vault))
+    return spec_builder
 
 
 # YtClient.run_operation() only accepts these keyword args; everything else must be
@@ -132,7 +149,7 @@ def _apply_spec_options_and_split_run_operation_kwargs(
             continue
         meth = getattr(spec_builder, k, None)
         if meth is not None and callable(meth):
-            spec_builder = meth(v)
+            spec_builder = cast("Any", meth)(v)
             del kwargs[k]
         else:
             msg = (
@@ -154,7 +171,7 @@ def _apply_command_leg_format(
     """
     if isinstance(leg, TypedJob):
         return leg_builder
-    return leg_builder.format(yt_format.JsonFormat(encode_utf8=False))
+    return cast("Any", leg_builder).format(yt_format.JsonFormat(encode_utf8=False))
 
 
 def _apply_max_row_weight_to_spec_builder(
@@ -165,10 +182,11 @@ def _apply_max_row_weight_to_spec_builder(
     if max_row_weight is None:
         return spec_builder
     max_row_weight_bytes = parse_max_row_weight_to_bytes(max_row_weight)
-    table_writer = getattr(spec_builder, "table_writer", None)
+    sb = cast("Any", spec_builder)
+    table_writer = getattr(sb, "table_writer", None)
     if callable(table_writer):
         return table_writer({"max_row_weight": max_row_weight_bytes})
-    job_io = getattr(spec_builder, "job_io", None)
+    job_io = getattr(sb, "job_io", None)
     if callable(job_io):
         return job_io({"table_writer": {"max_row_weight": max_row_weight_bytes}})
     return spec_builder
@@ -239,7 +257,7 @@ class YTProdClient(BaseYTClient):
         """
         if not pickling:
             return
-        cfg = self.client.config.setdefault("pickling", {})  # type: ignore[attr-defined]
+        cfg = cast("dict[str, Any]", self.client.config.setdefault("pickling", {}))
         if pickling.get("ignore_system_modules"):
             cfg["ignore_system_modules"] = True
             self.logger.debug("Pickling: ignore_system_modules=True")
@@ -422,10 +440,10 @@ class YTProdClient(BaseYTClient):
         return YTProdClient._filter_internal_yql_columns(columns)
 
     def _get_columns_from_table_attributes(self, table_path: str) -> list[str]:
-        attrs = self.client.get(table_path, attributes=["schema"])  # type: ignore[assignment]
-        if not (attrs and isinstance(attrs, dict) and "schema" in attrs):  # type: ignore[operator]
+        attrs = self.client.get(table_path, attributes=["schema"])
+        if not (attrs and isinstance(attrs, dict) and "schema" in attrs):
             return []
-        return self._extract_columns_from_schema_value(attrs["schema"])  # type: ignore[index]
+        return self._extract_columns_from_schema_value(attrs["schema"])
 
     def _get_columns_from_first_row(self, table_path: str) -> list[str]:
         rows = self.read_table(table_path)
@@ -449,9 +467,9 @@ PRAGMA yt.InferSchema = '1';
 INSERT INTO `{temp_output}` WITH TRUNCATE
 SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             self.run_yql(query)
-            temp_attrs = self.client.get(temp_output, attributes=["schema"])  # type: ignore[assignment]
-            if temp_attrs and isinstance(temp_attrs, dict) and "schema" in temp_attrs:  # type: ignore[operator]
-                return self._extract_columns_from_schema_value(temp_attrs["schema"])  # type: ignore[index]
+            temp_attrs = self.client.get(temp_output, attributes=["schema"])
+            if temp_attrs and isinstance(temp_attrs, dict) and "schema" in temp_attrs:
+                return self._extract_columns_from_schema_value(temp_attrs["schema"])
             return []
         finally:
             with contextlib.suppress(Exception):
@@ -1063,7 +1081,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 pop_secure_env_client_kwargs(kwargs)
             )
             kwargs["max_row_weight"] = validate_max_row_weight(
-                kwargs.get("max_row_weight"),
+                _optional_str_kw(kwargs.get("max_row_weight")),
             )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
@@ -1083,9 +1101,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             )
 
             output_path = TablePath(output_table, append=append, schema=output_schema)
+            msb: Any = MapSpecBuilder()
             spec_builder = (
-                MapSpecBuilder()
-                .pool(resources.pool)
+                msb.pool(resources.pool)
                 .resource_limits({"user_slots": resources.user_slots})
                 .max_failed_job_count(max_failed_jobs)
                 .job_count(resources.job_count)
@@ -1098,7 +1116,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 spec_builder = spec_builder.pool_trees([resources.pool_tree])
                 self.logger.debug("Set pool tree to %s", resources.pool_tree)
 
-            mapper_builder = (
+            mapper_builder: Any = (
                 spec_builder.begin_mapper()
                 .command(mapper_job)
                 .file_paths(file_paths)
@@ -1116,7 +1134,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             spec_builder = _spec_builder_secure_vault(spec_builder, merged_vault)
             spec_builder = _apply_max_row_weight_to_spec_builder(
                 spec_builder,
-                kwargs.get("max_row_weight"),
+                _optional_str_kw(kwargs.get("max_row_weight")),
             )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
@@ -1129,7 +1147,6 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 _raise_runtime_error(
                     "Failed to submit operation: run_operation returned None",
                 )
-
             self.logger.info("Operation submitted: %s", operation.id)
         except Exception:
             self.logger.exception("Failed to submit operation")
@@ -1139,40 +1156,47 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
 
     def run_vanilla(
         self,
-        command: str,
+        command: object,
         files: list[tuple[str, str]],
         env: dict[str, str],
         task_name: str,
-        resources: OperationResources,
-        docker_auth: dict[str, str] | None = None,
-        max_failed_jobs: int = 1,
-        job: str | None = None,
+        job: object = None,
         **kwargs: object,
-    ) -> Operation:
+    ) -> Operation | None:
         """Run a vanilla operation on YT cluster.
 
         Submits a vanilla operation that runs a standalone job without input/output tables.
         The operation runs on the YT cluster with the specified resources and dependencies.
+
+        ``resources``, ``docker_auth``, and ``max_failed_jobs`` are passed via ``kwargs``
+        (see :func:`yt_framework.operations.vanilla.run_vanilla`).
 
         Args:
             command: Legacy command argument (typically bash command with script path).
             files: List of (yt_path, local_path) tuples for dependencies.
             env: Environment variables dictionary.
             task_name: Task name for the operation.
-            resources: Operation resource configuration (memory, CPU, GPU, etc.).
-            docker_auth: Optional Docker authentication for private registries.
-            max_failed_jobs: Maximum failed jobs allowed before operation fails.
             job: Preferred command alias.
-            **kwargs: Extra options applied to the spec builder (e.g. weight, title) or
-                forwarded to run_operation (sync, enable_optimizations).
+            **kwargs: Must include ``resources=OperationResources``; may include
+                ``docker_auth``, ``max_failed_jobs``, and SpecBuilder / ``run_operation`` keys.
 
         Returns:
-            Operation: YT operation object that can be monitored and waited on.
+            Operation object or None when submission fails.
 
         Raises:
-            Exception: If operation submission fails.
+            TypeError: If ``resources`` is missing or not an :class:`OperationResources`.
 
         """
+        kw = dict(kwargs)
+        resources_obj = kw.pop("resources", None)
+        if not isinstance(resources_obj, OperationResources):
+            msg = "run_vanilla requires resources=OperationResources in kwargs"
+            raise TypeError(msg)
+        resources = resources_obj
+        docker_auth = cast("dict[str, str] | None", kw.pop("docker_auth", None))
+        max_failed_jobs = int(cast("Any", kw.pop("max_failed_jobs", 1)))
+        kwargs = kw
+
         self.logger.info("Submitting vanilla operation")
         self.logger.info("  Task Name: %s", task_name)
         self.logger.info("  Command: %s", command)
@@ -1191,7 +1215,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 pop_secure_env_client_kwargs(kwargs)
             )
             kwargs["max_row_weight"] = validate_max_row_weight(
-                kwargs.get("max_row_weight"),
+                _optional_str_kw(kwargs.get("max_row_weight")),
             )
             file_paths = [
                 FilePath(yt_path, file_name=local_path) for yt_path, local_path in files
@@ -1212,9 +1236,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 user_secure_vault=user_secure_vault,
             )
 
+            vsb: Any = VanillaSpecBuilder()
             spec_builder = (
-                VanillaSpecBuilder()
-                .pool(resources.pool)
+                vsb.pool(resources.pool)
                 .resource_limits({"user_slots": resources.user_slots})
                 .max_failed_job_count(max_failed_jobs)
             )
@@ -1245,7 +1269,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             spec_builder = _spec_builder_secure_vault(spec_builder, merged_vault)
             spec_builder = _apply_max_row_weight_to_spec_builder(
                 spec_builder,
-                kwargs.get("max_row_weight"),
+                _optional_str_kw(kwargs.get("max_row_weight")),
             )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
@@ -1258,7 +1282,6 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 _raise_runtime_error(
                     "Failed to submit operation: run_operation returned None",
                 )
-
             self.logger.info("Operation submitted: %s", operation.id)
         except Exception:
             self.logger.exception("Failed to submit vanilla operation")
@@ -1311,12 +1334,12 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 input_table=input_table,
                 output_table=output_table,
                 output_schema=output_schema,
-                kwargs=kwargs,
+                kwargs=dict(cast("Any", kwargs)),
             )
 
+            mrsb: Any = MapReduceSpecBuilder()
             spec_builder = (
-                MapReduceSpecBuilder()
-                .input_table_paths([source_table])
+                mrsb.input_table_paths([source_table])
                 .output_table_paths([dest_table])
                 .pool(resources.pool)
                 .max_failed_job_count(max_failed_jobs)
@@ -1332,24 +1355,32 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             if isinstance(od, dict):
                 spec_builder = spec_builder.description(od)
 
-            spec_builder = self._configure_map_reduce_leg(
-                spec_builder=spec_builder,
-                leg_name="mapper",
-                leg_command=mapper_leg,
-                file_paths=file_paths,
-                public_env=public_env,
-                resources=resources,
+            spec_builder = cast(
+                "Any",
+                self._configure_map_reduce_leg(
+                    spec_builder=spec_builder,
+                    leg_name="mapper",
+                    leg_command=mapper_leg,
+                    file_paths=file_paths,
+                    public_env=public_env,
+                    resources=resources,
+                ),
             )
-            spec_builder = self._configure_map_reduce_leg(
-                spec_builder=spec_builder,
-                leg_name="reducer",
-                leg_command=reducer_leg,
-                file_paths=file_paths,
-                public_env=public_env,
-                resources=resources,
+            spec_builder = cast(
+                "Any",
+                self._configure_map_reduce_leg(
+                    spec_builder=spec_builder,
+                    leg_name="reducer",
+                    leg_command=reducer_leg,
+                    file_paths=file_paths,
+                    public_env=public_env,
+                    resources=resources,
+                ),
             )
 
-            spec_builder = _spec_builder_secure_vault(spec_builder, merged_vault)
+            spec_builder = cast(
+                "Any", _spec_builder_secure_vault(spec_builder, merged_vault)
+            )
             spec_builder = spec_builder.reduce_by(reduce_by)
             if sort_by:
                 spec_builder = spec_builder.sort_by(sort_by)
@@ -1358,7 +1389,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 spec_builder = spec_builder.map_job_count(map_job_count)
             spec_builder = _apply_max_row_weight_to_spec_builder(
                 spec_builder,
-                kwargs.get("max_row_weight"),
+                _optional_str_kw(kwargs.get("max_row_weight")),
             )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
@@ -1390,9 +1421,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
         input_table: str,
         output_table: str,
         output_schema: TableSchema | None,
-        kwargs: object,
+        kwargs: dict[str, Any],
     ) -> tuple[
-        dict[str, object],
+        dict[str, Any],
         object,
         object,
         dict[str, str],
@@ -1406,7 +1437,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             pop_secure_env_client_kwargs(mutable_kwargs)
         )
         mutable_kwargs["max_row_weight"] = validate_max_row_weight(
-            mutable_kwargs.get("max_row_weight"),
+            _optional_str_kw(mutable_kwargs.get("max_row_weight")),
         )
         mapper_leg = _resolve_aliased_job(
             legacy_name="mapper",
@@ -1452,26 +1483,27 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
     def _configure_map_reduce_leg(
         self,
         *,
-        spec_builder: MapReduceSpecBuilder,
+        spec_builder: object,
         leg_name: Literal["mapper", "reducer"],
         leg_command: object,
         file_paths: list[FilePath],
         public_env: dict[str, str],
         resources: OperationResources,
-    ) -> MapReduceSpecBuilder:
-        if leg_name == "mapper":
-            leg_builder = spec_builder.begin_mapper()
-        else:
-            leg_builder = spec_builder.begin_reducer()
+    ) -> object:
         leg_builder = (
-            leg_builder.command(leg_command)
+            (
+                cast("Any", spec_builder).begin_mapper()
+                if leg_name == "mapper"
+                else cast("Any", spec_builder).begin_reducer()
+            )
+            .command(leg_command)
             .file_paths(file_paths)
             .environment(public_env)
             .memory_limit(resources.memory_gb * 1024**3)
             .cpu_limit(resources.cpu_limit)
             .gpu_limit(resources.gpu_limit)
         )
-        leg_builder = _apply_command_leg_format(leg_builder, leg_command)
+        leg_builder = cast("Any", _apply_command_leg_format(leg_builder, leg_command))
         if resources.docker_image:
             leg_builder = leg_builder.docker_image(resources.docker_image)
         if leg_name == "mapper":
@@ -1512,7 +1544,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 pop_secure_env_client_kwargs(kwargs)
             )
             kwargs["max_row_weight"] = validate_max_row_weight(
-                kwargs.get("max_row_weight"),
+                _optional_str_kw(kwargs.get("max_row_weight")),
             )
             public_env, secure_flat, reducer_leg = _partition_and_maybe_wrap_leg(
                 reducer_leg,
@@ -1532,9 +1564,9 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             source_table = TablePath(input_table)
             dest_table = TablePath(output_table, append=False, schema=output_schema)
 
+            rsb: Any = ReduceSpecBuilder()
             spec_builder = (
-                ReduceSpecBuilder()
-                .input_table_paths([source_table])
+                rsb.input_table_paths([source_table])
                 .output_table_paths([dest_table])
                 .pool(resources.pool)
                 .max_failed_job_count(max_failed_jobs)
@@ -1550,7 +1582,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             if isinstance(rod, dict):
                 spec_builder = spec_builder.description(rod)
 
-            reducer_builder = (
+            reducer_builder: Any = (
                 spec_builder.begin_reducer()
                 .command(reducer_leg)
                 .file_paths(file_paths)
@@ -1564,11 +1596,13 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
                 reducer_builder = reducer_builder.docker_image(resources.docker_image)
             reducer_builder.end_reducer()
 
-            spec_builder = _spec_builder_secure_vault(spec_builder, merged_vault)
+            spec_builder = cast(
+                "Any", _spec_builder_secure_vault(spec_builder, merged_vault)
+            )
             spec_builder = spec_builder.reduce_by(reduce_by)
             spec_builder = _apply_max_row_weight_to_spec_builder(
                 spec_builder,
-                kwargs.get("max_row_weight"),
+                _optional_str_kw(kwargs.get("max_row_weight")),
             )
 
             spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
@@ -1600,7 +1634,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             sort_columns = [
                 yt_schema.SortColumn(col, sort_order="ascending") for col in sort_by
             ]
-            spec: dict = dict(kwargs.pop("spec", None) or {})
+            spec: dict[str, Any] = dict(cast("Any", kwargs.pop("spec", None)) or {})
             if pool:
                 spec["pool"] = pool
             if pool_tree:

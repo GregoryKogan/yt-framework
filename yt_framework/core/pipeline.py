@@ -5,16 +5,19 @@ Subclass ``BasePipeline``, implement ``setup()`` to register stages with
 ``DefaultPipeline`` auto-discovers stages under ``stages/*/stage.py``.
 """
 
+from __future__ import annotations
+
 import argparse
 import logging
 import sys
 import traceback
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, TypeAlias, cast
+from typing import Any, Literal
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
+from yt_framework.core.debug_context import DebugContext  # noqa: TC001
 from yt_framework.core.dependencies import PipelineStageDependencies
 from yt_framework.core.discovery import discover_stages
 from yt_framework.core.registry import StageRegistry
@@ -27,8 +30,6 @@ from yt_framework.utils.logging import (
     setup_logging,
 )
 from yt_framework.yt.factory import create_yt_client
-
-DebugContext: TypeAlias = dict[str, Any]
 
 
 def _normalize_upload_modules(raw: object) -> list[str]:
@@ -70,6 +71,47 @@ def _normalize_upload_paths(raw: object) -> list[dict[str, str]]:
         normalized.append({k: str(v) for k, v in item.items()})
 
     return normalized
+
+
+def _yt_mode_from_pipeline_config(raw: object) -> Literal["prod", "dev"] | None:
+    """Coerce ``pipeline.mode`` to a literal prod/dev or None (caller may default)."""
+    if raw is None:
+        return None
+    s = str(raw).strip().lower()
+    if s == "prod":
+        return "prod"
+    if s == "dev":
+        return "dev"
+    msg = f"pipeline.mode must be 'prod' or 'dev', got {raw!r}"
+    raise ValueError(msg)
+
+
+def _pickling_dict_from_config(pickling_cfg: object) -> dict[str, Any]:
+    """Return a plain dict for ``create_yt_client(..., pickling=...)``."""
+    if not pickling_cfg:
+        return {}
+    raw = OmegaConf.to_container(pickling_cfg, resolve=True)
+    if raw is None:
+        return {}
+    if isinstance(raw, Mapping):
+        return dict(raw)
+    msg = (
+        "pipeline.pickling must be a mapping-compatible config, "
+        f"got {type(raw).__name__}"
+    )
+    raise TypeError(msg)
+
+
+def _enabled_stage_names(enabled: object) -> list[str]:
+    """Normalize ``stages.enabled_stages`` to a list of directory names."""
+    if enabled is None:
+        return []
+    if isinstance(enabled, (list, tuple, ListConfig)):
+        return [str(x) for x in enabled]
+    if isinstance(enabled, str):
+        s = enabled.strip()
+        return [s] if s else []
+    return [str(enabled)]
 
 
 class BasePipeline:
@@ -128,19 +170,11 @@ class BasePipeline:
         secrets = load_secrets(self.configs_dir)
 
         # Initialize YT client
-        pickling_cfg = self.config.pipeline.get("pickling")
-        pickling_dict = (
-            OmegaConf.to_container(pickling_cfg, resolve=True) if pickling_cfg else {}
-        )
-        if pickling_dict and not isinstance(pickling_dict, Mapping):
-            msg = (
-                "pipeline.pickling must be a mapping-compatible config, "
-                f"got {type(pickling_dict).__name__}"
-            )
-            raise TypeError(msg)
+        mode = _yt_mode_from_pipeline_config(self.config.pipeline.get("mode"))
+        pickling_dict = _pickling_dict_from_config(self.config.pipeline.get("pickling"))
         self.yt = create_yt_client(
             logger=self.logger,
-            mode=self.config.pipeline.get("mode"),
+            mode=mode,
             pipeline_dir=self.pipeline_dir,
             secrets=secrets or None,
             pickling=pickling_dict,
@@ -203,7 +237,7 @@ class BasePipeline:
             True if any enabled stage needs code execution, False otherwise
 
         """
-        enabled_stages = self.config.stages.enabled_stages
+        enabled_stages = _enabled_stage_names(self.config.stages.enabled_stages)
         if not enabled_stages:
             return False
 
@@ -245,7 +279,8 @@ class BasePipeline:
 
         # Only require build_folder if code execution is needed
         if build_folder is None:
-            build_folder = self.config.pipeline.get("build_folder")
+            bf_raw = self.config.pipeline.get("build_folder")
+            build_folder = None if bf_raw is None else str(bf_raw).strip() or None
             if not build_folder:
                 msg = (
                     "build_folder not found in [pipeline] config section. "
@@ -292,7 +327,7 @@ class BasePipeline:
         self.upload_code()
 
         # Get enabled stages from config
-        enabled_stages = self.config.stages.enabled_stages
+        enabled_stages = _enabled_stage_names(self.config.stages.enabled_stages)
         if not enabled_stages:
             msg = (
                 "No enabled_stages found in stages config section. "
@@ -390,7 +425,7 @@ class BasePipeline:
         try:
             temp_config = OmegaConf.load(config_path)
             mode = (
-                temp_config.pipeline.get("mode", "dev")
+                str(temp_config.pipeline.get("mode", "dev"))
                 if isinstance(temp_config, DictConfig)
                 else "dev"
             )
@@ -411,15 +446,14 @@ class BasePipeline:
 
         # Load configuration
         try:
-            loaded_config = OmegaConf.load(config_path)
-            # Ensure it's a DictConfig (not ListConfig)
-            if not isinstance(loaded_config, DictConfig):
+            loaded_cfg = OmegaConf.load(config_path)
+            if not isinstance(loaded_cfg, DictConfig):
                 logger.error(
                     "Config file must contain a dictionary, got %s",
-                    type(loaded_config).__name__,
+                    type(loaded_cfg).__name__,
                 )
                 sys.exit(1)
-            config = cast("DictConfig", loaded_config)
+            config = loaded_cfg
         except Exception:
             logger.exception("Failed to load config")
             traceback.print_exc()

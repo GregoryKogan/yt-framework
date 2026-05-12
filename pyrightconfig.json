@@ -1,14 +1,6 @@
 {
   "include": ["yt_framework", "ytjobs"],
-  "ignore": [
-    "yt_framework/core/discovery.py",
-    "yt_framework/core/pipeline.py",
-    "yt_framework/core/stage.py",
-    "yt_framework/operations/common.py",
-    "yt_framework/operations/map_reduce.py",
-    "yt_framework/yt/client_dev.py",
-    "yt_framework/yt/client_prod.py"
-  ],
+  "ignore": [],
   "exclude": [
     "**/node_modules",
     "**/__pycache__",
@@ -76,7 +68,7 @@
   "reportInvalidTypeForm": "error",
   "reportImportCycles": "error",
   "reportUnusedCallResult": "none",
-  "reportUnnecessaryTypeIgnoreComment": "none",
+  "reportUnnecessaryTypeIgnoreComment": "error",
   "reportMatchNotExhaustive": "error",
   "reportImplicitOverride": "none",
   "reportUnusedExcept": "error",

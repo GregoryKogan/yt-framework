@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from typing import Self
 
 class _DynamicValue:
     def __call__(self, *args: object, **kwargs: object) -> _DynamicValue: ...
@@ -10,8 +11,17 @@ class _DynamicValue:
     def decode(self, encoding: str = "utf-8", errors: str = "strict") -> str: ...
     def __getattr__(self, name: str) -> _DynamicValue: ...
 
-class FilePath(str): ...
-class TablePath(str): ...
+class FilePath(str):
+    def __new__(cls, path: str, *, file_name: str | None = None) -> Self: ...
+
+class TablePath(str):
+    def __new__(
+        cls,
+        path: str,
+        *,
+        append: bool = False,
+        schema: object | None = None,
+    ) -> Self: ...
 
 class Operation:
     id: str

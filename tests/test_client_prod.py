@@ -520,7 +520,7 @@ def test_yt_prod_client_run_vanilla_returns_operation_from_client_run_operation(
         [],
         {},
         "my_task",
-        OperationResources(),
+        resources=OperationResources(),
     )
     assert op.id == "yt-op-stub"
     fake_inner.run_operation.assert_called_once()
@@ -557,7 +557,7 @@ def test_yt_prod_client_run_vanilla_applies_default_max_row_weight_when_not_prov
     )
     monkeypatch.setattr("yt_framework.yt.client_prod.VanillaSpecBuilder", lambda: spec)
     _stub_split_run_operation_kwargs(monkeypatch)
-    client.run_vanilla("bash -c true", [], {}, "task", OperationResources())
+    client.run_vanilla("bash -c true", [], {}, "task", resources=OperationResources())
     assert spec.table_writer.call_args == call({"max_row_weight": 134217728})
 
 
@@ -612,7 +612,7 @@ def test_yt_prod_client_run_vanilla_configures_pool_tree_docker_description_and_
         [],
         {},
         "vtask",
-        resources,
+        resources=resources,
         docker_auth={"registry_user": "u"},
         operation_description={"title": "vanilla-op"},
     )
@@ -1870,7 +1870,7 @@ def test_yt_prod_client_run_vanilla_raises_when_run_operation_returns_none(
         secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
     )
     with pytest.raises(RuntimeError, match="run_operation returned None"):
-        client.run_vanilla("true", [], {}, "t", OperationResources())
+        client.run_vanilla("true", [], {}, "t", resources=OperationResources())
 
 
 def test_yt_prod_client_run_map_reduce_raises_when_run_operation_returns_none(
@@ -1929,7 +1929,7 @@ def test_yt_prod_client_run_vanilla_propagates_submit_exception_after_error_log(
         secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
     )
     with pytest.raises(ValueError, match="bad spec"):
-        client.run_vanilla("true", [], {}, "t", OperationResources())
+        client.run_vanilla("true", [], {}, "t", resources=OperationResources())
     assert "Failed to submit vanilla operation" in caplog.text
 
 

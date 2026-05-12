@@ -9,17 +9,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from dataclasses import replace as _dataclass_replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
 
 from omegaconf import DictConfig, OmegaConf
 
+from yt_framework.core.debug_context import DebugContext
 from yt_framework.core.dependencies import StageDependencies
-
-if TYPE_CHECKING:
-    from yt_framework.core.pipeline import DebugContext
-else:
-    # Avoid circular import at runtime - DebugContext is Dict[str, Any]
-    DebugContext = dict[str, Any]
 
 
 @dataclass
@@ -139,12 +133,11 @@ class BaseStage(ABC):
         if not config_path.exists():
             msg = f"Config file not found: {config_path}"
             raise FileNotFoundError(msg)
-        loaded_config = OmegaConf.load(config_path)
-        # Ensure it's a DictConfig (not ListConfig)
-        if not isinstance(loaded_config, DictConfig):
-            msg = f"Stage config file must contain a dictionary, got {type(loaded_config).__name__}"
+        loaded: object = OmegaConf.load(config_path)
+        if not isinstance(loaded, DictConfig):
+            msg = f"Stage config file must contain a dictionary, got {type(loaded).__name__}"
             raise TypeError(msg)
-        self.config = cast("DictConfig", loaded_config)
+        self.config = loaded
 
     @property
     def stage_dir(self) -> Path:
