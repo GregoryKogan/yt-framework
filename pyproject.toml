@@ -53,6 +53,7 @@ Issues = "https://github.com/GregoryKogan/yt-framework/issues"
 dev = [
     "ruff==0.15.12",
     "basedpyright==1.39.3",
+    "vulture==2.16",
     "pre-commit>=4.0.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -184,6 +185,11 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.vulture]
+paths = ["yt_framework", "ytjobs"]
+min_confidence = 100
+exclude = ["*/__pycache__/*"]
 
 [tool.coverage.run]
 branch = true
