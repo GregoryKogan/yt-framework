@@ -89,6 +89,54 @@ def _prepare_map_operation(
     )
 
 
+def _require_map_tables(operation_config: DictConfig) -> None:
+    if not operation_config.get("input_table"):
+        msg = (
+            "No input_table in operation_config; "
+            "expected at client.operations.map.input_table"
+        )
+        raise ValueError(msg)
+    if not operation_config.get("output_table"):
+        msg = (
+            "No output_table in operation_config; "
+            "expected at client.operations.map.output_table"
+        )
+        raise ValueError(msg)
+
+
+def _resolve_map_mapper_leg(
+    mapper: object | None,
+    job: object | None,
+    map_operation_data: MapOperationData,
+) -> object:
+    if mapper is not None and job is not None and mapper != job:
+        msg = "Both 'mapper' and 'job' are set with different values; use only one"
+        raise ValueError(msg)
+    mapper_leg = job if job is not None else mapper
+    if mapper_leg is None:
+        mapper_leg = map_operation_data.command
+    if mapper_leg is None:
+        msg = "Command not provided by dependency builder"
+        raise ValueError(msg)
+    return mapper_leg
+
+
+def _map_operation_description_kwargs(
+    operation_config: DictConfig,
+    logger: logging.Logger,
+) -> dict[str, object]:
+    map_kwargs: dict[str, object] = {}
+    od = operation_config.get("operation_description")
+    if not od:
+        return map_kwargs
+    if isinstance(od, str):
+        logger.info("Operation label: %s", od)
+        map_kwargs["title"] = od
+        return map_kwargs
+    map_kwargs["operation_description"] = OmegaConf.to_container(od, resolve=True)
+    return map_kwargs
+
+
 def run_map(
     context: "StageContext",
     operation_config: DictConfig,
@@ -116,18 +164,7 @@ def run_map(
 
     """
     logger = context.logger
-    if not operation_config.get("input_table"):
-        msg = (
-            "No input_table in operation_config; "
-            "expected at client.operations.map.input_table"
-        )
-        raise ValueError(msg)
-    if not operation_config.get("output_table"):
-        msg = (
-            "No output_table in operation_config; "
-            "expected at client.operations.map.output_table"
-        )
-        raise ValueError(msg)
+    _require_map_tables(operation_config)
 
     log_header(
         logger,
@@ -158,15 +195,7 @@ def run_map(
 
     logger.debug("Dependencies: %s files", len(map_operation_data.dependencies))
 
-    if mapper is not None and job is not None and mapper != job:
-        msg = "Both 'mapper' and 'job' are set with different values; use only one"
-        raise ValueError(msg)
-    mapper_leg = job if job is not None else mapper
-    if mapper_leg is None:
-        mapper_leg = map_operation_data.command
-    if mapper_leg is None:
-        msg = "Command not provided by dependency builder"
-        raise ValueError(msg)
+    mapper_leg = _resolve_map_mapper_leg(mapper, job, map_operation_data)
 
     logger.debug("Extracting operation resources from config")
     resources: OperationResources = extract_operation_resources(
@@ -176,17 +205,7 @@ def run_map(
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
     append_output = bool(operation_config.get("append", False))
 
-    map_kwargs: dict[str, object] = {}
-    od = operation_config.get("operation_description")
-    if od:
-        if isinstance(od, str):
-            logger.info("Operation label: %s", od)
-            map_kwargs["title"] = od
-        else:
-            map_kwargs["operation_description"] = OmegaConf.to_container(
-                od,
-                resolve=True,
-            )
+    map_kwargs = _map_operation_description_kwargs(operation_config, logger)
 
     reserved_keys = {
         "input_table",

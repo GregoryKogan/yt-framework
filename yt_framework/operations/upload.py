@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 from omegaconf.errors import OmegaConfBaseException
 
 import ytjobs
@@ -96,35 +96,17 @@ def _resolve_upload_target(source: str, target: str | None, _pipeline_dir: Path)
     return Path(source).name
 
 
-def _validate_upload_config(
+def _collect_upload_targets(
     upload_modules: list[str] | None,
     upload_paths: list[dict[str, str]] | None,
     pipeline_dir: Path,
-) -> None:
-    """Validate upload config for reserved targets and conflicts.
-
-    Args:
-        upload_modules: List of module names
-        upload_paths: List of dicts with source and optional target
-        pipeline_dir: Pipeline directory for path resolution
-
-    Raises:
-        ValueError: If reserved target used or target conflict detected
-
-    """
-    reserved = {"stages", "ytjobs"}
-
-    targets: list[tuple[str, str]] = []  # (target, source_description)
-
-    # ytjobs is implicit
-    targets.append(("ytjobs", _IMPLICIT_YTJOBS_SOURCE))
-
-    # upload_modules (use top-level package as target; my_package.sub -> my_package)
+) -> list[tuple[str, str]]:
+    """Build (target_name, source_description) rows for validation."""
+    targets: list[tuple[str, str]] = [("ytjobs", _IMPLICIT_YTJOBS_SOURCE)]
     for mod in upload_modules or []:
-        top_level = mod.split(".")[0]
+        top_level = mod.split(".", maxsplit=1)[0]
         targets.append((top_level, f"upload_modules[{mod}]"))
 
-    # upload_paths (validate source is within pipeline_dir)
     pipeline_dir_resolved = pipeline_dir.resolve()
     for i, entry in enumerate(upload_paths or []):
         if "source" not in entry:
@@ -141,17 +123,21 @@ def _validate_upload_config(
         target = entry.get("target")
         resolved_target = _resolve_upload_target(source, target, pipeline_dir)
         targets.append((resolved_target, f"upload_paths[{source}]"))
+    return targets
 
-    # Check reserved
+
+def _raise_if_reserved_upload_targets(targets: list[tuple[str, str]]) -> None:
+    reserved = {"stages", "ytjobs"}
     for target, source_desc in targets:
         if target in reserved and source_desc != _IMPLICIT_YTJOBS_SOURCE:
             msg = (
                 f"Reserved target name '{target}' cannot be used. "
-                f"Reserved names: stages, ytjobs."
+                "Reserved names: stages, ytjobs."
             )
             raise ValueError(msg)
 
-    # Check conflicts
+
+def _raise_if_upload_target_conflicts(targets: list[tuple[str, str]]) -> None:
     seen: dict[str, str] = {}
     for target, source_desc in targets:
         if target in seen and seen[target] != source_desc:
@@ -159,6 +145,27 @@ def _validate_upload_config(
             msg = f"Upload target conflict: '{target}' is used by multiple sources: {sources}."
             raise ValueError(msg)
         seen[target] = source_desc
+
+
+def _validate_upload_config(
+    upload_modules: list[str] | None,
+    upload_paths: list[dict[str, str]] | None,
+    pipeline_dir: Path,
+) -> None:
+    """Validate upload config for reserved targets and conflicts.
+
+    Args:
+        upload_modules: List of module names
+        upload_paths: List of dicts with source and optional target
+        pipeline_dir: Pipeline directory for path resolution
+
+    Raises:
+        ValueError: If reserved target used or target conflict detected
+
+    """
+    targets = _collect_upload_targets(upload_modules, upload_paths, pipeline_dir)
+    _raise_if_reserved_upload_targets(targets)
+    _raise_if_upload_target_conflicts(targets)
 
 
 def _copy_module_to_build_dir(
@@ -318,6 +325,89 @@ def _copy_path_to_build_dir(
     return file_count
 
 
+def _stage_config_has_nonempty_job(config: object) -> bool:
+    if not isinstance(config, DictConfig):
+        return False
+    if "job" not in config:
+        return False
+    job = config.get("job")
+    return bool(job and (not isinstance(job, dict) or len(job) > 0))
+
+
+def _copy_stage_config_yaml(
+    stage_dir: Path,
+    build_dir: Path,
+    stage_name: str,
+    ignore_matcher: YTIgnoreMatcher,
+    logger: logging.Logger,
+) -> tuple[int, int]:
+    """Copy ``config.yaml`` when present and not ignored. Returns (files_added, ignores_added)."""
+    config_path = stage_dir / "config.yaml"
+    if not config_path.exists():
+        return 0, 0
+    if ignore_matcher.should_ignore(config_path):
+        logger.debug(
+            "  Ignoring config: %s/config.yaml (matched .ytignore)",
+            stage_name,
+        )
+        return 0, 1
+    try:
+        config = OmegaConf.load(config_path)
+        if _stage_config_has_nonempty_job(config):
+            target_config = build_dir / "stages" / stage_name / "config.yaml"
+            target_config.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(config_path, target_config)
+            logger.debug("  Copied config: %s/config.yaml", stage_name)
+            return 1, 0
+    except (
+        OSError,
+        OmegaConfBaseException,
+        TypeError,
+        ValueError,
+        yaml.YAMLError,
+    ) as exc:
+        logger.debug("Skipping invalid config %s: %s", config_path, exc)
+    return 0, 0
+
+
+def _copy_stage_src_directory(
+    stage_dir: Path,
+    src_dir: Path,
+    build_dir: Path,
+    stage_name: str,
+    ignore_matcher: YTIgnoreMatcher,
+    logger: logging.Logger,
+) -> tuple[int, int]:
+    """Copy ``src/`` tree. Returns (files_added, ignores_added)."""
+    target_src = build_dir / "stages" / stage_name / "src"
+    target_src.mkdir(parents=True, exist_ok=True)
+    file_count = 0
+    ignored_count = 0
+    for source_file in src_dir.rglob("*"):
+        if not source_file.is_file():
+            continue
+        if ignore_matcher.should_ignore(source_file):
+            logger.debug(
+                "  Ignoring file: %s (matched .ytignore)",
+                source_file.relative_to(stage_dir),
+            )
+            ignored_count += 1
+            continue
+        rel_path = source_file.relative_to(src_dir)
+        target_file = target_src / rel_path
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_file, target_file)
+        file_count += 1
+    logger.debug("  Copied %s files from %s/src/", file_count, stage_name)
+    if ignored_count > 0:
+        logger.debug(
+            "  Ignored %s files from %s/ (matched .ytignore patterns)",
+            ignored_count,
+            stage_name,
+        )
+    return file_count, ignored_count
+
+
 def _copy_stage_to_build_dir(
     build_dir: Path,
     stage_dir: Path,
@@ -338,74 +428,32 @@ def _copy_stage_to_build_dir(
     """
     stage_name = stage_dir.name
     file_count = 0
-
-    # Initialize .ytignore matcher for stage directory
-    ignore_matcher = YTIgnoreMatcher(stage_dir)
     ignored_count = 0
 
-    # Copy config.yaml if it exists and has job section
-    config_path = stage_dir / "config.yaml"
-    if config_path.exists():
-        # Check if config should be ignored
-        if not ignore_matcher.should_ignore(config_path):
-            try:
-                config = OmegaConf.load(config_path)
-                if (
-                    "job" in config
-                    and config.job
-                    and (not isinstance(config.job, dict) or len(config.job) > 0)
-                ):
-                    target_config = build_dir / "stages" / stage_name / "config.yaml"
-                    target_config.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(config_path, target_config)
-                    file_count += 1
-                    logger.debug("  Copied config: %s/config.yaml", stage_name)
-            except (
-                OSError,
-                OmegaConfBaseException,
-                TypeError,
-                ValueError,
-                yaml.YAMLError,
-            ) as exc:
-                # If config parsing fails, skip this stage config.
-                logger.debug("Skipping invalid config %s: %s", config_path, exc)
-        else:
-            logger.debug(
-                "  Ignoring config: %s/config.yaml (matched .ytignore)",
-                stage_name,
-            )
-            ignored_count += 1
+    ignore_matcher = YTIgnoreMatcher(stage_dir)
 
-    # Copy src directory
+    fc_cfg, ig_cfg = _copy_stage_config_yaml(
+        stage_dir,
+        build_dir,
+        stage_name,
+        ignore_matcher,
+        logger,
+    )
+    file_count += fc_cfg
+    ignored_count += ig_cfg
+
     src_dir = stage_dir / "src"
     if src_dir.exists():
-        target_src = build_dir / "stages" / stage_name / "src"
-        target_src.mkdir(parents=True, exist_ok=True)
-
-        for source_file in src_dir.rglob("*"):
-            if source_file.is_file():
-                # Check if file should be ignored
-                if ignore_matcher.should_ignore(source_file):
-                    logger.debug(
-                        "  Ignoring file: %s (matched .ytignore)",
-                        source_file.relative_to(stage_dir),
-                    )
-                    ignored_count += 1
-                    continue
-
-                rel_path = source_file.relative_to(src_dir)
-                target_file = target_src / rel_path
-                target_file.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source_file, target_file)
-                file_count += 1
-
-        logger.debug("  Copied %s files from %s/src/", file_count, stage_name)
-        if ignored_count > 0:
-            logger.debug(
-                "  Ignored %s files from %s/ (matched .ytignore patterns)",
-                ignored_count,
-                stage_name,
-            )
+        fc_src, ig_src = _copy_stage_src_directory(
+            stage_dir,
+            src_dir,
+            build_dir,
+            stage_name,
+            ignore_matcher,
+            logger,
+        )
+        file_count += fc_src
+        ignored_count += ig_src
 
     return file_count
 
@@ -478,6 +526,21 @@ def _load_stage_job_section(
         return {}
 
 
+_MAP_REDUCE_REDUCER_CANDIDATES = (
+    "reducer.py",
+    "reducer_mds.py",
+    "reducer_main.py",
+    "reducer_index.py",
+)
+
+
+def _first_existing_reducer_script(src: Path) -> str | None:
+    for candidate in _MAP_REDUCE_REDUCER_CANDIDATES:
+        if (src / candidate).is_file():
+            return candidate
+    return None
+
+
 def _resolve_map_reduce_command_scripts(
     stage_dir: Path,
     logger: logging.Logger,
@@ -496,15 +559,7 @@ def _resolve_map_reduce_command_scripts(
         reducer = str(reducer)
     src = stage_dir / "src"
     if reducer is None:
-        for candidate in (
-            "reducer.py",
-            "reducer_mds.py",
-            "reducer_main.py",
-            "reducer_index.py",
-        ):
-            if (src / candidate).is_file():
-                reducer = candidate
-                break
+        reducer = _first_existing_reducer_script(src)
     if not (src / mapper).is_file():
         logger.debug("No %s at %s — skipping map_reduce_mapper wrapper", mapper, src)
         return None, None

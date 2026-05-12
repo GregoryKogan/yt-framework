@@ -1212,6 +1212,34 @@ class YTDevClient(BaseYTClient):
 
         return None
 
+    def _merge_checkpoint_env_from_stage(
+        self,
+        stage_cfg: object,
+        env_merged: dict[str, str],
+    ) -> None:
+        if not isinstance(stage_cfg, DictConfig):
+            return
+        local_checkpoint = self._find_checkpoint_in_config(stage_cfg)
+        model_name = OmegaConf.select(stage_cfg, "job.model_name")
+        if not local_checkpoint:
+            return
+        checkpoint_path = Path(local_checkpoint).resolve()
+        if not checkpoint_path.exists():
+            self.logger.warning(
+                "  Dev: local_checkpoint_path not found: %s",
+                checkpoint_path,
+            )
+            return
+        checkpoint_filename = (
+            str(model_name) if model_name not in (None, "") else checkpoint_path.name
+        )
+        env_merged["CHECKPOINT_FILE"] = checkpoint_filename
+        self.logger.info(
+            "  Dev: checkpoint file set to: %s (from %s)",
+            checkpoint_filename,
+            checkpoint_path,
+        )
+
     def _setup_checkpoint_config(self, env_merged: dict[str, str]) -> None:
         """Merge checkpoint-related variables from stage config when available."""
         self._pipeline_dir_or_raise()
@@ -1235,38 +1263,7 @@ class YTDevClient(BaseYTClient):
 
                         try:
                             stage_cfg = OmegaConf.load(stage_config_path)
-                            if not isinstance(stage_cfg, DictConfig):
-                                continue
-                            local_checkpoint = self._find_checkpoint_in_config(
-                                stage_cfg,
-                            )
-                            # Get model_name from job.model_name (used as checkpoint filename)
-                            model_name = OmegaConf.select(
-                                stage_cfg,
-                                "job.model_name",
-                            )
-
-                            if local_checkpoint:
-                                checkpoint_path = Path(local_checkpoint).resolve()
-                                if checkpoint_path.exists():
-                                    # Set CHECKPOINT_FILE to the filename (not full path) since the file
-                                    # will be copied to the sandbox directory and processor expects it there
-                                    checkpoint_filename = (
-                                        str(model_name)
-                                        if model_name not in (None, "")
-                                        else checkpoint_path.name
-                                    )
-                                    env_merged["CHECKPOINT_FILE"] = checkpoint_filename
-                                    self.logger.info(
-                                        "  Dev: checkpoint file set to: %s (from %s)",
-                                        checkpoint_filename,
-                                        checkpoint_path,
-                                    )
-                                else:
-                                    self.logger.warning(
-                                        "  Dev: local_checkpoint_path not found: %s",
-                                        checkpoint_path,
-                                    )
+                            self._merge_checkpoint_env_from_stage(stage_cfg, env_merged)
                         except Exception as e:  # noqa: BLE001
                             self.logger.warning(
                                 "  Dev: failed to load checkpoint config: %s",

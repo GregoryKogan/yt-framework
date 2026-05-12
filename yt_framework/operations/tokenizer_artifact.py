@@ -94,6 +94,48 @@ def _prepare_local_archive(local_artifact_path: Path, artifact_name: str) -> Pat
     raise ValueError(msg)
 
 
+def _tokenizer_artifact_base_str(tokenizer_artifact_config: DictConfig) -> str | None:
+    raw = tokenizer_artifact_config.get("artifact_base")
+    if isinstance(raw, str) and raw.strip():
+        return str(raw).strip()
+    return None
+
+
+def _upload_tokenizer_if_missing(
+    context: StageContext,
+    *,
+    local_artifact_path: str,
+    yt_artifact_path: str,
+    artifact_name: str,
+) -> Path | None:
+    """Upload local tarball when path exists and YT object missing. Returns temp archive to delete."""
+    source = Path(str(local_artifact_path))
+    if not source.exists():
+        context.logger.warning(
+            "tokenizer_artifact.local_artifact_path does not exist: %s",
+            source,
+        )
+        return None
+    if context.deps.yt_client.exists(yt_artifact_path):
+        context.logger.info(
+            "Tokenizer artifact already exists in YT: %s (skipping upload)",
+            yt_artifact_path,
+        )
+        return None
+    archive_local_path = _prepare_local_archive(source, artifact_name)
+    context.logger.info(
+        "Uploading tokenizer artifact: %s -> %s",
+        archive_local_path,
+        yt_artifact_path,
+    )
+    context.deps.yt_client.upload_file(
+        archive_local_path,
+        yt_artifact_path,
+        create_parent_dir=True,
+    )
+    return archive_local_path if archive_local_path != source else None
+
+
 def init_tokenizer_artifact_directory(
     context: StageContext,
     tokenizer_artifact_config: DictConfig,
@@ -105,12 +147,7 @@ def init_tokenizer_artifact_directory(
     - uploads local artifact from `local_artifact_path` if provided and missing in YT;
     - validates artifact presence in YT.
     """
-    artifact_base_value = tokenizer_artifact_config.get("artifact_base")
-    artifact_base = (
-        str(artifact_base_value)
-        if isinstance(artifact_base_value, str) and artifact_base_value.strip()
-        else None
-    )
+    artifact_base = _tokenizer_artifact_base_str(tokenizer_artifact_config)
     if not artifact_base:
         return
 
@@ -127,11 +164,9 @@ def init_tokenizer_artifact_directory(
 
     archive_name = resolve_tokenizer_archive_name(artifact_name)
     yt_artifact_path = f"{artifact_base}/{archive_name}"
-    local_artifact_path_value = tokenizer_artifact_config.get("local_artifact_path")
+    local_raw = tokenizer_artifact_config.get("local_artifact_path")
     local_artifact_path = (
-        str(local_artifact_path_value)
-        if isinstance(local_artifact_path_value, str) and local_artifact_path_value
-        else None
+        str(local_raw) if isinstance(local_raw, str) and local_raw else None
     )
 
     context.deps.yt_client.create_path(artifact_base, node_type="map_node")
@@ -140,31 +175,14 @@ def init_tokenizer_artifact_directory(
     temp_archive: Path | None = None
     try:
         if local_artifact_path:
-            source = Path(str(local_artifact_path))
-            if not source.exists():
-                context.logger.warning(
-                    "tokenizer_artifact.local_artifact_path does not exist: %s",
-                    source,
-                )
-            elif context.deps.yt_client.exists(yt_artifact_path):
-                context.logger.info(
-                    "Tokenizer artifact already exists in YT: %s (skipping upload)",
-                    yt_artifact_path,
-                )
-            else:
-                archive_local_path = _prepare_local_archive(source, artifact_name)
-                if archive_local_path != source:
-                    temp_archive = archive_local_path
-                context.logger.info(
-                    "Uploading tokenizer artifact: %s -> %s",
-                    archive_local_path,
-                    yt_artifact_path,
-                )
-                context.deps.yt_client.upload_file(
-                    archive_local_path,
-                    yt_artifact_path,
-                    create_parent_dir=True,
-                )
+            maybe_temp = _upload_tokenizer_if_missing(
+                context,
+                local_artifact_path=local_artifact_path,
+                yt_artifact_path=yt_artifact_path,
+                artifact_name=artifact_name,
+            )
+            if maybe_temp is not None:
+                temp_archive = maybe_temp
 
         if not context.deps.yt_client.exists(yt_artifact_path):
             msg = (

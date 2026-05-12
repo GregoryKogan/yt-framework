@@ -10,6 +10,20 @@ from botocore.client import Config as BotoConfig
 from botocore.exceptions import ClientError
 
 
+def _parse_chunk_size(line: bytes) -> int | None:
+    size_part = line.split(b";")[0].strip() if b";" in line else line.strip()
+    try:
+        return int(size_part, 16)
+    except ValueError:
+        return None
+
+
+def _skip_crlf_after_chunk(data: bytes, i: int) -> int:
+    while i < len(data) and data[i : i + 1] in (b"\r", b"\n"):
+        i += 1
+    return i
+
+
 def _decode_http_chunked_if_present(data: bytes, logger: logging.Logger) -> bytes:
     """Decode HTTP chunked-transfer payloads when present, else return ``data``.
 
@@ -26,10 +40,8 @@ def _decode_http_chunked_if_present(data: bytes, logger: logging.Logger) -> byte
         if line_end < 0:
             break
         line = data[i:line_end].strip(b"\r")
-        size_part = line.split(b";")[0].strip() if b";" in line else line.strip()
-        try:
-            size = int(size_part, 16)
-        except ValueError:
+        size = _parse_chunk_size(line)
+        if size is None:
             break
         i = line_end + 1
         if size == 0:
@@ -38,8 +50,7 @@ def _decode_http_chunked_if_present(data: bytes, logger: logging.Logger) -> byte
             break
         out.extend(data[i : i + size])
         i += size
-        while i < len(data) and data[i : i + 1] in (b"\r", b"\n"):
-            i += 1
+        i = _skip_crlf_after_chunk(data, i)
     if out:
         logger.debug("Decoded HTTP chunked body (%s bytes payload)", len(out))
         return bytes(out)
