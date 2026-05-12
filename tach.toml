@@ -1,0 +1,24 @@
+exclude = [
+    "**/__pycache__",
+    "**/*.egg-info",
+    ".eggs/",
+    "build/",
+    "dist/",
+    "docs/**",
+    "examples/**",
+    "tests/**",
+    "tools/**",
+]
+source_roots = ["."]
+exact = true
+ignore_type_checking_imports = true
+forbid_circular_dependencies = true
+root_module = "forbid"
+
+[[modules]]
+path = "ytjobs"
+depends_on = []
+
+[[modules]]
+path = "yt_framework"
+depends_on = ["ytjobs"]

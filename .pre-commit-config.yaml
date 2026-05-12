@@ -31,12 +31,9 @@ repos:
           - yt_framework
           - ytjobs
 
-  - repo: local
+  - repo: https://github.com/gauge-sh/tach-pre-commit
+    rev: v0.29.0
     hooks:
-      - id: pytest
-        name: pytest (pre-push)
-        entry: bash -c 'conda run -n yt-framework -- pytest'
-        language: system
+      - id: tach
         pass_filenames: false
         always_run: true
-        stages: [pre-push]
