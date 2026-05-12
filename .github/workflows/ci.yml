@@ -37,6 +37,9 @@ jobs:
       - name: Vulture
         run: vulture
 
+      - name: Xenon
+        run: xenon --max-absolute=C --max-modules=B --max-average=A yt_framework ytjobs
+
   typecheck:
     runs-on: ubuntu-latest
     steps:

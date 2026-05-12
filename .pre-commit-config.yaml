@@ -18,6 +18,19 @@ repos:
     hooks:
       - id: vulture
 
+  - repo: https://github.com/rubik/xenon
+    rev: v0.9.3
+    hooks:
+      - id: xenon
+        pass_filenames: false
+        always_run: true
+        args:
+          - --max-absolute=C
+          - --max-modules=B
+          - --max-average=A
+          - yt_framework
+          - ytjobs
+
   - repo: local
     hooks:
       - id: pytest
