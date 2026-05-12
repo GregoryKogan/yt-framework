@@ -87,6 +87,22 @@ def _prepare_vanilla_operation(
     )
 
 
+def _vanilla_operation_description_kwargs(
+    operation_config: DictConfig,
+    logger: logging.Logger,
+) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    od = operation_config.get("operation_description")
+    if not od:
+        return out
+    if isinstance(od, str):
+        logger.info("Operation label: %s", od)
+        out["title"] = od
+        return out
+    out["operation_description"] = OmegaConf.to_container(od, resolve=True)
+    return out
+
+
 def run_vanilla(
     context: "StageContext",
     operation_config: DictConfig,
@@ -151,17 +167,7 @@ def run_vanilla(
     resources = extract_operation_resources(operation_config, logger)
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
-    vanilla_kwargs: dict[str, Any] = {}
-    od = operation_config.get("operation_description")
-    if od:
-        if isinstance(od, str):
-            logger.info("Operation label: %s", od)
-            vanilla_kwargs["title"] = od
-        else:
-            vanilla_kwargs["operation_description"] = OmegaConf.to_container(
-                od,
-                resolve=True,
-            )
+    vanilla_kwargs = _vanilla_operation_description_kwargs(operation_config, logger)
 
     vanilla_kwargs.update(
         collect_passthrough_kwargs(

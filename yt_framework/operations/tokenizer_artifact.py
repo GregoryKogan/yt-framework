@@ -13,27 +13,44 @@ if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
 
 
+def _nonempty_str(value: object) -> str | None:
+    if value and str(value).strip():
+        return str(value).strip()
+    return None
+
+
+def _artifact_name_from_job(stage_config: DictConfig) -> str | None:
+    if "job" not in stage_config:
+        return None
+    tokenizer_name = stage_config.job.get("tokenizer_name")
+    t = _nonempty_str(tokenizer_name)
+    if t is not None:
+        return t
+    model_name = stage_config.job.get("model_name")
+    m = _nonempty_str(model_name)
+    if m is None:
+        return None
+    return m.split("/")[-1]
+
+
 def resolve_tokenizer_artifact_name(
     stage_config: DictConfig,
     tokenizer_artifact_config: DictConfig,
 ) -> str | None:
     """Resolve logical tokenizer artifact name from config."""
     explicit = tokenizer_artifact_config.get("artifact_name")
-    if explicit and str(explicit).strip():
-        return str(explicit).strip()
+    e = _nonempty_str(explicit)
+    if e is not None:
+        return e
 
-    if "job" in stage_config:
-        tokenizer_name = stage_config.job.get("tokenizer_name")
-        if tokenizer_name and str(tokenizer_name).strip():
-            return str(tokenizer_name).strip()
-
-        model_name = stage_config.job.get("model_name")
-        if model_name and str(model_name).strip():
-            return str(model_name).strip().split("/")[-1]
+    from_job = _artifact_name_from_job(stage_config)
+    if from_job is not None:
+        return from_job
 
     local_path = tokenizer_artifact_config.get("local_artifact_path")
-    if local_path and str(local_path).strip():
-        return Path(str(local_path)).name.replace(".tar.gz", "")
+    lp = _nonempty_str(local_path)
+    if lp is not None:
+        return Path(lp).name.replace(".tar.gz", "")
 
     return None
 
@@ -136,6 +153,58 @@ def _upload_tokenizer_if_missing(
     return archive_local_path if archive_local_path != source else None
 
 
+def _resolved_tokenizer_artifact_name_or_raise(
+    stage_config: DictConfig,
+    tokenizer_artifact_config: DictConfig,
+) -> str:
+    artifact_name = resolve_tokenizer_artifact_name(
+        stage_config=stage_config,
+        tokenizer_artifact_config=tokenizer_artifact_config,
+    )
+    if artifact_name:
+        return artifact_name
+    msg = (
+        "tokenizer_artifact is configured but artifact_name cannot be resolved. "
+        "Set tokenizer_artifact.artifact_name or job.tokenizer_name/model_name."
+    )
+    raise ValueError(msg)
+
+
+def _local_artifact_path_option(tokenizer_artifact_config: DictConfig) -> str | None:
+    local_raw = tokenizer_artifact_config.get("local_artifact_path")
+    return str(local_raw) if isinstance(local_raw, str) and local_raw else None
+
+
+def _verify_tokenizer_yt_path_or_raise(
+    context: StageContext,
+    yt_artifact_path: str,
+) -> None:
+    if not context.deps.yt_client.exists(yt_artifact_path):
+        msg = (
+            f"Tokenizer artifact not found in YT: {yt_artifact_path}. "
+            "Provide tokenizer_artifact.local_artifact_path or upload manually."
+        )
+        raise FileNotFoundError(msg)
+    context.logger.info("Tokenizer artifact verified: %s", yt_artifact_path)
+
+
+def _tokenizer_try_upload_local(
+    context: StageContext,
+    *,
+    local_artifact_path: str | None,
+    yt_artifact_path: str,
+    artifact_name: str,
+) -> Path | None:
+    if not local_artifact_path:
+        return None
+    return _upload_tokenizer_if_missing(
+        context,
+        local_artifact_path=local_artifact_path,
+        yt_artifact_path=yt_artifact_path,
+        artifact_name=artifact_name,
+    )
+
+
 def init_tokenizer_artifact_directory(
     context: StageContext,
     tokenizer_artifact_config: DictConfig,
@@ -151,47 +220,30 @@ def init_tokenizer_artifact_directory(
     if not artifact_base:
         return
 
-    artifact_name = resolve_tokenizer_artifact_name(
+    artifact_name = _resolved_tokenizer_artifact_name_or_raise(
         stage_config=context.config,
         tokenizer_artifact_config=tokenizer_artifact_config,
     )
-    if not artifact_name:
-        msg = (
-            "tokenizer_artifact is configured but artifact_name cannot be resolved. "
-            "Set tokenizer_artifact.artifact_name or job.tokenizer_name/model_name."
-        )
-        raise ValueError(msg)
 
     archive_name = resolve_tokenizer_archive_name(artifact_name)
     yt_artifact_path = f"{artifact_base}/{archive_name}"
-    local_raw = tokenizer_artifact_config.get("local_artifact_path")
-    local_artifact_path = (
-        str(local_raw) if isinstance(local_raw, str) and local_raw else None
-    )
+    local_artifact_path = _local_artifact_path_option(tokenizer_artifact_config)
 
     context.deps.yt_client.create_path(artifact_base, node_type="map_node")
     context.logger.info("Tokenizer artifact directory ready: %s", artifact_base)
 
     temp_archive: Path | None = None
     try:
-        if local_artifact_path:
-            maybe_temp = _upload_tokenizer_if_missing(
-                context,
-                local_artifact_path=local_artifact_path,
-                yt_artifact_path=yt_artifact_path,
-                artifact_name=artifact_name,
-            )
-            if maybe_temp is not None:
-                temp_archive = maybe_temp
+        maybe_temp = _tokenizer_try_upload_local(
+            context,
+            local_artifact_path=local_artifact_path,
+            yt_artifact_path=yt_artifact_path,
+            artifact_name=artifact_name,
+        )
+        if maybe_temp is not None:
+            temp_archive = maybe_temp
 
-        if not context.deps.yt_client.exists(yt_artifact_path):
-            msg = (
-                f"Tokenizer artifact not found in YT: {yt_artifact_path}. "
-                "Provide tokenizer_artifact.local_artifact_path or upload manually."
-            )
-            raise FileNotFoundError(msg)
-
-        context.logger.info("Tokenizer artifact verified: %s", yt_artifact_path)
+        _verify_tokenizer_yt_path_or_raise(context, yt_artifact_path)
     finally:
         if temp_archive and temp_archive.exists():
             temp_archive.unlink(missing_ok=True)

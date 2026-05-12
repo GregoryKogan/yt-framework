@@ -81,66 +81,47 @@ class YTIgnorePattern:
         # Convert to regex-like pattern for matching
         self._compile_pattern()
 
+    def _translate_fnmatch_segment(self, part: str) -> str:
+        if part == "*":
+            return "[^/]*"
+        part_regex = fnmatch.translate(part)
+        part_regex = part_regex.lstrip("^").rstrip(r"\Z")
+        return part_regex.replace(".*", "[^/]*")
+
+    def _slash_separated_pattern_to_regex(self, pattern: str) -> str:
+        parts = pattern.split("/")
+        regex_parts = [self._translate_fnmatch_segment(part) for part in parts]
+        return "^" + "/".join(regex_parts) + r"\Z"
+
+    def _double_star_leading_to_regex(self, pattern: str) -> str:
+        rest_pattern = pattern[3:]
+        rest_regex = fnmatch.translate(rest_pattern)
+        rest_regex = rest_regex.lstrip("^").rstrip("$").rstrip(r"\Z")
+        return f"^.*/{rest_regex}$"
+
+    def _double_star_generic_to_regex(self, pattern: str) -> str:
+        marked = pattern.replace("**", "__RECURSIVE_WILDCARD__")
+        translated = fnmatch.translate(marked)
+        return translated.replace("__RECURSIVE_WILDCARD__", ".*")
+
+    def _pattern_core_to_regex(self, pattern: str) -> str:
+        if "**" in pattern:
+            if pattern.startswith("**/"):
+                return self._double_star_leading_to_regex(pattern)
+            return self._double_star_generic_to_regex(pattern)
+        if "/" in pattern:
+            return self._slash_separated_pattern_to_regex(pattern)
+        return fnmatch.translate(pattern)
+
+    def _apply_rooted_anchor(self, pattern: str) -> str:
+        stripped = pattern.lstrip("^").rstrip("$").rstrip(r"\Z")
+        return f"^{stripped}$"
+
     def _compile_pattern(self) -> None:
         """Compile pattern into a matching function."""
-        # Pattern is already stripped of leading slash and trailing slash
-        pattern = self.pattern
-
-        # Handle ** for recursive matching
-        if "**" in pattern:
-            # Convert ** to regex equivalent
-            # ** matches zero or more directories
-            # Special case: **/ at start means match in any subdirectory (requires at least one /)
-            if pattern.startswith("**/"):
-                # **/pattern should match pattern in subdirectories (not at root)
-                rest_pattern = pattern[3:]  # Remove '**/'
-                # Translate the rest
-                rest_regex = fnmatch.translate(rest_pattern)
-                # Remove the ^ and $ from rest_regex since we'll add our own
-                rest_regex = rest_regex.lstrip("^").rstrip("$").rstrip(r"\Z")
-                # Match in subdirectories only (requires at least one /)
-                pattern = f"^.*/{rest_regex}$"
-            else:
-                # ** in middle or end - replace with .* (matches any path)
-                pattern = pattern.replace("**", "__RECURSIVE_WILDCARD__")
-                # Escape other special characters
-                pattern = fnmatch.translate(pattern)
-                # Replace our placeholder with regex for any path
-                pattern = pattern.replace("__RECURSIVE_WILDCARD__", ".*")
-        # Check if pattern contains path separator
-        elif "/" in pattern:
-            # Pattern with explicit path - use fnmatch but ensure * doesn't match /
-            # Split pattern by / and translate each part separately
-            parts = pattern.split("/")
-            regex_parts = []
-            for part in parts:
-                if part == "*":
-                    # * should not match path separators
-                    regex_parts.append("[^/]*")
-                else:
-                    # Use fnmatch for this part, but replace * with [^/]*
-                    # to prevent matching across directories
-                    part_regex = fnmatch.translate(part)
-                    # Remove the anchors that fnmatch adds
-                    part_regex = part_regex.lstrip("^").rstrip(r"\Z")
-                    # Replace .* (from fnmatch's * translation) with [^/]*
-                    # to prevent matching across path separators
-                    part_regex = part_regex.replace(".*", "[^/]*")
-                    regex_parts.append(part_regex)
-            pattern = "^" + "/".join(regex_parts) + r"\Z"
-        else:
-            # Use fnmatch for standard wildcards
-            pattern = fnmatch.translate(pattern)
-
-        # If pattern was rooted (started with /), only match at root level
-        # This means the path should NOT have any leading directory components
+        pattern = self._pattern_core_to_regex(self.pattern)
         if self.is_rooted:
-            # Remove any existing anchor
-            pattern = pattern.lstrip("^").rstrip("$").rstrip(r"\Z")
-            # Anchors: pattern must match from start, and must not have leading dirs
-            # Use negative lookahead to ensure no leading path components
-            pattern = f"^{pattern}$"
-
+            pattern = self._apply_rooted_anchor(pattern)
         self._regex = re.compile(pattern)
 
     def _relative_path_str(self, file_path: Path) -> str | None:
@@ -153,17 +134,17 @@ class YTIgnorePattern:
     def _rooted_blocks_match(self, path_str: str) -> bool:
         return bool(self.is_rooted and "/" in path_str)
 
+    def _directory_segment_matches(self, parts: list[str], idx: int) -> bool:
+        parent_path = "/".join(parts[: idx + 1])
+        if self._regex.match(parent_path):
+            return True
+        if self.is_rooted or idx >= len(parts) - 1:
+            return False
+        return bool(self._regex.match(parts[idx]))
+
     def _directory_pattern_matches(self, path_str: str) -> bool:
         parts = path_str.split("/")
-        for i in range(len(parts)):
-            parent_path = "/".join(parts[: i + 1])
-            if self._regex.match(parent_path):
-                return True
-            if not self.is_rooted and i < len(parts) - 1:
-                dir_name = parts[i]
-                if self._regex.match(dir_name):
-                    return True
-        return False
+        return any(self._directory_segment_matches(parts, i) for i in range(len(parts)))
 
     def _file_pattern_matches(self, path_str: str) -> bool:
         filename_match = (
@@ -194,6 +175,16 @@ class YTIgnorePattern:
             return self._directory_pattern_matches(path_str)
 
         return self._file_pattern_matches(path_str)
+
+
+def _ytignore_pattern_from_line(line: str, base_dir: Path) -> YTIgnorePattern | None:
+    if not line or line.startswith("#"):
+        return None
+    is_negation = line.startswith("!")
+    pattern = line[1:].strip() if is_negation else line
+    if not pattern:
+        return None
+    return YTIgnorePattern(pattern, base_dir, is_negation)
 
 
 class YTIgnoreMatcher:
@@ -285,24 +276,12 @@ class YTIgnoreMatcher:
         try:
             with ytignore_file.open(encoding="utf-8") as f:
                 for raw_line in f:
-                    # Remove leading and trailing whitespace
-                    line = raw_line.strip()
-
-                    # Skip empty lines and comments
-                    if not line or line.startswith("#"):
-                        continue
-
-                    # Check for negation
-                    is_negation = line.startswith("!")
-                    pattern = line[1:].strip() if is_negation else line
-
-                    # Skip if pattern is empty after processing
-                    if not pattern:
-                        continue
-
-                    # Create pattern object
-                    ignore_pattern = YTIgnorePattern(pattern, base_dir, is_negation)
-                    self.patterns.append(ignore_pattern)
+                    ignore_pattern = _ytignore_pattern_from_line(
+                        raw_line.strip(),
+                        base_dir,
+                    )
+                    if ignore_pattern is not None:
+                        self.patterns.append(ignore_pattern)
         except (OSError, UnicodeDecodeError, ValueError) as e:
             # Log error but don't fail - just skip this .ytignore file
             logger = logging.getLogger(__name__)

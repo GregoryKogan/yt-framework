@@ -9,6 +9,7 @@ import warnings
 from typing import TYPE_CHECKING, Any
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
+from yt.wrapper import Operation
 
 from yt_framework.utils.logging import log_header, log_success
 
@@ -29,6 +30,22 @@ if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
 
 
+def _wait_operation_with_log(
+    context: "StageContext",
+    operation: Operation,
+    logger: logging.Logger,
+    *,
+    success_msg: str,
+    failure_msg: str,
+) -> bool:
+    success = context.deps.yt_client.wait_for_operation(operation)
+    if success:
+        log_success(logger, success_msg)
+    else:
+        logger.error(failure_msg)
+    return success
+
+
 def _str_list_from_config(value: object) -> list[str]:
     if value is None:
         return []
@@ -37,13 +54,21 @@ def _str_list_from_config(value: object) -> list[str]:
     return [str(value)]
 
 
+def _map_reduce_tables_ready(
+    input_table: str,
+    output_table: str,
+    reduce_by: list[str],
+) -> bool:
+    return bool(input_table and output_table and reduce_by)
+
+
 def _validate_map_reduce_inputs(
     operation_config: DictConfig,
 ) -> tuple[str, str, list[str]]:
     input_table = str(operation_config.get("input_table") or "")
     output_table = str(operation_config.get("output_table") or "")
     reduce_by = _str_list_from_config(operation_config.get("reduce_by"))
-    if input_table and output_table and reduce_by:
+    if _map_reduce_tables_ready(input_table, output_table, reduce_by):
         return input_table, output_table, reduce_by
     msg = (
         "operation_config must set input_table, output_table, and reduce_by; "
@@ -52,22 +77,56 @@ def _validate_map_reduce_inputs(
     raise ValueError(msg)
 
 
+def _assert_exclusive_map_job_aliases(
+    mapper: object,
+    map_job: object,
+) -> None:
+    if mapper is not None and map_job is not None and mapper != map_job:
+        msg = "Both 'mapper' and 'map_job' are set with different values; use only one"
+        raise ValueError(msg)
+
+
+def _assert_exclusive_reduce_job_aliases(
+    reducer: object,
+    reduce_job: object,
+) -> None:
+    if reducer is not None and reduce_job is not None and reducer != reduce_job:
+        msg = "Both 'reducer' and 'reduce_job' are set with different values; use only one"
+        raise ValueError(msg)
+
+
 def _resolve_map_reduce_legs(
     mapper: object,
     reducer: object,
     map_job: object,
     reduce_job: object,
 ) -> tuple[object, object]:
-    if mapper is not None and map_job is not None and mapper != map_job:
-        msg = "Both 'mapper' and 'map_job' are set with different values; use only one"
-        raise ValueError(msg)
-    if reducer is not None and reduce_job is not None and reducer != reduce_job:
-        msg = "Both 'reducer' and 'reduce_job' are set with different values; use only one"
-        raise ValueError(msg)
+    _assert_exclusive_map_job_aliases(mapper, map_job)
+    _assert_exclusive_reduce_job_aliases(reducer, reduce_job)
     resolved_mapper = map_job if map_job is not None else mapper
     resolved_reducer = reduce_job if reduce_job is not None else reducer
     require_consistent_map_reduce_legs(resolved_mapper, resolved_reducer)
     return resolved_mapper, resolved_reducer
+
+
+def _warn_deprecated_map_reduce_aliases(
+    mapper: object,
+    map_job: object,
+    reducer: object,
+    reduce_job: object,
+) -> None:
+    if mapper is not None and map_job is None:
+        warnings.warn(
+            "'mapper=' is deprecated; use 'map_job=' instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    if reducer is not None and reduce_job is None:
+        warnings.warn(
+            "'reducer=' is deprecated; use 'reduce_job=' instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
 
 def _prepare_map_reduce_dependencies(
@@ -249,18 +308,7 @@ def run_map_reduce(
         True if the operation completed successfully.
 
     """
-    if mapper is not None and map_job is None:
-        warnings.warn(
-            "'mapper=' is deprecated; use 'map_job=' instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-    if reducer is not None and reduce_job is None:
-        warnings.warn(
-            "'reducer=' is deprecated; use 'reduce_job=' instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+    _warn_deprecated_map_reduce_aliases(mapper, map_job, reducer, reduce_job)
     logger = context.logger
     log_header(
         logger,
@@ -311,12 +359,13 @@ def run_map_reduce(
         **spec_kwargs,
     )
 
-    success = context.deps.yt_client.wait_for_operation(operation)
-    if success:
-        log_success(logger, "Map-reduce operation completed successfully")
-    else:
-        logger.error("Map-reduce operation failed")
-    return success
+    return _wait_operation_with_log(
+        context,
+        operation,
+        logger,
+        success_msg="Map-reduce operation completed successfully",
+        failure_msg="Map-reduce operation failed",
+    )
 
 
 def run_reduce(
@@ -413,9 +462,10 @@ def run_reduce(
         **reduce_kw,
     )
 
-    success = context.deps.yt_client.wait_for_operation(operation)
-    if success:
-        log_success(logger, "Reduce operation completed successfully")
-    else:
-        logger.error("Reduce operation failed")
-    return success
+    return _wait_operation_with_log(
+        context,
+        operation,
+        logger,
+        success_msg="Reduce operation completed successfully",
+        failure_msg="Reduce operation failed",
+    )

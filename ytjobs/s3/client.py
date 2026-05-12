@@ -1,6 +1,7 @@
 """Minimal boto3 wrapper for job-side list/get/put helpers."""
 
 import logging
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 from urllib.parse import urlparse
@@ -24,6 +25,37 @@ def _skip_crlf_after_chunk(data: bytes, i: int) -> int:
     return i
 
 
+def _try_decode_next_chunk(data: bytes, i: int) -> tuple[int, bytes] | None:
+    line_end = data.find(b"\n", i)
+    if line_end < 0:
+        return None
+    line = data[i:line_end].strip(b"\r")
+    size = _parse_chunk_size(line)
+    if size is None:
+        return None
+    i = line_end + 1
+    if size == 0:
+        return None
+    if i + size > len(data):
+        return None
+    chunk = bytes(data[i : i + size])
+    i += size
+    i = _skip_crlf_after_chunk(data, i)
+    return i, chunk
+
+
+def _decode_all_http_chunks(data: bytes) -> bytes:
+    out = bytearray()
+    i = 0
+    while i < len(data):
+        step = _try_decode_next_chunk(data, i)
+        if step is None:
+            break
+        i, chunk = step
+        out.extend(chunk)
+    return bytes(out)
+
+
 def _decode_http_chunked_if_present(data: bytes, logger: logging.Logger) -> bytes:
     """Decode HTTP chunked-transfer payloads when present, else return ``data``.
 
@@ -33,28 +65,11 @@ def _decode_http_chunked_if_present(data: bytes, logger: logging.Logger) -> byte
     """
     if not data or data[0:1] not in b"0123456789abcdefABCDEF":
         return data
-    out = bytearray()
-    i = 0
-    while i < len(data):
-        line_end = data.find(b"\n", i)
-        if line_end < 0:
-            break
-        line = data[i:line_end].strip(b"\r")
-        size = _parse_chunk_size(line)
-        if size is None:
-            break
-        i = line_end + 1
-        if size == 0:
-            break
-        if i + size > len(data):
-            break
-        out.extend(data[i : i + size])
-        i += size
-        i = _skip_crlf_after_chunk(data, i)
-    if out:
-        logger.debug("Decoded HTTP chunked body (%s bytes payload)", len(out))
-        return bytes(out)
-    return data
+    decoded = _decode_all_http_chunks(data)
+    if not decoded:
+        return data
+    logger.debug("Decoded HTTP chunked body (%s bytes payload)", len(decoded))
+    return decoded
 
 
 @dataclass(frozen=True)
@@ -75,26 +90,28 @@ def _coerce_int_option(value: object, option_name: str) -> int:
     return value
 
 
-def _options_from_legacy_kwargs(
-    options: S3ClientOptions | None,
-    legacy_kwargs: dict[str, object],
-) -> S3ClientOptions:
-    """Build options from explicit object plus backward-compatible kwargs."""
-    merged_options = options or S3ClientOptions()
-    if not legacy_kwargs:
-        return merged_options
-
-    unknown = set(legacy_kwargs) - {
+_LEGACY_S3_INIT_KEYS = frozenset(
+    {
         "max_retries",
         "timeout",
         "logger",
         "region_name",
         "boto_config",
-    }
+    },
+)
+
+
+def _reject_unknown_s3_legacy_kwargs(legacy_kwargs: dict[str, object]) -> None:
+    unknown = set(legacy_kwargs) - _LEGACY_S3_INIT_KEYS
     if unknown:
         msg = f"Unknown S3Client init option(s): {sorted(unknown)}"
         raise TypeError(msg)
 
+
+def _replace_options_with_legacy_kwargs(
+    merged_options: S3ClientOptions,
+    legacy_kwargs: dict[str, object],
+) -> S3ClientOptions:
     return replace(
         merged_options,
         max_retries=_coerce_int_option(
@@ -114,6 +131,54 @@ def _options_from_legacy_kwargs(
         ),
         boto_config=legacy_kwargs.get("boto_config", merged_options.boto_config),
     )
+
+
+def _options_from_legacy_kwargs(
+    options: S3ClientOptions | None,
+    legacy_kwargs: dict[str, object],
+) -> S3ClientOptions:
+    """Build options from explicit object plus backward-compatible kwargs."""
+    merged_options = options or S3ClientOptions()
+    if not legacy_kwargs:
+        return merged_options
+
+    _reject_unknown_s3_legacy_kwargs(legacy_kwargs)
+    return _replace_options_with_legacy_kwargs(merged_options, legacy_kwargs)
+
+
+def _append_single_listed_key(
+    result: list[str],
+    key: str,
+    *,
+    extension: str | None,
+    max_files: int | None,
+) -> bool:
+    """Append key if it passes extension filter; return True if max_files reached."""
+    if extension and not key.endswith(f".{extension}"):
+        return False
+    result.append(key)
+    return max_files is not None and len(result) >= max_files
+
+
+def _append_keys_until_limit(
+    result: list[str],
+    contents: Sequence[Mapping[str, Any]],
+    *,
+    extension: str | None,
+    max_files: int | None,
+    logger: logging.Logger,
+) -> bool:
+    """Append keys from one list_objects_v2 page; return True if max_files reached."""
+    for obj in contents:
+        if _append_single_listed_key(
+            result,
+            obj["Key"],
+            extension=extension,
+            max_files=max_files,
+        ):
+            logger.info("Reached max_files limit (%s)", max_files)
+            return True
+    return False
 
 
 class S3Client:
@@ -189,6 +254,41 @@ class S3Client:
         return u.netloc, u.path.lstrip("/")
 
     @staticmethod
+    def _access_keys_for_client_type(
+        secrets: dict[str, str],
+        client_type: Literal["download", "upload"],
+    ) -> tuple[str | None, str | None]:
+        if client_type == "upload":
+            return secrets.get("S3_UPLOAD_ACCESS_KEY"), secrets.get(
+                "S3_UPLOAD_SECRET_KEY"
+            )
+        if client_type == "download":
+            return secrets.get("S3_DOWNLOAD_ACCESS_KEY"), secrets.get(
+                "S3_DOWNLOAD_SECRET_KEY"
+            )
+        msg = f"Unknown client type: {client_type}"
+        raise ValueError(msg)
+
+    @staticmethod
+    def _require_s3_connection_secrets(
+        *,
+        endpoint: object,
+        access_key: object,
+        secret_key: object,
+        client_type: Literal["download", "upload"],
+    ) -> tuple[str, str, str]:
+        if not endpoint:
+            msg = "S3_ENDPOINT is not set"
+            raise ValueError(msg)
+        if not access_key:
+            msg = f"S3_{client_type.upper()}_ACCESS_KEY is not set"
+            raise ValueError(msg)
+        if not secret_key:
+            msg = f"S3_{client_type.upper()}_SECRET_KEY is not set"
+            raise ValueError(msg)
+        return str(endpoint), str(access_key), str(secret_key)
+
+    @staticmethod
     def create(
         secrets: dict[str, str],
         client_type: Literal["download", "upload"] = "download",
@@ -211,29 +311,17 @@ class S3Client:
             ValueError: If ``client_type`` is unknown or required secrets are missing.
 
         """
-        if client_type == "upload":
-            access_key = secrets.get("S3_UPLOAD_ACCESS_KEY")
-            secret_key = secrets.get("S3_UPLOAD_SECRET_KEY")
-        elif client_type == "download":
-            access_key = secrets.get("S3_DOWNLOAD_ACCESS_KEY")
-            secret_key = secrets.get("S3_DOWNLOAD_SECRET_KEY")
-        else:
-            msg = f"Unknown client type: {client_type}"
-            raise ValueError(msg)
-
+        access_key, secret_key = S3Client._access_keys_for_client_type(
+            secrets, client_type
+        )
         endpoint = secrets.get("S3_ENDPOINT")
-
-        if not endpoint:
-            msg = "S3_ENDPOINT is not set"
-            raise ValueError(msg)
-        if not access_key:
-            msg = f"S3_{client_type.upper()}_ACCESS_KEY is not set"
-            raise ValueError(msg)
-        if not secret_key:
-            msg = f"S3_{client_type.upper()}_SECRET_KEY is not set"
-            raise ValueError(msg)
-
-        return S3Client(endpoint=endpoint, access_key=access_key, secret_key=secret_key)
+        ep, ak, sk = S3Client._require_s3_connection_secrets(
+            endpoint=endpoint,
+            access_key=access_key,
+            secret_key=secret_key,
+            client_type=client_type,
+        )
+        return S3Client(endpoint=ep, access_key=ak, secret_key=sk)
 
     def list_files(
         self,
@@ -274,19 +362,14 @@ class S3Client:
                 self.logger.exception("Failed to list objects")
                 raise
 
-            for obj in response.get("Contents", []):
-                key = obj["Key"]
-
-                # Apply extension filter
-                if extension and not key.endswith(f".{extension}"):
-                    continue
-
-                result.append(key)
-
-                # Check max files limit
-                if max_files and len(result) >= max_files:
-                    self.logger.info("Reached max_files limit (%s)", max_files)
-                    return result
+            if _append_keys_until_limit(
+                result,
+                response.get("Contents", []),
+                extension=extension,
+                max_files=max_files,
+                logger=self.logger,
+            ):
+                return result
 
             truncated = response.get("IsTruncated", False)
             token = response.get("NextContinuationToken")

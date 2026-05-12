@@ -38,7 +38,7 @@ jobs:
         run: vulture
 
       - name: Xenon
-        run: xenon --max-absolute=B --max-modules=A --max-average=A yt_framework ytjobs
+        run: xenon --max-absolute=A --max-modules=A --max-average=A yt_framework ytjobs
 
   typecheck:
     runs-on: ubuntu-latest

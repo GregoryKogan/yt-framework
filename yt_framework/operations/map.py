@@ -104,14 +104,20 @@ def _require_map_tables(operation_config: DictConfig) -> None:
         raise ValueError(msg)
 
 
-def _resolve_map_mapper_leg(
+def _assert_exclusive_mapper_job_leg(
+    mapper: object | None,
+    job: object | None,
+) -> None:
+    if mapper is not None and job is not None and mapper != job:
+        msg = "Both 'mapper' and 'job' are set with different values; use only one"
+        raise ValueError(msg)
+
+
+def _pick_mapper_leg(
     mapper: object | None,
     job: object | None,
     map_operation_data: MapOperationData,
 ) -> object:
-    if mapper is not None and job is not None and mapper != job:
-        msg = "Both 'mapper' and 'job' are set with different values; use only one"
-        raise ValueError(msg)
     mapper_leg = job if job is not None else mapper
     if mapper_leg is None:
         mapper_leg = map_operation_data.command
@@ -119,6 +125,15 @@ def _resolve_map_mapper_leg(
         msg = "Command not provided by dependency builder"
         raise ValueError(msg)
     return mapper_leg
+
+
+def _resolve_map_mapper_leg(
+    mapper: object | None,
+    job: object | None,
+    map_operation_data: MapOperationData,
+) -> object:
+    _assert_exclusive_mapper_job_leg(mapper, job)
+    return _pick_mapper_leg(mapper, job, map_operation_data)
 
 
 def _map_operation_description_kwargs(

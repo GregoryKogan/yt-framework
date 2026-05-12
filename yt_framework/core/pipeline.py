@@ -32,17 +32,43 @@ from yt_framework.utils.logging import (
 from yt_framework.yt.factory import create_yt_client
 
 
+def _single_nonempty_module_name(raw: str) -> list[str]:
+    s = raw.strip()
+    return [s] if s else []
+
+
+def _upload_modules_from_sequence(
+    raw: list[object] | tuple[object, ...] | ListConfig,
+) -> list[str]:
+    return [str(m).strip() for m in raw if str(m).strip()]
+
+
 def _normalize_upload_modules(raw: object) -> list[str]:
     """Normalize upload_modules config: accept list, tuple, or single string."""
     if raw is None:
         return []
-    if isinstance(raw, str):
-        s = raw.strip()
-        return [s] if s else []
     if isinstance(raw, (list, tuple, ListConfig)):
-        return [str(m).strip() for m in raw if str(m).strip()]
+        return _upload_modules_from_sequence(raw)
+    if isinstance(raw, str):
+        return _single_nonempty_module_name(raw)
     msg = "upload_modules must be a list of module names or a single string."
     raise ValueError(msg)
+
+
+def _coerce_upload_path_mapping(idx: int, element: object) -> dict[str, str]:
+    item: object = element
+    if isinstance(item, DictConfig):
+        item = OmegaConf.to_container(item, resolve=True)
+    if not isinstance(item, Mapping):
+        msg = (
+            f"upload_paths[{idx}] must be a mapping with at least a 'source' key, "
+            f"got {type(item).__name__!r}."
+        )
+        raise TypeError(msg)
+    if "source" not in item:
+        msg = f"upload_paths[{idx}] is missing required 'source' key."
+        raise ValueError(msg)
+    return {k: str(v) for k, v in item.items()}
 
 
 def _normalize_upload_paths(raw: object) -> list[dict[str, str]]:
@@ -54,23 +80,7 @@ def _normalize_upload_paths(raw: object) -> list[dict[str, str]]:
         msg = "upload_paths must be a list of {source, target?} dicts."
         raise TypeError(msg)
 
-    normalized: list[dict[str, str]] = []
-    for idx, element in enumerate(raw):
-        item: object = element
-        if isinstance(item, DictConfig):
-            item = OmegaConf.to_container(item, resolve=True)
-        if not isinstance(item, Mapping):
-            msg = (
-                f"upload_paths[{idx}] must be a mapping with at least a 'source' key, "
-                f"got {type(item).__name__!r}."
-            )
-            raise TypeError(msg)
-        if "source" not in item:
-            msg = f"upload_paths[{idx}] is missing required 'source' key."
-            raise ValueError(msg)
-        normalized.append({k: str(v) for k, v in item.items()})
-
-    return normalized
+    return [_coerce_upload_path_mapping(i, el) for i, el in enumerate(raw)]
 
 
 def _yt_mode_from_pipeline_config(raw: object) -> Literal["prod", "dev"] | None:
@@ -102,16 +112,87 @@ def _pickling_dict_from_config(pickling_cfg: object) -> dict[str, Any]:
     raise TypeError(msg)
 
 
+def _enabled_from_sequence(
+    enabled: list[object] | tuple[object, ...] | ListConfig,
+) -> list[str]:
+    return [str(x) for x in enabled]
+
+
 def _enabled_stage_names(enabled: object) -> list[str]:
     """Normalize ``stages.enabled_stages`` to a list of directory names."""
     if enabled is None:
         return []
     if isinstance(enabled, (list, tuple, ListConfig)):
-        return [str(x) for x in enabled]
+        return _enabled_from_sequence(enabled)
     if isinstance(enabled, str):
         s = enabled.strip()
         return [s] if s else []
     return [str(enabled)]
+
+
+def _build_pipeline_cli_parser(cls_name: str) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=f"Run {cls_name}")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="configs/config.yaml",
+        help="Path to config file (default: configs/config.yaml)",
+    )
+    return parser
+
+
+def _resolve_pipeline_config_path(pipeline_dir: Path, config_arg: str) -> Path:
+    config_path = Path(config_arg)
+    if not config_path.is_absolute():
+        config_path = pipeline_dir / config_path
+    return config_path
+
+
+def _read_pipeline_mode_for_header(config_path: Path, logger: logging.Logger) -> str:
+    try:
+        temp_config = OmegaConf.load(config_path)
+    except Exception:
+        logger.exception("Failed to determine mode")
+        return "dev"
+    if isinstance(temp_config, DictConfig):
+        return str(temp_config.pipeline.get("mode", "dev"))
+    return "dev"
+
+
+def _load_dict_config_or_exit(
+    config_path: Path,
+    logger: logging.Logger,
+) -> DictConfig:
+    try:
+        loaded_cfg = OmegaConf.load(config_path)
+    except Exception:
+        logger.exception("Failed to load config")
+        traceback.print_exc()
+        sys.exit(1)
+    if not isinstance(loaded_cfg, DictConfig):
+        logger.error(
+            "Config file must contain a dictionary, got %s",
+            type(loaded_cfg).__name__,
+        )
+        sys.exit(1)
+    return loaded_cfg
+
+
+def _run_pipeline_instance_or_exit(
+    cls: type[BasePipeline],
+    config: DictConfig,
+    pipeline_dir: Path,
+    logger: logging.Logger,
+) -> None:
+    try:
+        pipeline = cls(config=config, pipeline_dir=pipeline_dir)
+        pipeline.run()
+        log_success(logger, "Pipeline completed successfully")
+        sys.exit(0)
+    except Exception:
+        logger.exception("Pipeline failed")
+        traceback.print_exc()
+        sys.exit(1)
 
 
 class BasePipeline:
@@ -253,6 +334,20 @@ class BasePipeline:
 
         return False
 
+    def _resolve_upload_build_folder(self, build_folder: str | None) -> str:
+        if build_folder is not None:
+            return build_folder
+        bf_raw = self.config.pipeline.get("build_folder")
+        resolved = None if bf_raw is None else str(bf_raw).strip() or None
+        if resolved:
+            return resolved
+        msg = (
+            "build_folder not found in [pipeline] config section. "
+            "Stages with src/ directory require code execution on YT. "
+            'Add: build_folder = "//path/to/build/folder"'
+        )
+        raise ValueError(msg)
+
     def upload_code(self, build_folder: str | None = None) -> None:
         """Upload code to YT build folder.
 
@@ -277,17 +372,7 @@ class BasePipeline:
             )
             return
 
-        # Only require build_folder if code execution is needed
-        if build_folder is None:
-            bf_raw = self.config.pipeline.get("build_folder")
-            build_folder = None if bf_raw is None else str(bf_raw).strip() or None
-            if not build_folder:
-                msg = (
-                    "build_folder not found in [pipeline] config section. "
-                    "Stages with src/ directory require code execution on YT. "
-                    'Add: build_folder = "//path/to/build/folder"'
-                )
-                raise ValueError(msg)
+        resolved_folder = self._resolve_upload_build_folder(build_folder)
 
         # Get upload_modules and upload_paths from config
         upload_modules = _normalize_upload_modules(
@@ -297,7 +382,7 @@ class BasePipeline:
 
         upload_all_code(
             yt_client=self.yt,
-            build_folder=build_folder,
+            build_folder=resolved_folder,
             pipeline_dir=self.pipeline_dir,
             logger=self.logger,
             upload_modules=upload_modules,
@@ -399,39 +484,16 @@ class BasePipeline:
         """
         logger = setup_logging(level=logging.INFO, name=cls.__name__)
 
-        parser = argparse.ArgumentParser(description=f"Run {cls.__name__}")
-        parser.add_argument(
-            "--config",
-            type=str,
-            default="configs/config.yaml",
-            help="Path to config file (default: configs/config.yaml)",
-        )
+        parser = _build_pipeline_cli_parser(cls.__name__)
         args = parser.parse_args(argv)
-
-        # Resolve pipeline directory (where pipeline.py is located)
-        # sys.argv[0] is the script being run (pipeline.py)
         pipeline_dir = Path(sys.argv[0]).parent.resolve()
 
-        # Resolve config path
-        config_path = Path(args.config)
-        if not config_path.is_absolute():
-            config_path = pipeline_dir / config_path
-
+        config_path = _resolve_pipeline_config_path(pipeline_dir, args.config)
         if not config_path.exists():
             logger.error("Config file not found: %s", config_path)
             sys.exit(1)
 
-        # Determine mode for logging
-        try:
-            temp_config = OmegaConf.load(config_path)
-            mode = (
-                str(temp_config.pipeline.get("mode", "dev"))
-                if isinstance(temp_config, DictConfig)
-                else "dev"
-            )
-        except Exception:
-            logger.exception("Failed to determine mode")
-            mode = "dev"
+        mode = _read_pipeline_mode_for_header(config_path, logger)
 
         config_rel_path = (
             config_path.relative_to(pipeline_dir)
@@ -444,32 +506,8 @@ class BasePipeline:
             f"Pipeline: {pipeline_dir} | Config: {config_rel_path} | Mode: {mode}",
         )
 
-        # Load configuration
-        try:
-            loaded_cfg = OmegaConf.load(config_path)
-            if not isinstance(loaded_cfg, DictConfig):
-                logger.error(
-                    "Config file must contain a dictionary, got %s",
-                    type(loaded_cfg).__name__,
-                )
-                sys.exit(1)
-            config = loaded_cfg
-        except Exception:
-            logger.exception("Failed to load config")
-            traceback.print_exc()
-            sys.exit(1)
-
-        # Initialize and run pipeline
-        try:
-            pipeline = cls(config=config, pipeline_dir=pipeline_dir)
-            pipeline.run()
-            log_success(logger, "Pipeline completed successfully")
-            sys.exit(0)
-
-        except Exception:
-            logger.exception("Pipeline failed")
-            traceback.print_exc()
-            sys.exit(1)
+        config = _load_dict_config_or_exit(config_path, logger)
+        _run_pipeline_instance_or_exit(cls, config, pipeline_dir, logger)
 
 
 class DefaultPipeline(BasePipeline):

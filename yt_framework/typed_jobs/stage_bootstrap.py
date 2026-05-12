@@ -38,22 +38,18 @@ def _safe_extractall(tf: tarfile.TarFile, destination: Path) -> None:
         tf.extract(member, destination)
 
 
-def _find_source_tarball_root() -> str | None:
-    """Return sandbox root that contains `source.tar.gz` (or None)."""
-    seen: set[str] = set()
+def _parent_directories_from_cwd(max_depth: int) -> list[str]:
     candidates: list[str] = [str(Path.cwd())]
-
-    # TypedJob reducers may run with cwd under tmpfs/modules; tarball stays higher.
-    for _ in range(6):
+    for _ in range(max_depth):
         parent = str(Path(candidates[-1]).parent)
-        if parent == candidates[-1] or parent in seen:
+        if parent == candidates[-1]:
             break
         candidates.append(parent)
+    return candidates
 
-    for extra in ("/slot/sandbox",):
-        if extra not in candidates:
-            candidates.append(extra)
 
+def _scan_for_source_tarball(candidates: list[str]) -> str | None:
+    seen: set[str] = set()
     for base in candidates:
         if not base or base in seen:
             continue
@@ -63,14 +59,16 @@ def _find_source_tarball_root() -> str | None:
     return None
 
 
+def _find_source_tarball_root() -> str | None:
+    """Return sandbox root that contains `source.tar.gz` (or None)."""
+    candidates = _parent_directories_from_cwd(6)
+    if "/slot/sandbox" not in candidates:
+        candidates.append("/slot/sandbox")
+    return _scan_for_source_tarball(candidates)
+
+
 def _infer_root_from_stage_dir(stage_name: str) -> str | None:
-    candidates: list[str] = [str(Path.cwd())]
-    for _ in range(6):
-        parent = str(Path(candidates[-1]).parent)
-        if parent == candidates[-1]:
-            break
-        candidates.append(parent)
-    for base in candidates:
+    for base in _parent_directories_from_cwd(6):
         stage_src_path = Path(base) / "stages" / stage_name / "src"
         if stage_src_path.is_dir():
             return base
@@ -108,21 +106,28 @@ def _ensure_job_config_path(root: str, stage_name: str) -> None:
         os.environ["JOB_CONFIG_PATH"] = job_config_path
 
 
+def _default_tokenizer_artifact_dir(root: str) -> str:
+    artifact_name = os.environ.get("TOKENIZER_ARTIFACT_NAME", "default").strip()
+    tokenizer_artifact_dir = str(
+        Path("tokenizer_artifacts") / (artifact_name or "default"),
+    )
+    os.environ["TOKENIZER_ARTIFACT_DIR"] = tokenizer_artifact_dir
+    return str(Path(root) / tokenizer_artifact_dir)
+
+
 def _extract_tokenizer_artifact_if_needed(root: str) -> None:
     tokenizer_artifact_file = os.environ.get("TOKENIZER_ARTIFACT_FILE", "").strip()
-    tokenizer_artifact_dir = os.environ.get("TOKENIZER_ARTIFACT_DIR", "").strip()
     if not tokenizer_artifact_file:
         return
 
     artifact_tar = str(Path(root) / tokenizer_artifact_file)
-    if not tokenizer_artifact_dir:
-        artifact_name = os.environ.get("TOKENIZER_ARTIFACT_NAME", "default").strip()
-        tokenizer_artifact_dir = str(
-            Path("tokenizer_artifacts") / (artifact_name or "default")
-        )
-        os.environ["TOKENIZER_ARTIFACT_DIR"] = tokenizer_artifact_dir
+    tokenizer_artifact_dir = os.environ.get("TOKENIZER_ARTIFACT_DIR", "").strip()
+    artifact_dir_abs = (
+        _default_tokenizer_artifact_dir(root)
+        if not tokenizer_artifact_dir
+        else str(Path(root) / tokenizer_artifact_dir)
+    )
 
-    artifact_dir_abs = str(Path(root) / tokenizer_artifact_dir)
     if not Path(artifact_tar).is_file():
         return
 

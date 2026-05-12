@@ -56,6 +56,51 @@ def _import_stage_module(
     return _first_stage_subclass(module, stage_name, logger)
 
 
+def _scan_one_stage_directory(
+    pipeline_dir: Path,
+    stage_dir: Path,
+    logger: logging.Logger,
+) -> type[BaseStage] | None:
+    if not stage_dir.is_dir():
+        return None
+    stage_file = stage_dir / "stage.py"
+    if not stage_file.exists():
+        logger.debug("Skipping %s: no stage.py file", stage_dir.name)
+        return None
+    _ensure_pipeline_on_sys_path(pipeline_dir)
+    module_name = f"stages.{stage_dir.name}.stage"
+    return _import_stage_module(module_name, stage_file, stage_dir.name, logger)
+
+
+def _gather_discovered_stages(
+    stages_dir: Path,
+    pipeline_dir: Path,
+    logger: logging.Logger,
+) -> list[type[BaseStage]]:
+    discovered: list[type[BaseStage]] = []
+    for stage_dir in sorted(stages_dir.iterdir()):
+        found = _scan_one_stage_directory(pipeline_dir, stage_dir, logger)
+        if found is not None:
+            discovered.append(found)
+    return discovered
+
+
+def _log_discovered_stages_summary(
+    discovered_stages: list[type[BaseStage]],
+    logger: logging.Logger,
+) -> None:
+    if not discovered_stages:
+        return
+    stage_names = [sc.__name__ for sc in discovered_stages]
+    plural = "s" if len(discovered_stages) != 1 else ""
+    logger.info(
+        "[Discovery] Found %s stage%s: %s",
+        len(discovered_stages),
+        plural,
+        ", ".join(stage_names),
+    )
+
+
 def discover_stages(
     pipeline_dir: Path,
     logger: logging.Logger,
@@ -82,35 +127,7 @@ def discover_stages(
         logger.warning("Stages directory not found: %s", stages_dir)
         return []
 
-    discovered_stages: list[type[BaseStage]] = []
-
     _purge_stages_modules_from_sys()
-
-    # Iterate through each subdirectory in stages/
-    for stage_dir in sorted(stages_dir.iterdir()):  # Sort for consistent order
-        if not stage_dir.is_dir():
-            continue
-
-        stage_file = stage_dir / "stage.py"
-        if not stage_file.exists():
-            logger.debug("Skipping %s: no stage.py file", stage_dir.name)
-            continue
-
-        # Import the stage module dynamically
-        stage_name = stage_dir.name
-        module_name = f"stages.{stage_name}.stage"
-
-        _ensure_pipeline_on_sys_path(pipeline_dir)
-        found = _import_stage_module(module_name, stage_file, stage_name, logger)
-        if found is not None:
-            discovered_stages.append(found)
-
-    if discovered_stages:
-        stage_names = [sc.__name__ for sc in discovered_stages]
-        logger.info(
-            "[Discovery] Found %s stage%s: %s",
-            len(discovered_stages),
-            "s" if len(discovered_stages) != 1 else "",
-            ", ".join(stage_names),
-        )
+    discovered_stages = _gather_discovered_stages(stages_dir, pipeline_dir, logger)
+    _log_discovered_stages_summary(discovered_stages, logger)
     return discovered_stages

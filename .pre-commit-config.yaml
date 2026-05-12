@@ -25,7 +25,7 @@ repos:
         pass_filenames: false
         always_run: true
         args:
-          - --max-absolute=B
+          - --max-absolute=A
           - --max-modules=A
           - --max-average=A
           - yt_framework

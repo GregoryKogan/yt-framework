@@ -146,6 +146,12 @@ class DuckDBSimulator:
 
         return sql, output_table
 
+    def _rows_as_dicts_from_fetch(self, result: list[Any]) -> list[dict[str, Any]]:
+        if not result:
+            return []
+        columns = [desc[0] for desc in self.conn.description]
+        return [dict(zip(columns, row, strict=False)) for row in result]
+
     def execute_query(self, sql: str) -> list[dict[str, Any]]:
         """Execute SQL query and return results.
 
@@ -159,14 +165,7 @@ class DuckDBSimulator:
         try:
             self.logger.debug("Executing SQL: %s", sql)
             result = self.conn.execute(sql).fetchall()
-
-            # Get column names
-            if result:
-                columns = [desc[0] for desc in self.conn.description]
-                # Convert to list of dicts
-                rows = [dict(zip(columns, row, strict=False)) for row in result]
-            else:
-                rows = []
+            rows = self._rows_as_dicts_from_fetch(result)
         except Exception:
             self.logger.exception("Failed to execute SQL query")
             self.logger.exception("Query: %s", sql)

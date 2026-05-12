@@ -92,7 +92,7 @@ Contributions come in many forms:
    pre-commit run xenon --all-files
    ```
 
-   Or directly (same Conda env): `conda run -n yt-framework -- ruff check .`, `conda run -n yt-framework -- ruff format .`, `conda run -n yt-framework -- basedpyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`, `conda run -n yt-framework -- vulture`, and `conda run -n yt-framework -- xenon --max-absolute=B --max-modules=A --max-average=A yt_framework ytjobs`.
+   Or directly (same Conda env): `conda run -n yt-framework -- ruff check .`, `conda run -n yt-framework -- ruff format .`, `conda run -n yt-framework -- basedpyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`, `conda run -n yt-framework -- vulture`, and `conda run -n yt-framework -- xenon --max-absolute=A --max-modules=A --max-average=A yt_framework ytjobs`.
 
 6. **Set up YT credentials** (for production mode testing):
 
@@ -185,7 +185,7 @@ This helps ensure you haven't broken existing functionality.
 - Use **Ruff** for formatting and linting (line length 88, Python 3.11; see `[tool.ruff]` in `pyproject.toml`). Lint uses `select = ["ALL"]` with a small documented `ignore` list.
 - Use **BasedPyright** for strict static typing (`pyrightconfig.json`). The checked tree is `yt_framework` and `ytjobs` (see `include` / `exclude` there); tests and `examples/` are excluded from that pass.
 - Use **Vulture** for unused code at 100% confidence (`[tool.vulture]` in `pyproject.toml`). If static analysis flags code that is used dynamically, add a small whitelist module and list it under `[tool.vulture]` `paths` (see [Vulture’s docs](https://github.com/jendrikseipp/vulture#handling-false-positives)).
-- Use **Xenon** (Radon-backed) for cyclomatic complexity on `yt_framework` and `ytjobs`. Thresholds are `--max-absolute=B`, `--max-modules=A`, `--max-average=A` (see [.pre-commit-config.yaml](.pre-commit-config.yaml) and the CI lint job). See [Xenon](https://github.com/rubik/xenon) and [Radon ranks](https://radon.readthedocs.io/en/latest/commandline.html#the-cc-command).
+- Use **Xenon** (Radon-backed) for cyclomatic complexity on `yt_framework` and `ytjobs`. Thresholds are `--max-absolute=A`, `--max-modules=A`, `--max-average=A` (see [.pre-commit-config.yaml](.pre-commit-config.yaml) and the CI lint job). See [Xenon](https://github.com/rubik/xenon) and [Radon ranks](https://radon.readthedocs.io/en/latest/commandline.html#the-cc-command).
 - Use type hints where appropriate
 
 ### Naming Conventions

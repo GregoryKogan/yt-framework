@@ -6,7 +6,8 @@ Formats log records as plain text on stderr.
 import datetime
 import logging
 import sys
-from typing import ClassVar
+from collections.abc import Mapping, Sequence
+from typing import Any, ClassVar
 
 _LOG_STRING_PREVIEW_MAX_LEN = 100
 _LOG_STRING_ELLIPSIS_LEN = 3
@@ -91,20 +92,30 @@ class TextFormatter(logging.Formatter):
             log_line += "\n" + self.formatException(record.exc_info)
         return log_line
 
+    def _format_collection_value(self, value: Sequence[object]) -> str:
+        inner = ", ".join(str(self._format_value(v)) for v in value)
+        return f"[{inner}]"
+
+    def _format_dict_value(self, value: Mapping[str, Any]) -> str:
+        items = ", ".join(f"{k}={self._format_value(v)}" for k, v in value.items())
+        return "{" + items + "}"
+
+    def _format_str_value(self, value: str) -> str:
+        if len(value) > _LOG_STRING_PREVIEW_MAX_LEN:
+            tail = _LOG_STRING_PREVIEW_MAX_LEN - _LOG_STRING_ELLIPSIS_LEN
+            return value[:tail] + "..."
+        return value
+
     def _format_value(self, value: object) -> str:
         """Format a value for readable output."""
         if value is None:
             return "None"
         if isinstance(value, (list, tuple)):
-            return "[" + ", ".join(str(self._format_value(v)) for v in value) + "]"
+            return self._format_collection_value(value)
         if isinstance(value, dict):
-            items = ", ".join(f"{k}={self._format_value(v)}" for k, v in value.items())
-            return "{" + items + "}"
+            return self._format_dict_value(value)
         if isinstance(value, str):
-            if len(value) > _LOG_STRING_PREVIEW_MAX_LEN:
-                tail = _LOG_STRING_PREVIEW_MAX_LEN - _LOG_STRING_ELLIPSIS_LEN
-                return value[:tail] + "..."
-            return value
+            return self._format_str_value(value)
         return str(value)
 
 

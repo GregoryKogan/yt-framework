@@ -34,6 +34,22 @@ if TYPE_CHECKING:
 _FILE_PATH_PAIR_MIN_LEN = 2
 
 
+def _checkpoint_model_name_from_stage(stage_config: DictConfig) -> str | None:
+    if "job" not in stage_config:
+        return None
+    if not stage_config.job.get("model_name"):
+        return None
+    return stage_config.job.model_name
+
+
+def _checkpoint_base_from_operation_config(operation_config: DictConfig) -> str | None:
+    if "checkpoint" not in operation_config:
+        return None
+    if not operation_config.checkpoint.get("checkpoint_base"):
+        return None
+    return operation_config.checkpoint.checkpoint_base
+
+
 @dataclass
 class DependencyBuildResult:
     """Result of tar-dependency preparation for an operation."""
@@ -74,6 +90,19 @@ class DependencyBuilder(Protocol):
         bootstrap when ``tar_command_bootstrap`` is enabled in ``operation_config``.
         """
         ...
+
+
+def _tar_bootstrap_applies_to_map_reduce(
+    *,
+    tar_bootstrap_flag: bool,
+    mapper: object,
+    reducer: object,
+) -> bool:
+    if not tar_bootstrap_flag:
+        return False
+    if mapper is None or reducer is None:
+        return False
+    return map_reduce_leg_kind(mapper) == "command"
 
 
 class TarArchiveDependencyBuilder:
@@ -190,6 +219,24 @@ class TarArchiveDependencyBuilder:
         )
         return bootstrap_command, None, None
 
+    def _bootstrap_map_reduce_tar_commands(
+        self,
+        stage_name: str,
+        archive_name: str,
+        logger: logging.Logger,
+    ) -> tuple[str, str]:
+        w_m, w_r = map_reduce_wrapper_names(stage_name)
+        inner_m = bootstrap_shell_run_wrapper(archive_name, w_m, logger)
+        inner_r = bootstrap_shell_run_wrapper(archive_name, w_r, logger)
+        mapper_command = wrap_bootstrap_as_bash_c(inner_m)
+        reducer_command = wrap_bootstrap_as_bash_c(inner_r)
+        logger.info(
+            "tar_command_bootstrap enabled: map-reduce legs use tar extract + %s / %s",
+            w_m,
+            w_r,
+        )
+        return mapper_command, reducer_command
+
     def _map_reduce_commands(
         self,
         stage_name: str,
@@ -204,21 +251,15 @@ class TarArchiveDependencyBuilder:
         reducer_command: str | None = None
         if mapper is not None and reducer is not None:
             require_consistent_map_reduce_legs(mapper, reducer)
-        if (
-            tar_bootstrap_flag
-            and mapper is not None
-            and reducer is not None
-            and map_reduce_leg_kind(mapper) == "command"
+        if _tar_bootstrap_applies_to_map_reduce(
+            tar_bootstrap_flag=tar_bootstrap_flag,
+            mapper=mapper,
+            reducer=reducer,
         ):
-            w_m, w_r = map_reduce_wrapper_names(stage_name)
-            inner_m = bootstrap_shell_run_wrapper(archive_name, w_m, logger)
-            inner_r = bootstrap_shell_run_wrapper(archive_name, w_r, logger)
-            mapper_command = wrap_bootstrap_as_bash_c(inner_m)
-            reducer_command = wrap_bootstrap_as_bash_c(inner_r)
-            logger.info(
-                "tar_command_bootstrap enabled: map-reduce legs use tar extract + %s / %s",
-                w_m,
-                w_r,
+            mapper_command, reducer_command = self._bootstrap_map_reduce_tar_commands(
+                stage_name=stage_name,
+                archive_name=archive_name,
+                logger=logger,
             )
         return "", mapper_command, reducer_command
 
@@ -323,14 +364,8 @@ class TarArchiveDependencyBuilder:
     ) -> None:
         if effective_type != "map":
             return
-        model_name = None
-        if "job" in stage_config and stage_config.job.get("model_name"):
-            model_name = stage_config.job.model_name
-        checkpoint_base = None
-        if "checkpoint" in operation_config and operation_config.checkpoint.get(
-            "checkpoint_base",
-        ):
-            checkpoint_base = operation_config.checkpoint.checkpoint_base
+        model_name = _checkpoint_model_name_from_stage(stage_config)
+        checkpoint_base = _checkpoint_base_from_operation_config(operation_config)
         if not (model_name and checkpoint_base):
             return
         checkpoint_file_path = f"{checkpoint_base}/{model_name}"
