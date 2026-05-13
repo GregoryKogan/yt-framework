@@ -149,6 +149,8 @@ ignore = [
 ]
 # Pre-commit policy runner: sys.path bootstrap before importing ``scripts.*``.
 "scripts/precommit/run.py" = ["E402"]
+# Policy AST walker: many explicit node kinds; keep complexity local to this file.
+"scripts/precommit/checks/max_snake_binding_words.py" = ["C901", "PLR0912", "PLR0915"]
 # Policy helper: subprocess runs fixed ``git check-ignore`` argv; paths are repo-relative.
 "scripts/precommit/checks/max_dir_entries.py" = ["S603"]
 # Runnable demos: not API-grade modules; keep lint focused on the library.
@@ -204,6 +206,11 @@ roots = ["yt_framework", "ytjobs"]
 [tool.yt_framework.pre_commit.max_dir_entries]
 enabled = true
 limit = 15
+roots = ["yt_framework", "ytjobs"]
+
+[tool.yt_framework.pre_commit.max_snake_binding_words]
+enabled = true
+limit = 8
 roots = ["yt_framework", "ytjobs"]
 
 [tool.vulture]
