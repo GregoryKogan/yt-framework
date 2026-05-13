@@ -27,7 +27,7 @@ def _vanilla_stage_context(tmp_path: Path) -> StageContext:
     fake_yt = MagicMock(spec=BaseYTClient)
     op = MagicMock()
     op.id = "op-vanilla-1"
-    fake_yt.run_vanilla.return_value = op
+    fake_yt.run_vanilla_submit.return_value = op
     fake_yt.wait_for_operation.return_value = True
     deps = PipelineStageDependencies(
         yt_client=fake_yt,
@@ -49,7 +49,7 @@ def _minimal_vanilla_config() -> OmegaConf:
 
 def test_run_vanilla_returns_false_when_client_returns_none(tmp_path: Path) -> None:
     ctx = _vanilla_stage_context(tmp_path)
-    ctx.deps.yt_client.run_vanilla.return_value = None
+    ctx.deps.yt_client.run_vanilla_submit.return_value = None
     assert run_vanilla(ctx, _minimal_vanilla_config()) is False
 
 
@@ -63,7 +63,7 @@ def test_run_vanilla_passes_task_name_from_context(tmp_path: Path) -> None:
     ctx = _vanilla_stage_context(tmp_path)
     assert run_vanilla(ctx, _minimal_vanilla_config()) is True
     assert (
-        ctx.deps.yt_client.run_vanilla.call_args.kwargs["task_name"] == "van_stage"
+        ctx.deps.yt_client.run_vanilla_submit.call_args[0][0].task_name == "van_stage"
     ), "task_name must match stage context name"
 
 
@@ -75,7 +75,10 @@ def test_run_vanilla_forwards_string_operation_description_as_title(
         {"resources": {"pool": "p"}, "operation_description": "vanilla-job"}
     )
     assert run_vanilla(ctx, cfg) is True
-    assert ctx.deps.yt_client.run_vanilla.call_args.kwargs.get("title") == "vanilla-job"
+    assert (
+        ctx.deps.yt_client.run_vanilla_submit.call_args[0][0].extras_dict().get("title")
+        == "vanilla-job"
+    )
 
 
 @patch(
@@ -105,13 +108,13 @@ def test_run_vanilla_forwards_dict_operation_description(
         }
     )
     assert run_vanilla(ctx, cfg) is True
-    kw = ctx.deps.yt_client.run_vanilla.call_args.kwargs
-    assert kw.get("operation_description") == {"label": "dict-v"}
+    spec = ctx.deps.yt_client.run_vanilla_submit.call_args[0][0]
+    assert spec.extras_dict().get("operation_description") == {"label": "dict-v"}
 
 
 def test_run_vanilla_forwards_max_row_weight_override(tmp_path: Path) -> None:
     ctx = _vanilla_stage_context(tmp_path)
     cfg = OmegaConf.create({"resources": {"pool": "p"}, "max_row_weight": "64M"})
     assert run_vanilla(ctx, cfg) is True
-    kw = ctx.deps.yt_client.run_vanilla.call_args.kwargs
-    assert kw.get("max_row_weight") == "64M"
+    spec = ctx.deps.yt_client.run_vanilla_submit.call_args[0][0]
+    assert spec.extras_dict().get("max_row_weight") == "64M"

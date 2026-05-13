@@ -2,6 +2,16 @@
 
 import pytest
 
+from yt_framework.yt.clients.yql_requests import (
+    DistinctRequest,
+    FilterTableRequest,
+    GroupByAggregateRequest,
+    JoinTablesRequest,
+    LimitTableRequest,
+    SelectColumnsRequest,
+    SortTableRequest,
+    UnionTablesRequest,
+)
 from yt_framework.yt.yql_builder import (
     _escape_table_name,
     _format_aggregations,
@@ -91,12 +101,14 @@ def test_format_aggregations_string_sum_strips_total_prefix_from_key() -> None:
 
 def test_build_join_query_inner_with_using_when_select_columns_provided() -> None:
     q = build_join_query(
-        "//l",
-        "//r",
-        "//out",
-        on="id",
-        how="inner",
-        select_columns=["a.id", "b.name"],
+        JoinTablesRequest(
+            left_table="//l",
+            right_table="//r",
+            output_table="//out",
+            on="id",
+            how="inner",
+            select_columns=["a.id", "b.name"],
+        ),
     )
     assert "INSERT INTO `//out`" in q
     assert "USING (id)" in q
@@ -105,11 +117,13 @@ def test_build_join_query_inner_with_using_when_select_columns_provided() -> Non
 
 def test_build_join_query_left_uses_on_when_dict_on_without_select_columns() -> None:
     q = build_join_query(
-        "//left",
-        "//right",
-        "//out",
-        on={"left": "uid", "right": "id"},
-        how="left",
+        JoinTablesRequest(
+            left_table="//left",
+            right_table="//right",
+            output_table="//out",
+            on={"left": "uid", "right": "id"},
+            how="left",
+        ),
     )
     assert "LEFT JOIN" in q
     assert "ON a.uid = b.id" in q
@@ -120,7 +134,15 @@ def test_build_join_query_left_uses_on_when_dict_on_without_select_columns() -> 
 def test_build_join_query_string_on_uses_on_clause_when_select_columns_omitted() -> (
     None
 ):
-    q = build_join_query("//l", "//r", "//out", on="id", how="inner")
+    q = build_join_query(
+        JoinTablesRequest(
+            left_table="//l",
+            right_table="//r",
+            output_table="//out",
+            on="id",
+            how="inner",
+        ),
+    )
     assert "INNER JOIN" in q
     assert "ON a.id = b.id" in q
     assert "a.*, b.*" in q
@@ -128,7 +150,15 @@ def test_build_join_query_string_on_uses_on_clause_when_select_columns_omitted()
 
 
 def test_build_join_query_list_on_uses_on_clause_when_select_columns_omitted() -> None:
-    q = build_join_query("//l", "//r", "//out", on=["uid", "region"], how="right")
+    q = build_join_query(
+        JoinTablesRequest(
+            left_table="//l",
+            right_table="//r",
+            output_table="//out",
+            on=["uid", "region"],
+            how="right",
+        ),
+    )
     assert "RIGHT JOIN" in q
     assert "ON a.uid = b.uid AND a.region = b.region" in q
     assert "a.*, b.*" in q
@@ -137,12 +167,14 @@ def test_build_join_query_list_on_uses_on_clause_when_select_columns_omitted() -
 
 def test_build_join_query_full_maps_to_full_outer_join() -> None:
     q = build_join_query(
-        "//a",
-        "//b",
-        "//out",
-        on="k",
-        how="full",
-        select_columns=["a.k", "b.k"],
+        JoinTablesRequest(
+            left_table="//a",
+            right_table="//b",
+            output_table="//out",
+            on="k",
+            how="full",
+            select_columns=["a.k", "b.k"],
+        ),
     )
     assert "FULL OUTER JOIN" in q
     assert "USING (k)" in q
@@ -152,12 +184,14 @@ def test_build_join_query_formats_multi_column_using_when_on_is_list_with_select
     None
 ):
     q = build_join_query(
-        "//l",
-        "//r",
-        "//out",
-        on=["uid", "region"],
-        how="inner",
-        select_columns=["a.uid", "b.uid", "a.region", "b.region"],
+        JoinTablesRequest(
+            left_table="//l",
+            right_table="//r",
+            output_table="//out",
+            on=["uid", "region"],
+            how="inner",
+            select_columns=["a.uid", "b.uid", "a.region", "b.region"],
+        ),
     )
     assert "USING (uid, region)" in q
     assert "INNER JOIN" in q
@@ -166,12 +200,14 @@ def test_build_join_query_formats_multi_column_using_when_on_is_list_with_select
 def test_build_join_query_uses_on_when_on_is_tuple_even_with_select_columns() -> None:
     """Tuple keys are not ``list`` — exercises ``build_join_query`` else / fallback path."""
     q = build_join_query(
-        "//l",
-        "//r",
-        "//out",
-        on=("uid", "region"),
-        how="left",
-        select_columns=["a.uid", "a.region", "b.name"],
+        JoinTablesRequest(
+            left_table="//l",
+            right_table="//r",
+            output_table="//out",
+            on=("uid", "region"),
+            how="left",
+            select_columns=["a.uid", "a.region", "b.name"],
+        ),
     )
     assert "LEFT JOIN" in q
     assert "ON a.uid = b.uid AND a.region = b.region" in q
@@ -180,11 +216,19 @@ def test_build_join_query_uses_on_when_on_is_tuple_even_with_select_columns() ->
 
 def test_build_union_query_raises_when_fewer_than_two_tables() -> None:
     with pytest.raises(ValueError, match="at least 2 tables"):
-        build_union_query(["//only"], "//out", ["id"])
+        build_union_query(
+            UnionTablesRequest(
+                tables=("//only",), output_table="//out", columns=["id"]
+            ),
+        )
 
 
 def test_build_union_query_joins_two_tables_with_union_all() -> None:
-    q = build_union_query(["//a", "//b"], "//out", ["id", "name"])
+    q = build_union_query(
+        UnionTablesRequest(
+            tables=("//a", "//b"), output_table="//out", columns=["id", "name"]
+        ),
+    )
     assert "UNION ALL" in q
     assert "FROM `//a`" in q
     assert "FROM `//b`" in q
@@ -193,42 +237,66 @@ def test_build_union_query_joins_two_tables_with_union_all() -> None:
 
 def test_build_filter_query_includes_where_clause() -> None:
     q = build_filter_query(
-        "//in",
-        "//out",
-        "status = 'active'",
-        ["id", "status"],
+        FilterTableRequest(
+            input_table="//in",
+            output_table="//out",
+            condition="status = 'active'",
+            columns=["id", "status"],
+        ),
     )
     assert "FROM `//in`" in q
     assert "WHERE status = 'active'" in q
 
 
 def test_build_select_query_lists_explicit_columns() -> None:
-    q = build_select_query("//src", "//dst", ["a", "b"])
+    q = build_select_query(
+        SelectColumnsRequest(
+            input_table="//src", output_table="//dst", columns=["a", "b"]
+        )
+    )
     assert "SELECT\n    a,\n    b\n" in q
     assert "FROM `//src`" in q
 
 
 def test_build_select_query_includes_default_max_row_weight_pragma() -> None:
-    q = build_select_query("//src", "//dst", ["a"])
+    q = build_select_query(
+        SelectColumnsRequest(input_table="//src", output_table="//dst", columns=["a"]),
+    )
     assert 'PRAGMA yt.MaxRowWeight = "128M";' in q
 
 
 def test_build_select_query_uses_custom_max_row_weight_pragma_when_overridden() -> None:
-    q = build_select_query("//src", "//dst", ["a"], max_row_weight="64M")
+    q = build_select_query(
+        SelectColumnsRequest(
+            input_table="//src",
+            output_table="//dst",
+            columns=["a"],
+            max_row_weight="64M",
+        ),
+    )
     assert 'PRAGMA yt.MaxRowWeight = "64M";' in q
 
 
 def test_build_select_query_raises_when_max_row_weight_exceeds_cluster_limit() -> None:
     with pytest.raises(ValueError, match="exceeds cluster maximum"):
-        build_select_query("//src", "//dst", ["a"], max_row_weight="256M")
+        build_select_query(
+            SelectColumnsRequest(
+                input_table="//src",
+                output_table="//dst",
+                columns=["a"],
+                max_row_weight="256M",
+            ),
+        )
 
 
 def test_build_group_by_query_omits_group_by_when_group_by_empty_list() -> None:
     q = build_group_by_query(
-        "//in",
-        "//out",
-        [],
-        {"n": "count"},
+        GroupByAggregateRequest(
+            input_table="//in",
+            output_table="//out",
+            group_by=[],
+            aggregations={"n": "count"},
+        ),
     )
     assert "GROUP BY" not in q
     assert "COUNT(*) AS n" in q
@@ -236,38 +304,52 @@ def test_build_group_by_query_omits_group_by_when_group_by_empty_list() -> None:
 
 def test_build_group_by_query_includes_group_by_when_group_by_is_string() -> None:
     q = build_group_by_query(
-        "//in",
-        "//out",
-        "region",
-        {"n": "count"},
+        GroupByAggregateRequest(
+            input_table="//in",
+            output_table="//out",
+            group_by="region",
+            aggregations={"n": "count"},
+        ),
     )
     assert "GROUP BY region" in q
     assert "COUNT(*) AS n" in q
 
 
 def test_build_distinct_query_selects_star_when_columns_omitted() -> None:
-    q = build_distinct_query("//in", "//out", columns=None)
+    q = build_distinct_query(
+        DistinctRequest(input_table="//in", output_table="//out", columns=None)
+    )
     assert "SELECT DISTINCT\n    *\n" in q
 
 
 def test_build_distinct_query_lists_columns_when_provided() -> None:
-    q = build_distinct_query("//in", "//out", columns=["id", "name"])
+    q = build_distinct_query(
+        DistinctRequest(
+            input_table="//in", output_table="//out", columns=["id", "name"]
+        )
+    )
     assert "SELECT DISTINCT\n    id,\n    name\n" in q
 
 
 def test_build_sort_query_wraps_order_by_in_subquery() -> None:
     q = build_sort_query(
-        "//in",
-        "//out",
-        order_by="id",
-        columns=["id", "name"],
-        ascending=False,
+        SortTableRequest(
+            input_table="//in",
+            output_table="//out",
+            order_by="id",
+            columns=["id", "name"],
+            ascending=False,
+        ),
     )
     assert "ORDER BY id DESC" in q
     assert "FROM (\n    SELECT *" in q
 
 
 def test_build_limit_query_appends_limit() -> None:
-    q = build_limit_query("//in", "//out", limit=10, columns=["id"])
+    q = build_limit_query(
+        LimitTableRequest(
+            input_table="//in", output_table="//out", limit=10, columns=["id"]
+        )
+    )
     assert q.rstrip().endswith("LIMIT 10;")
     assert "FROM `//in`" in q

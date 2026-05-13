@@ -22,9 +22,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from yt.wrapper import Operation
-    from yt.wrapper.schema import TableSchema
 
-    from yt_framework.yt.clients.client_base import OperationResources
+    from yt_framework.yt.clients.operation_specs import MapSubmitSpec, VanillaSubmitSpec
+
 
 _DEV_BUILD_SPLIT_PARTS = 2
 
@@ -69,56 +69,24 @@ class ClientDevOpsMixin(ClientDevMrReduceSortMixin):
         self.logger.debug("Dev: upload_directory no-op %s → %s", local_dir, yt_dir)
         return []
 
-    def run_map(
-        self,
-        command: object,
-        input_table: str,
-        output_table: str,
-        files: list[tuple[str, str]],
-        resources: OperationResources,
-        env: dict[str, str],
-        output_schema: TableSchema | None = None,
-        max_failed_jobs: int = 1,
-        docker_auth: dict[str, str] | None = None,
-        job: object = None,
-        *,
-        append: bool = False,
-        **kwargs: object,
-    ) -> Operation:
-        """Run a map operation locally using subprocess.
-
-        In dev mode, executes the mapper script locally with input/output tables
-        as JSONL files. The command is executed in a temporary sandbox directory
-        with all dependencies available.
-
-        Args:
-            command: Mapper job (command string in dev mode).
-            input_table: Input YT table path (read from local JSONL).
-            output_table: Output YT table path (written to local JSONL).
-            files: List of (yt_path, local_path) tuples for dependencies.
-            resources: Operation resource configuration (not fully used in dev mode).
-            env: Environment variables dictionary.
-            output_schema: Optional output table schema (not used in dev mode).
-            max_failed_jobs: Maximum failed jobs allowed (not used in dev mode).
-            docker_auth: Optional Docker authentication (not used in dev mode).
-            job: Mapper command string when set; otherwise ``command`` is used.
-            append: If True and output JSONL exists, append mapper stdout lines to it.
-            **kwargs: Additional arguments (not used in dev mode).
-
-        Returns:
-            Operation: Mock operation object that simulates YT operation.
-
-        Example:
-            >>> op = client.run_map(
-            ...     command="python3 mapper.py",
-            ...     input_table="//tmp/input",
-            ...     output_table="//tmp/output",
-            ...     files=[],
-            ...     resources=OperationResources(),
-            ...     env={}
-            ... )
-
-        """
+    def run_map_submit(self, spec: MapSubmitSpec) -> Operation:
+        """Run a map operation locally using subprocess."""
+        command = spec.command
+        input_table = spec.input_table
+        output_table = spec.output_table
+        files = spec.files_list()
+        resources = spec.resources
+        env = spec.env_dict()
+        append = spec.append
+        job = spec.job
+        kwargs = dict(spec.extras_dict())
+        self.logger.debug(
+            "Dev map ignoring prod hints: schema=%s max_failed=%s docker=%s pool=%s",
+            spec.output_schema is not None,
+            spec.max_failed_jobs,
+            spec.docker_auth is not None,
+            resources.pool,
+        )
         self._pipeline_dir_or_raise()
         _kw = dict(kwargs)
         pop_secure_env_client_kwargs(_kw)
@@ -160,34 +128,20 @@ class ClientDevOpsMixin(ClientDevMrReduceSortMixin):
         )
         return cast("Operation", DevOperation(rc, err_hint))
 
-    def run_vanilla(
-        self,
-        command: object,
-        files: list[tuple[str, str]],
-        env: dict[str, str],
-        task_name: str = "main",
-        job: object = None,
-        **kwargs: object,
-    ) -> Operation | None:
-        """Run a vanilla operation locally using subprocess.
-
-        In dev mode, executes the vanilla script locally in a temporary sandbox
-        directory with all dependencies available. No input/output tables are involved.
-
-        Args:
-            command: Command to execute (typically bash command with script path).
-            files: List of (yt_path, local_path) tuples for dependencies.
-            env: Environment variables dictionary.
-            task_name: Task name for logging (default: "main").
-            job: Command string when set; otherwise ``command`` is executed.
-            **kwargs: Additional arguments (not used in dev mode).
-
-        Returns:
-            Operation: Mock operation object that simulates YT operation.
-
-        """
+    def run_vanilla_submit(self, spec: VanillaSubmitSpec) -> Operation | None:
+        """Run a vanilla operation locally using subprocess."""
+        command = spec.command
+        files = spec.files_list()
+        env = spec.env_dict()
+        task_name = spec.task_name
+        job = spec.job
+        self.logger.debug(
+            "Dev vanilla ignoring prod-only hints: max_failed_jobs=%s resources=%s",
+            spec.max_failed_jobs,
+            spec.resources.pool,
+        )
         self.logger.info("Submitting vanilla operation")
-        _kw = dict(kwargs)
+        _kw = dict(spec.extras_dict())
         pop_secure_env_client_kwargs(_kw)
         vanilla_job = str(job) if job is not None else str(command)
         self.logger.info("  Command: %s", vanilla_job)

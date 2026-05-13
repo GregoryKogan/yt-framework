@@ -12,6 +12,16 @@ from yt.wrapper import Operation
 
 from .client_wait import ClientOperationWaitMixin
 from .operation_resources import OperationResources
+from .operation_specs import (
+    MapReduceSubmitSpec,
+    MapSubmitSpec,
+    ReduceSubmitSpec,
+    VanillaSubmitSpec,
+    docker_auth_tuple,
+    env_pairs_tuple,
+    extras_tuple,
+    file_pairs_tuple,
+)
 from .yql_ops_abc import YqlOpsABC
 
 if TYPE_CHECKING:
@@ -206,6 +216,9 @@ class BaseYTClient(ClientOperationWaitMixin, YqlOpsABC, ABC):
         """
 
     @abstractmethod
+    def run_map_submit(self, spec: MapSubmitSpec) -> Operation:
+        """Submit a map operation using a :class:`MapSubmitSpec`."""
+
     def run_map(
         self,
         command: object,
@@ -222,25 +235,28 @@ class BaseYTClient(ClientOperationWaitMixin, YqlOpsABC, ABC):
         append: bool = False,
         **kwargs: object,
     ) -> Operation:
-        """Run a map operation on YT.
-
-        Args:
-            command: Legacy mapper job argument (TypedJob instance or command string).
-            input_table: Input table path
-            output_table: Output table path
-            files: List of (yt_path, local_path) tuples for files to upload
-            resources: Operation resources (pool, memory, CPU, GPU, etc.)
-            env: Environment variables dictionary
-            output_schema: Optional YT TableSchema for typed output table
-            max_failed_jobs: Maximum number of failed jobs before operation fails
-            docker_auth: Optional Docker authentication dictionary
-            job: Preferred mapper job argument (TypedJob instance or command string).
-            append: If True, append mapper output to an existing output table.
-            **kwargs: Extra options forwarded to the underlying YT client.
-
-        """
+        """Run a map operation on YT (delegates to :meth:`run_map_submit`)."""
+        return self.run_map_submit(
+            MapSubmitSpec(
+                command=command,
+                input_table=input_table,
+                output_table=output_table,
+                files=file_pairs_tuple(files),
+                resources=resources,
+                env=env_pairs_tuple(env),
+                output_schema=output_schema,
+                max_failed_jobs=max_failed_jobs,
+                docker_auth=docker_auth_tuple(docker_auth),
+                job=job,
+                append=append,
+                extras=extras_tuple(dict(kwargs)),
+            ),
+        )
 
     @abstractmethod
+    def run_map_reduce_submit(self, spec: MapReduceSubmitSpec) -> Operation:
+        """Submit a map-reduce operation using a :class:`MapReduceSubmitSpec`."""
+
     def run_map_reduce(
         self,
         mapper: object,
@@ -259,28 +275,31 @@ class BaseYTClient(ClientOperationWaitMixin, YqlOpsABC, ABC):
         reduce_job: object = None,
         **kwargs: object,
     ) -> Operation:
-        """Run a map-reduce operation on YT.
-
-        Args:
-            mapper: Mapper job (TypedJob instance or command string).
-            reducer: Reducer job (TypedJob instance or command string).
-            input_table: Input table path.
-            output_table: Output table path.
-            reduce_by: List of columns to reduce by.
-            files: List of (yt_path, local_path) tuples for dependencies.
-            resources: Operation resources.
-            env: Environment variables.
-            sort_by: Optional sort columns before reduce.
-            output_schema: Optional output table schema.
-            max_failed_jobs: Maximum failed jobs allowed.
-            docker_auth: Optional Docker auth.
-            map_job: Preferred mapper job alias (TypedJob instance or command string).
-            reduce_job: Preferred reducer job alias (TypedJob instance or command string).
-            **kwargs: Extra options applied to the spec builder where supported.
-
-        """
+        """Run a map-reduce operation (delegates to :meth:`run_map_reduce_submit`)."""
+        return self.run_map_reduce_submit(
+            MapReduceSubmitSpec(
+                mapper=mapper,
+                reducer=reducer,
+                input_table=input_table,
+                output_table=output_table,
+                reduce_by=tuple(reduce_by),
+                files=file_pairs_tuple(files),
+                resources=resources,
+                env=env_pairs_tuple(env),
+                sort_by=None if sort_by is None else tuple(sort_by),
+                output_schema=output_schema,
+                max_failed_jobs=max_failed_jobs,
+                docker_auth=docker_auth_tuple(docker_auth),
+                map_job=map_job,
+                reduce_job=reduce_job,
+                extras=extras_tuple(dict(kwargs)),
+            ),
+        )
 
     @abstractmethod
+    def run_reduce_submit(self, spec: ReduceSubmitSpec) -> Operation:
+        """Submit a reduce-only operation using a :class:`ReduceSubmitSpec`."""
+
     def run_reduce(
         self,
         reducer: object,
@@ -296,23 +315,23 @@ class BaseYTClient(ClientOperationWaitMixin, YqlOpsABC, ABC):
         job: object = None,
         **kwargs: object,
     ) -> Operation:
-        """Run a reduce-only operation on YT.
-
-        Args:
-            reducer: Reducer job (TypedJob instance or command string).
-            input_table: Input table path.
-            output_table: Output table path.
-            reduce_by: List of columns to reduce by.
-            files: List of (yt_path, local_path) tuples for dependencies.
-            resources: Operation resources.
-            env: Environment variables.
-            output_schema: Optional output table schema.
-            max_failed_jobs: Maximum failed jobs allowed.
-            docker_auth: Optional Docker auth.
-            job: Preferred reducer job alias (TypedJob instance or command string).
-            **kwargs: Extra options applied to the spec builder where supported.
-
-        """
+        """Run a reduce-only operation (delegates to :meth:`run_reduce_submit`)."""
+        return self.run_reduce_submit(
+            ReduceSubmitSpec(
+                reducer=reducer,
+                input_table=input_table,
+                output_table=output_table,
+                reduce_by=tuple(reduce_by),
+                files=file_pairs_tuple(files),
+                resources=resources,
+                env=env_pairs_tuple(env),
+                output_schema=output_schema,
+                max_failed_jobs=max_failed_jobs,
+                docker_auth=docker_auth_tuple(docker_auth),
+                job=job,
+                extras=extras_tuple(dict(kwargs)),
+            ),
+        )
 
     @abstractmethod
     def run_sort(
@@ -335,6 +354,9 @@ class BaseYTClient(ClientOperationWaitMixin, YqlOpsABC, ABC):
         """
 
     @abstractmethod
+    def run_vanilla_submit(self, spec: VanillaSubmitSpec) -> Operation | None:
+        """Submit a vanilla operation using a :class:`VanillaSubmitSpec`."""
+
     def run_vanilla(
         self,
         command: object,
@@ -344,21 +366,26 @@ class BaseYTClient(ClientOperationWaitMixin, YqlOpsABC, ABC):
         job: object = None,
         **kwargs: object,
     ) -> Operation | None:
-        """Run a vanilla operation on YT.
-
-        Args:
-            command: Legacy vanilla command argument (e.g., "python3 vanilla.py")
-            files: List of (yt_path, local_path) tuples for files to upload
-            env: Environment variables dictionary
-            task_name: Task name for the operation
-            job: Preferred vanilla command alias.
-            *args: Additional positional arguments (implementation-specific)
-            **kwargs: Additional keyword arguments. Common kwargs include:
-                - resources: OperationResources instance (pool, memory, CPU, GPU, etc.)
-                - docker_auth: Optional Docker authentication dictionary
-                - max_failed_jobs: Maximum number of failed jobs before operation fails
-
-        Returns:
-            Operation object or None when submission fails.
-
-        """
+        """Run a vanilla operation (delegates to :meth:`run_vanilla_submit`)."""
+        kw = dict(kwargs)
+        resources_obj = kw.pop("resources", None)
+        if not isinstance(resources_obj, OperationResources):
+            msg = "run_vanilla requires resources=OperationResources in kwargs"
+            raise TypeError(msg)
+        docker_auth = kw.pop("docker_auth", None)
+        _mfj = kw.pop("max_failed_jobs", 1)
+        max_failed_jobs = _mfj if isinstance(_mfj, int) else 1
+        docker_map = docker_auth if isinstance(docker_auth, dict) else None
+        return self.run_vanilla_submit(
+            VanillaSubmitSpec(
+                command=command,
+                files=file_pairs_tuple(files),
+                env=env_pairs_tuple(env),
+                task_name=task_name,
+                resources=resources_obj,
+                job=job,
+                max_failed_jobs=max_failed_jobs,
+                docker_auth=docker_auth_tuple(docker_map),
+                extras=extras_tuple(kw),
+            ),
+        )

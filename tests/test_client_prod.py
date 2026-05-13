@@ -1,6 +1,7 @@
 """Contract tests for yt_framework.yt.clients.client_prod.YTProdClient (no cluster I/O)."""
 
 import logging
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, call
@@ -16,6 +17,16 @@ from yt_framework.yt._client_prod_runtime import (
 )
 from yt_framework.yt.clients.client_base import OperationResources
 from yt_framework.yt.clients.client_prod import YTProdClient
+from yt_framework.yt.clients.yql_requests import (
+    DistinctRequest,
+    FilterTableRequest,
+    GroupByAggregateRequest,
+    JoinTablesRequest,
+    LimitTableRequest,
+    SelectColumnsRequest,
+    SortTableRequest,
+    UnionTablesRequest,
+)
 
 
 def _null_logger(name: str) -> logging.Logger:
@@ -1391,11 +1402,19 @@ def test_yt_prod_client_join_tables_runs_yql_when_not_dry_run(
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     _attach_completed_yql_query(fake_inner)
-    client.join_tables("//left/t", "//right/t", "//out/t", "id", dry_run=False)
+    client.join_tables_request(
+        JoinTablesRequest(
+            left_table="//left/t",
+            right_table="//right/t",
+            output_table="//out/t",
+            on="id",
+            dry_run=False,
+        ),
+    )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
     assert "//left/t" in q and "//right/t" in q and "//out/t" in q, (
-        "join_tables should execute built YQL referencing all three paths"
+        "join_tables_request should execute built YQL referencing all three paths"
     )
 
 
@@ -1405,16 +1424,18 @@ def test_yt_prod_client_filter_table_runs_yql_using_resolved_columns(
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "status"}]}
     _attach_completed_yql_query(fake_inner)
-    client.filter_table(
-        "//tmp/in_tbl",
-        "//tmp/out_tbl",
-        "status = 'active'",
-        dry_run=False,
+    client.filter_table_request(
+        FilterTableRequest(
+            input_table="//tmp/in_tbl",
+            output_table="//tmp/out_tbl",
+            condition="status = 'active'",
+            dry_run=False,
+        ),
     )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
     assert "WHERE" in q and "//tmp/in_tbl" in q, (
-        "filter_table should run YQL with WHERE after _get_table_columns"
+        "filter_table_request should run YQL with WHERE after _get_table_columns"
     )
 
 
@@ -1424,7 +1445,13 @@ def test_yt_prod_client_union_tables_runs_yql_when_not_dry_run(
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "id"}]}
     _attach_completed_yql_query(fake_inner)
-    client.union_tables(["//tmp/a", "//tmp/b"], "//tmp/u_out", dry_run=False)
+    client.union_tables_request(
+        UnionTablesRequest(
+            tables=("//tmp/a", "//tmp/b"),
+            output_table="//tmp/u_out",
+            dry_run=False,
+        ),
+    )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
     assert "//tmp/a" in q
@@ -1437,11 +1464,13 @@ def test_yt_prod_client_select_columns_runs_yql_when_not_dry_run(
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     _attach_completed_yql_query(fake_inner)
-    client.select_columns(
-        "//tmp/s_in",
-        "//tmp/s_out",
-        ["id", "name"],
-        dry_run=False,
+    client.select_columns_request(
+        SelectColumnsRequest(
+            input_table="//tmp/s_in",
+            output_table="//tmp/s_out",
+            columns=["id", "name"],
+            dry_run=False,
+        ),
     )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
@@ -1454,12 +1483,14 @@ def test_yt_prod_client_group_by_aggregate_runs_yql_when_not_dry_run(
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     _attach_completed_yql_query(fake_inner)
-    client.group_by_aggregate(
-        "//tmp/g_in",
-        "//tmp/g_out",
-        "region",
-        {"n": "count"},
-        dry_run=False,
+    client.group_by_aggregate_request(
+        GroupByAggregateRequest(
+            input_table="//tmp/g_in",
+            output_table="//tmp/g_out",
+            group_by="region",
+            aggregations={"n": "count"},
+            dry_run=False,
+        ),
     )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
@@ -1472,7 +1503,14 @@ def test_yt_prod_client_distinct_runs_yql_when_not_dry_run(
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     _attach_completed_yql_query(fake_inner)
-    client.distinct("//tmp/d_in", "//tmp/d_out", columns=["k"], dry_run=False)
+    client.distinct_request(
+        DistinctRequest(
+            input_table="//tmp/d_in",
+            output_table="//tmp/d_out",
+            columns=["k"],
+            dry_run=False,
+        ),
+    )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
     assert "//tmp/d_in" in q
@@ -1485,11 +1523,13 @@ def test_yt_prod_client_sort_table_runs_yql_using_resolved_columns(
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "ts"}, {"name": "id"}]}
     _attach_completed_yql_query(fake_inner)
-    client.sort_table(
-        "//tmp/sort_in",
-        "//tmp/sort_out",
-        order_by="ts",
-        dry_run=False,
+    client.sort_table_request(
+        SortTableRequest(
+            input_table="//tmp/sort_in",
+            output_table="//tmp/sort_out",
+            order_by="ts",
+            dry_run=False,
+        ),
     )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
@@ -1503,7 +1543,14 @@ def test_yt_prod_client_limit_table_runs_yql_using_resolved_columns(
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "id"}]}
     _attach_completed_yql_query(fake_inner)
-    client.limit_table("//tmp/l_in", "//tmp/l_out", limit=10, dry_run=False)
+    client.limit_table_request(
+        LimitTableRequest(
+            input_table="//tmp/l_in",
+            output_table="//tmp/l_out",
+            limit=10,
+            dry_run=False,
+        ),
+    )
     fake_inner.run_query.assert_called_once()
     q = fake_inner.run_query.call_args.kwargs["query"]
     assert "//tmp/l_in" in q
@@ -1713,7 +1760,15 @@ def test_yt_prod_client_join_tables_dry_run_returns_query_without_run_yql(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
-    q = client.join_tables("//l", "//r", "//o", "id", dry_run=True)
+    q = client.join_tables_request(
+        JoinTablesRequest(
+            left_table="//l",
+            right_table="//r",
+            output_table="//o",
+            on="id",
+            dry_run=True,
+        ),
+    )
     assert isinstance(q, str)
     assert "JOIN" in q.upper()
     assert not fake_inner.run_query.called
@@ -1724,7 +1779,11 @@ def test_yt_prod_client_filter_table_dry_run_returns_query_without_run_yql(
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "status"}]}
-    q = client.filter_table("//i", "//o", "status = 1", dry_run=True)
+    q = client.filter_table_request(
+        FilterTableRequest(
+            input_table="//i", output_table="//o", condition="status = 1", dry_run=True
+        ),
+    )
     assert "WHERE" in q
     assert not fake_inner.run_query.called
 
@@ -1733,7 +1792,11 @@ def test_yt_prod_client_select_columns_dry_run_returns_query_without_run_yql(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
-    q = client.select_columns("//i", "//o", ["a", "b"], dry_run=True)
+    q = client.select_columns_request(
+        SelectColumnsRequest(
+            input_table="//i", output_table="//o", columns=["a", "b"], dry_run=True
+        ),
+    )
     assert "//i" in q
     assert "//o" in q
     assert not fake_inner.run_query.called
@@ -1743,7 +1806,15 @@ def test_yt_prod_client_group_by_aggregate_dry_run_returns_query_without_run_yql
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
-    q = client.group_by_aggregate("//i", "//o", "g", {"n": "count"}, dry_run=True)
+    q = client.group_by_aggregate_request(
+        GroupByAggregateRequest(
+            input_table="//i",
+            output_table="//o",
+            group_by="g",
+            aggregations={"n": "count"},
+            dry_run=True,
+        ),
+    )
     assert "GROUP BY" in q.upper()
     assert not fake_inner.run_query.called
 
@@ -1753,7 +1824,9 @@ def test_yt_prod_client_union_tables_dry_run_returns_query_without_run_yql(
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "id"}]}
-    q = client.union_tables(["//a", "//b"], "//u", dry_run=True)
+    q = client.union_tables_request(
+        UnionTablesRequest(tables=("//a", "//b"), output_table="//u", dry_run=True),
+    )
     assert "UNION" in q.upper()
     assert not fake_inner.run_query.called
 
@@ -1762,7 +1835,11 @@ def test_yt_prod_client_distinct_dry_run_returns_query_without_run_yql(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
-    q = client.distinct("//d_in", "//d_out", columns=["k"], dry_run=True)
+    q = client.distinct_request(
+        DistinctRequest(
+            input_table="//d_in", output_table="//d_out", columns=["k"], dry_run=True
+        )
+    )
     assert "//d_in" in q
     assert not fake_inner.run_query.called
 
@@ -1772,7 +1849,11 @@ def test_yt_prod_client_sort_table_dry_run_returns_query_without_run_yql(
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "ts"}]}
-    q = client.sort_table("//s_in", "//s_out", order_by="ts", dry_run=True)
+    q = client.sort_table_request(
+        SortTableRequest(
+            input_table="//s_in", output_table="//s_out", order_by="ts", dry_run=True
+        ),
+    )
     assert "//s_in" in q
     assert not fake_inner.run_query.called
 
@@ -1782,77 +1863,85 @@ def test_yt_prod_client_limit_table_dry_run_returns_query_without_run_yql(
 ) -> None:
     client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
     fake_inner.get.return_value = {"schema": [{"name": "id"}]}
-    q = client.limit_table("//l_in", "//l_out", limit=3, dry_run=True)
+    q = client.limit_table_request(
+        LimitTableRequest(
+            input_table="//l_in", output_table="//l_out", limit=3, dry_run=True
+        ),
+    )
     assert "LIMIT" in q.upper()
     assert not fake_inner.run_query.called
 
 
 @pytest.mark.parametrize(
-    ("method_name", "kwargs"),
+    ("method_name", "build_req"),
     [
         (
-            "join_tables",
-            {
-                "left_table": "//l",
-                "right_table": "//r",
-                "output_table": "//o",
-                "on": "id",
-            },
+            "join_tables_request",
+            lambda: JoinTablesRequest(
+                left_table="//l",
+                right_table="//r",
+                output_table="//o",
+                on="id",
+            ),
         ),
         (
-            "filter_table",
-            {
-                "input_table": "//i",
-                "output_table": "//o",
-                "condition": "id > 0",
-            },
+            "filter_table_request",
+            lambda: FilterTableRequest(
+                input_table="//i",
+                output_table="//o",
+                condition="id > 0",
+            ),
         ),
         (
-            "select_columns",
-            {
-                "input_table": "//i",
-                "output_table": "//o",
-                "columns": ["id"],
-            },
+            "select_columns_request",
+            lambda: SelectColumnsRequest(
+                input_table="//i",
+                output_table="//o",
+                columns=["id"],
+            ),
         ),
         (
-            "group_by_aggregate",
-            {
-                "input_table": "//i",
-                "output_table": "//o",
-                "group_by": "id",
-                "aggregations": {"n": "count"},
-            },
+            "group_by_aggregate_request",
+            lambda: GroupByAggregateRequest(
+                input_table="//i",
+                output_table="//o",
+                group_by="id",
+                aggregations={"n": "count"},
+            ),
         ),
         (
-            "union_tables",
-            {"tables": ["//a", "//b"], "output_table": "//o"},
+            "union_tables_request",
+            lambda: UnionTablesRequest(tables=("//a", "//b"), output_table="//o"),
         ),
         (
-            "distinct",
-            {"input_table": "//i", "output_table": "//o", "columns": ["id"]},
+            "distinct_request",
+            lambda: DistinctRequest(
+                input_table="//i", output_table="//o", columns=["id"]
+            ),
         ),
         (
-            "sort_table",
-            {"input_table": "//i", "output_table": "//o", "order_by": "id"},
+            "sort_table_request",
+            lambda: SortTableRequest(
+                input_table="//i", output_table="//o", order_by="id"
+            ),
         ),
         (
-            "limit_table",
-            {"input_table": "//i", "output_table": "//o", "limit": 5},
+            "limit_table_request",
+            lambda: LimitTableRequest(input_table="//i", output_table="//o", limit=5),
         ),
     ],
 )
 def test_yt_prod_yql_helpers_forward_max_row_weight_to_run_yql(
     monkeypatch: pytest.MonkeyPatch,
     method_name: str,
-    kwargs: dict[str, Any],
+    build_req: Any,
 ) -> None:
     client, _ = _prod_client_with_fake_inner(monkeypatch)
     monkeypatch.setattr(client, "_get_table_columns", lambda _path: ["id"])
     run_yql = MagicMock()
     monkeypatch.setattr(client, "run_yql", run_yql)
     method = getattr(client, method_name)
-    method(max_row_weight="64M", **kwargs)
+    method(replace(build_req(), max_row_weight="64M"))
     assert run_yql.call_args.kwargs.get("max_row_weight") == "64M"
 
 

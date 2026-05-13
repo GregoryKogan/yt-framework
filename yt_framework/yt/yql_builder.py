@@ -3,6 +3,16 @@
 Utilities compose INSERT/SELECT statements with pragmas and escaped paths.
 """
 
+from yt_framework.yt.clients.yql_requests import (
+    DistinctRequest,
+    FilterTableRequest,
+    GroupByAggregateRequest,
+    JoinTablesRequest,
+    LimitTableRequest,
+    SelectColumnsRequest,
+    SortTableRequest,
+    UnionTablesRequest,
+)
 from yt_framework.yt.max_row_weight import build_max_row_weight_pragma
 
 _AGG_SPEC_TUPLE_LEN = 2
@@ -169,20 +179,40 @@ def _pragma_header(max_row_weight: str | None = None) -> str:
     )
 
 
+def _str_join_using_or_on(
+    on: str,
+    select_columns: list[str] | None,
+) -> tuple[bool, list[str] | None, str]:
+    if select_columns:
+        return True, [on], ""
+    return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
+
+
+def _list_join_using_or_on(
+    on: list[str],
+    select_columns: list[str] | None,
+) -> tuple[bool, list[str] | None, str]:
+    if select_columns:
+        return True, on, ""
+    return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
+
+
 def _resolve_join_strategy(
-    on: str | list[str] | dict[str, str],
+    on: str | list[str] | dict[str, str] | tuple[str, ...],
     select_columns: list[str] | None,
 ) -> tuple[bool, list[str] | None, str]:
     """Return join strategy as ``(use_using, using_columns, join_conditions)``."""
     if isinstance(on, str):
-        if select_columns:
-            return True, [on], ""
+        return _str_join_using_or_on(on, select_columns)
+    if isinstance(on, dict):
         return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
     if isinstance(on, list):
-        if select_columns:
-            return True, on, ""
-        return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
-    return False, None, _format_join_conditions(on, left_alias="a", right_alias="b")
+        return _list_join_using_or_on(on, select_columns)
+    return (
+        False,
+        None,
+        _format_join_conditions(list(on), left_alias="a", right_alias="b"),
+    )
 
 
 def _join_using_clause(using_columns: list[str]) -> str:
@@ -236,35 +266,15 @@ FROM {_escape_table_name(left_table)} AS a
 ON {join_conditions};"""  # noqa: S608
 
 
-def build_join_query(
-    left_table: str,
-    right_table: str,
-    output_table: str,
-    on: str | list[str] | dict[str, str],
-    how: str = "left",
-    select_columns: list[str] | None = None,
-    max_row_weight: str | None = None,
-) -> str:
-    """Build a YQL JOIN query.
-
-    Args:
-        left_table: Left table path
-        right_table: Right table path
-        output_table: Output table path
-        on: Join key(s) - column name(s) to join on
-            - str: Same column name on both sides (e.g., "user_id")
-            - List[str]: Multiple columns with same names (e.g., ["user_id", "region"])
-            - Dict[str, str]: Different column names (e.g., {"left": "input_s3_path", "right": "path"})
-        how: Join type - "inner", "left", "right", or "full"
-        select_columns: Optional list of columns to select (with table aliases)
-                       e.g., ["a.col1", "a.col2", "b.col3"]
-        max_row_weight: Optional value for the max-row-weight pragma prefix.
-
-    Returns:
-        YQL query string
-
-    """
-    join_type = how.upper()
+def build_join_query(req: JoinTablesRequest) -> str:
+    """Build a YQL JOIN query from a :class:`JoinTablesRequest`."""
+    left_table = req.left_table
+    right_table = req.right_table
+    output_table = req.output_table
+    on = req.on
+    select_columns = req.select_columns
+    max_row_weight = req.max_row_weight
+    join_type = req.how.upper()
     if join_type == "FULL":
         join_type = "FULL OUTER"
 
@@ -301,26 +311,16 @@ def build_join_query(
     )
 
 
-def build_filter_query(
-    input_table: str,
-    output_table: str,
-    condition: str,
-    columns: list[str],
-    max_row_weight: str | None = None,
-) -> str:
-    """Build a YQL filter query with WHERE clause.
-
-    Args:
-        input_table: Input table path
-        output_table: Output table path
-        condition: WHERE condition (e.g., "status = 'active' AND total > 100")
-        columns: List of columns to select (required to avoid _other column issues)
-        max_row_weight: Optional value for the max-row-weight pragma prefix.
-
-    Returns:
-        YQL query string
-
-    """
+def build_filter_query(req: FilterTableRequest) -> str:
+    """Build a YQL filter query with WHERE clause."""
+    input_table = req.input_table
+    output_table = req.output_table
+    condition = req.condition
+    columns = req.columns
+    max_row_weight = req.max_row_weight
+    if columns is None:
+        msg = "build_filter_query requires FilterTableRequest.columns"
+        raise ValueError(msg)
     select_clause = _format_column_list(columns)
 
     return f"""{_pragma_header(max_row_weight)}
@@ -331,24 +331,12 @@ FROM {_escape_table_name(input_table)}
 WHERE {condition};"""  # noqa: S608
 
 
-def build_select_query(
-    input_table: str,
-    output_table: str,
-    columns: list[str],
-    max_row_weight: str | None = None,
-) -> str:
-    """Build a YQL query to select specific columns.
-
-    Args:
-        input_table: Input table path
-        output_table: Output table path
-        columns: List of column names to select
-        max_row_weight: Optional value for the max-row-weight pragma prefix.
-
-    Returns:
-        YQL query string
-
-    """
+def build_select_query(req: SelectColumnsRequest) -> str:
+    """Build a YQL query to select specific columns."""
+    input_table = req.input_table
+    output_table = req.output_table
+    columns = req.columns
+    max_row_weight = req.max_row_weight
     select_clause = _format_column_list(columns)
 
     return f"""{_pragma_header(max_row_weight)}
@@ -358,28 +346,13 @@ SELECT
 FROM {_escape_table_name(input_table)};"""  # noqa: S608
 
 
-def build_group_by_query(
-    input_table: str,
-    output_table: str,
-    group_by: str | list[str],
-    aggregations: dict[str, str | tuple[str, str]],
-    max_row_weight: str | None = None,
-) -> str:
-    """Build a YQL GROUP BY query with aggregations.
-
-    Args:
-        input_table: Input table path
-        output_table: Output table path
-        group_by: Column(s) to group by (empty list means aggregate all rows)
-        aggregations: Dict mapping output column names to aggregation functions
-                     - Simple format: {"order_count": "count", "total_amount": "sum"}
-                     - Explicit column: {"total_amount": ("sum", "amount")} or {"total_amount": ("sum", "a.amount")}
-        max_row_weight: Optional value for the max-row-weight pragma prefix.
-
-    Returns:
-        YQL query string
-
-    """
+def build_group_by_query(req: GroupByAggregateRequest) -> str:
+    """Build a YQL GROUP BY query with aggregations."""
+    input_table = req.input_table
+    output_table = req.output_table
+    group_by = req.group_by
+    aggregations = req.aggregations
+    max_row_weight = req.max_row_weight
     select_clause = _format_aggregations(aggregations, group_by)
     group_clause = _format_group_by_list(group_by)
 
@@ -401,26 +374,17 @@ GROUP BY {group_clause};"""  # noqa: S608
     return query
 
 
-def build_union_query(
-    tables: list[str],
-    output_table: str,
-    columns: list[str],
-    max_row_weight: str | None = None,
-) -> str:
-    """Build a YQL UNION ALL query.
-
-    Args:
-        tables: List of table paths to union
-        output_table: Output table path
-        columns: List of columns to select (required to avoid _other column issues)
-        max_row_weight: Optional value for the max-row-weight pragma prefix.
-
-    Returns:
-        YQL query string
-
-    """
+def build_union_query(req: UnionTablesRequest) -> str:
+    """Build a YQL UNION ALL query."""
+    tables = list(req.tables)
+    output_table = req.output_table
+    columns = req.columns
+    max_row_weight = req.max_row_weight
     if len(tables) < _UNION_MIN_TABLES:
         msg = "UNION requires at least 2 tables"
+        raise ValueError(msg)
+    if columns is None:
+        msg = "build_union_query requires UnionTablesRequest.columns"
         raise ValueError(msg)
 
     select_clause = _format_column_list(columns)
@@ -435,24 +399,12 @@ INSERT INTO {_escape_table_name(output_table)} WITH TRUNCATE
 {union_clause};"""
 
 
-def build_distinct_query(
-    input_table: str,
-    output_table: str,
-    columns: list[str] | None = None,
-    max_row_weight: str | None = None,
-) -> str:
-    """Build a YQL DISTINCT query.
-
-    Args:
-        input_table: Input table path
-        output_table: Output table path
-        columns: Optional list of columns to select (if None, selects all)
-        max_row_weight: Optional value for the max-row-weight pragma prefix.
-
-    Returns:
-        YQL query string
-
-    """
+def build_distinct_query(req: DistinctRequest) -> str:
+    """Build a YQL DISTINCT query."""
+    input_table = req.input_table
+    output_table = req.output_table
+    columns = req.columns
+    max_row_weight = req.max_row_weight
     select_clause = _format_column_list(columns) if columns else "*"
 
     return f"""{_pragma_header(max_row_weight)}
@@ -462,31 +414,17 @@ SELECT DISTINCT
 FROM {_escape_table_name(input_table)};"""  # noqa: S608
 
 
-def build_sort_query(
-    input_table: str,
-    output_table: str,
-    order_by: str | list[str],
-    columns: list[str],
-    ascending: bool = True,  # noqa: FBT001,FBT002
-    max_row_weight: str | None = None,
-) -> str:
-    """Build a YQL ORDER BY query.
-
-    Uses a subquery pattern to prevent YQL from adding internal binary columns
-    like _yql_column_0 that can appear with ORDER BY operations.
-
-    Args:
-        input_table: Input table path
-        output_table: Output table path
-        order_by: Column(s) to sort by
-        columns: List of columns to select (required to avoid _other column issues)
-        ascending: Sort direction (True for ASC, False for DESC)
-        max_row_weight: Optional value for the max-row-weight pragma prefix.
-
-    Returns:
-        YQL query string
-
-    """
+def build_sort_query(req: SortTableRequest) -> str:
+    """Build a YQL ORDER BY query (subquery pattern for stable column sets)."""
+    input_table = req.input_table
+    output_table = req.output_table
+    order_by = req.order_by
+    columns = req.columns
+    ascending = req.ascending
+    max_row_weight = req.max_row_weight
+    if columns is None:
+        msg = "build_sort_query requires SortTableRequest.columns"
+        raise ValueError(msg)
     order_clause = _format_order_by_list(order_by, ascending)
     select_clause = _format_column_list(columns)
 
@@ -503,26 +441,16 @@ FROM (
 );"""  # noqa: S608
 
 
-def build_limit_query(
-    input_table: str,
-    output_table: str,
-    limit: int,
-    columns: list[str],
-    max_row_weight: str | None = None,
-) -> str:
-    """Build a YQL LIMIT query.
-
-    Args:
-        input_table: Input table path
-        output_table: Output table path
-        limit: Maximum number of rows to return
-        columns: List of columns to select (required to avoid _other column issues)
-        max_row_weight: Optional value for the max-row-weight pragma prefix.
-
-    Returns:
-        YQL query string
-
-    """
+def build_limit_query(req: LimitTableRequest) -> str:
+    """Build a YQL LIMIT query."""
+    input_table = req.input_table
+    output_table = req.output_table
+    limit = req.limit
+    columns = req.columns
+    max_row_weight = req.max_row_weight
+    if columns is None:
+        msg = "build_limit_query requires LimitTableRequest.columns"
+        raise ValueError(msg)
     select_clause = _format_column_list(columns)
 
     return f"""{_pragma_header(max_row_weight)}

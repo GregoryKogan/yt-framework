@@ -4,6 +4,17 @@ from __future__ import annotations
 
 import pytest
 
+from yt_framework.yt.clients.yql_requests import (
+    DistinctRequest,
+    FilterTableRequest,
+    GroupByAggregateRequest,
+    JoinTablesRequest,
+    LimitTableRequest,
+    SelectColumnsRequest,
+    SortTableRequest,
+    UnionTablesRequest,
+)
+
 
 @pytest.mark.yt_cluster
 def test_run_yql_inserts_projection(
@@ -27,7 +38,9 @@ def test_filter_table(yt_case_prefix: str, yt_client) -> None:
     yt_client.write_table(
         tin, [{"a": 1, "b": "u"}, {"a": 5, "b": "v"}, {"a": 3, "b": "w"}]
     )
-    yt_client.filter_table(tin, tout, "a > 2")
+    yt_client.filter_table_request(
+        FilterTableRequest(input_table=tin, output_table=tout, condition="a > 2"),
+    )
     rows = sorted(yt_client.read_table(tout), key=lambda r: r["a"])
     assert rows == [{"a": 3, "b": "w"}, {"a": 5, "b": "v"}]
 
@@ -36,7 +49,9 @@ def test_filter_table(yt_case_prefix: str, yt_client) -> None:
 def test_select_columns(yt_case_prefix: str, yt_client) -> None:
     tin, tout = f"{yt_case_prefix}/s_in", f"{yt_case_prefix}/s_out"
     yt_client.write_table(tin, [{"x": 1, "y": 2}, {"x": 3, "y": 4}])
-    yt_client.select_columns(tin, tout, ["y"])
+    yt_client.select_columns_request(
+        SelectColumnsRequest(input_table=tin, output_table=tout, columns=["y"]),
+    )
     rows = sorted(yt_client.read_table(tout), key=lambda r: r["y"])
     assert rows == [{"y": 2}, {"y": 4}]
 
@@ -52,11 +67,13 @@ def test_group_by_aggregate(yt_case_prefix: str, yt_client) -> None:
             {"region": "west", "v": 7},
         ],
     )
-    yt_client.group_by_aggregate(
-        tin,
-        tout,
-        group_by="region",
-        aggregations={"total_v": "sum"},
+    yt_client.group_by_aggregate_request(
+        GroupByAggregateRequest(
+            input_table=tin,
+            output_table=tout,
+            group_by="region",
+            aggregations={"total_v": "sum"},
+        ),
     )
     rows = {r["region"]: r["total_v"] for r in yt_client.read_table(tout)}
     assert rows == {"east": 30, "west": 7}
@@ -71,7 +88,9 @@ def test_union_tables(yt_case_prefix: str, yt_client) -> None:
     )
     yt_client.write_table(t1, [{"n": 1}, {"n": 2}])
     yt_client.write_table(t2, [{"n": 3}])
-    yt_client.union_tables([t1, t2], tout)
+    yt_client.union_tables_request(
+        UnionTablesRequest(tables=(t1, t2), output_table=tout),
+    )
     nums = sorted(r["n"] for r in yt_client.read_table(tout))
     assert nums == [1, 2, 3]
 
@@ -80,7 +99,7 @@ def test_union_tables(yt_case_prefix: str, yt_client) -> None:
 def test_distinct_table(yt_case_prefix: str, yt_client) -> None:
     tin, tout = f"{yt_case_prefix}/d_in", f"{yt_case_prefix}/d_out"
     yt_client.write_table(tin, [{"k": 1}, {"k": 1}, {"k": 2}])
-    yt_client.distinct(tin, tout)
+    yt_client.distinct_request(DistinctRequest(input_table=tin, output_table=tout))
     nums = sorted(r["k"] for r in yt_client.read_table(tout))
     assert nums == [1, 2]
 
@@ -89,7 +108,9 @@ def test_distinct_table(yt_case_prefix: str, yt_client) -> None:
 def test_sort_table_yql(yt_case_prefix: str, yt_client) -> None:
     tin, tout = f"{yt_case_prefix}/sort_in", f"{yt_case_prefix}/sort_yql_out"
     yt_client.write_table(tin, [{"v": 3}, {"v": 1}, {"v": 2}])
-    yt_client.sort_table(tin, tout, order_by="v")
+    yt_client.sort_table_request(
+        SortTableRequest(input_table=tin, output_table=tout, order_by="v"),
+    )
     # Static Cypress reads do not guarantee row order; compare sorted values.
     rows = yt_client.read_table(tout)
     assert sorted(r["v"] for r in rows) == [1, 2, 3]
@@ -99,7 +120,9 @@ def test_sort_table_yql(yt_case_prefix: str, yt_client) -> None:
 def test_limit_table(yt_case_prefix: str, yt_client) -> None:
     tin, tout = f"{yt_case_prefix}/l_in", f"{yt_case_prefix}/l_out"
     yt_client.write_table(tin, [{"i": 10}, {"i": 20}, {"i": 30}])
-    yt_client.limit_table(tin, tout, 2)
+    yt_client.limit_table_request(
+        LimitTableRequest(input_table=tin, output_table=tout, limit=2)
+    )
     vals = sorted(r["i"] for r in yt_client.read_table(tout))
     assert vals == [10, 20]
 
@@ -113,17 +136,19 @@ def test_join_tables(yt_case_prefix: str, yt_client) -> None:
     )
     yt_client.write_table(left, [{"uid": 1, "name": "a"}, {"uid": 2, "name": "b"}])
     yt_client.write_table(right, [{"uid": 1, "score": 100}, {"uid": 3, "score": 200}])
-    yt_client.join_tables(
-        left,
-        right,
-        out,
-        on="uid",
-        how="inner",
-        select_columns=[
-            "a.uid AS uid",
-            "a.name AS name",
-            "b.score AS score",
-        ],
+    yt_client.join_tables_request(
+        JoinTablesRequest(
+            left_table=left,
+            right_table=right,
+            output_table=out,
+            on="uid",
+            how="inner",
+            select_columns=[
+                "a.uid AS uid",
+                "a.name AS name",
+                "b.score AS score",
+            ],
+        ),
     )
     rows = yt_client.read_table(out)
     assert len(rows) == 1

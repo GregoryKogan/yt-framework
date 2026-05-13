@@ -13,6 +13,12 @@ if TYPE_CHECKING:
     from yt.wrapper import Operation
     from yt.wrapper.schema import TableSchema
 
+    from yt_framework.yt.clients.client_base import OperationResources
+    from yt_framework.yt.clients.operation_specs import (
+        MapReduceSubmitSpec,
+        ReduceSubmitSpec,
+    )
+
 from yt_framework.job_command import resolve_aliased_job as _resolve_aliased_job
 from yt_framework.yt._client_prod_runtime import (
     _apply_command_leg_format,
@@ -29,7 +35,6 @@ from yt_framework.yt._client_split._client_prod_cmd_helpers import (
     _partition_and_maybe_wrap_leg,
     maybe_wrap_cmd_for_vault,
 )
-from yt_framework.yt.clients.client_base import OperationResources
 from yt_framework.yt.max_row_weight import validate_max_row_weight
 from yt_framework.yt.operation_secure_env import (
     merge_secure_vault,
@@ -40,25 +45,23 @@ from yt_framework.yt.operation_secure_env import (
 class ClientProdMrReduceSortMixin:
     """Mixin for map-reduce, reduce-only, and sort operations."""
 
-    def run_map_reduce(
-        self,
-        mapper: object,
-        reducer: object,
-        input_table: str,
-        output_table: str,
-        reduce_by: list[str],
-        files: list[tuple[str, str]],
-        resources: OperationResources,
-        env: dict[str, str],
-        sort_by: list[str] | None = None,
-        output_schema: TableSchema | None = None,
-        max_failed_jobs: int = 1,
-        docker_auth: dict[str, str] | None = None,
-        map_job: object = None,
-        reduce_job: object = None,
-        **kwargs: object,
-    ) -> Operation:
+    def run_map_reduce_submit(self, spec: MapReduceSubmitSpec) -> Operation:
         """Run a map-reduce operation on YT cluster."""
+        mapper = spec.mapper
+        reducer = spec.reducer
+        input_table = spec.input_table
+        output_table = spec.output_table
+        reduce_by = spec.reduce_by_list()
+        files = spec.files_list()
+        resources = spec.resources
+        env = spec.env_dict()
+        sort_by = spec.sort_by_list()
+        output_schema = spec.output_schema
+        max_failed_jobs = spec.max_failed_jobs
+        docker_auth = spec.docker_auth_dict()
+        map_job = spec.map_job
+        reduce_job = spec.reduce_job
+        kwargs = dict(spec.extras_dict())
         self.logger.info("Submitting map-reduce operation")
         self.logger.info("  Input: %s -> Output: %s", input_table, output_table)
         self.logger.info("  Reduce by: %s", reduce_by)
@@ -245,22 +248,20 @@ class ClientProdMrReduceSortMixin:
             leg_builder.end_reducer()
         return spec_builder
 
-    def run_reduce(
-        self,
-        reducer: object,
-        input_table: str,
-        output_table: str,
-        reduce_by: list[str],
-        files: list[tuple[str, str]],
-        resources: OperationResources,
-        env: dict[str, str],
-        output_schema: TableSchema | None = None,
-        max_failed_jobs: int = 1,
-        docker_auth: dict[str, str] | None = None,
-        job: object = None,
-        **kwargs: object,
-    ) -> Operation:
+    def run_reduce_submit(self, spec: ReduceSubmitSpec) -> Operation:
         """Run a reduce-only operation on YT cluster."""
+        reducer = spec.reducer
+        input_table = spec.input_table
+        output_table = spec.output_table
+        reduce_by = spec.reduce_by_list()
+        files = spec.files_list()
+        resources = spec.resources
+        env = spec.env_dict()
+        output_schema = spec.output_schema
+        max_failed_jobs = spec.max_failed_jobs
+        docker_auth = spec.docker_auth_dict()
+        job = spec.job
+        kwargs = dict(spec.extras_dict())
         self.logger.info("Submitting reduce operation")
         self.logger.info("  Input: %s -> Output: %s", input_table, output_table)
         self.logger.info("  Reduce by: %s", reduce_by)

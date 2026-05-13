@@ -102,7 +102,7 @@ How-to guides under `docs/operations`, `docs/configuration`, and `docs/advanced`
 
 ### YQL Operations
 
-YQL operations are methods on the YT client. See the **YT Client** sections below for `join_tables`, `filter_table`, `select_columns`, `group_by_aggregate`, `union_tables`, `distinct`, `sort_table`, and `limit_table`.
+YQL operations are ``*_request`` methods on the YT client, each taking a frozen request type from ``yt_framework.yt.clients.yql_requests`` (for example ``JoinTablesRequest``). See :doc:`../operations/yql`.
 
 ```{note}
 **YQL Operations Location**

@@ -13,7 +13,11 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 
 if TYPE_CHECKING:
     from yt.wrapper import Operation
-    from yt.wrapper.schema import TableSchema
+
+    from yt_framework.yt.clients.operation_specs import (
+        MapReduceSubmitSpec,
+        ReduceSubmitSpec,
+    )
 
 from yt_framework.job_command import is_typed_job, resolve_aliased_job
 from yt_framework.yt._client_dev_runtime import (
@@ -25,32 +29,40 @@ from yt_framework.yt._client_dev_runtime import (
     dev_try_upload_one_dependency,
 )
 from yt_framework.yt._client_split.dev_operation import DevOperation
-from yt_framework.yt.clients.client_base import OperationResources
 from yt_framework.yt.operation_secure_env import pop_secure_env_client_kwargs
 
 
 class ClientDevMrReduceSortMixin:
     """Mixin for dev map-reduce / reduce / sort no-ops."""
 
-    def run_map_reduce(
-        self,
-        mapper: object,
-        reducer: object,
-        input_table: str,
-        output_table: str,
-        reduce_by: list[str],
-        files: list[tuple[str, str]],
-        resources: OperationResources,
-        env: dict[str, str],
-        sort_by: list[str] | None = None,
-        output_schema: TableSchema | None = None,
-        max_failed_jobs: int = 1,
-        docker_auth: dict[str, str] | None = None,
-        map_job: object = None,
-        reduce_job: object = None,
-        **kwargs: object,
-    ) -> Operation:
+    def run_map_reduce_submit(self, spec: MapReduceSubmitSpec) -> Operation:
         """Dev: no-op; copy input table to output table."""
+        mapper = spec.mapper
+        reducer = spec.reducer
+        input_table = spec.input_table
+        output_table = spec.output_table
+        reduce_by_cols = spec.reduce_by_list()
+        files = spec.files_list()
+        resources = spec.resources
+        env = spec.env_dict()
+        sort_by = spec.sort_by_list()
+        output_schema = spec.output_schema
+        max_failed_jobs = spec.max_failed_jobs
+        docker_auth = spec.docker_auth_dict()
+        map_job = spec.map_job
+        reduce_job = spec.reduce_job
+        kwargs = dict(spec.extras_dict())
+        self.logger.debug(
+            "Dev map-reduce ignoring hints: reduce_by=%s sort_by=%s schema=%s max_failed=%s files=%s docker=%s env_keys=%s pool=%s",
+            reduce_by_cols,
+            sort_by,
+            output_schema is not None,
+            max_failed_jobs,
+            len(files),
+            docker_auth is not None,
+            len(env),
+            resources.pool,
+        )
         _kw = dict(kwargs)
         pop_secure_env_client_kwargs(_kw)
         mapper_leg = resolve_aliased_job(
@@ -90,22 +102,30 @@ class ClientDevMrReduceSortMixin:
             output_path.write_text("")
         return cast("Operation", DevOperation(0))
 
-    def run_reduce(
-        self,
-        reducer: object,
-        input_table: str,
-        output_table: str,
-        reduce_by: list[str],
-        files: list[tuple[str, str]],
-        resources: OperationResources,
-        env: dict[str, str],
-        output_schema: TableSchema | None = None,
-        max_failed_jobs: int = 1,
-        docker_auth: dict[str, str] | None = None,
-        job: object = None,
-        **kwargs: object,
-    ) -> Operation:
+    def run_reduce_submit(self, spec: ReduceSubmitSpec) -> Operation:
         """Dev: no-op; copy input table to output table."""
+        reducer = spec.reducer
+        input_table = spec.input_table
+        output_table = spec.output_table
+        reduce_by_cols = spec.reduce_by_list()
+        files = spec.files_list()
+        resources = spec.resources
+        env = spec.env_dict()
+        output_schema = spec.output_schema
+        max_failed_jobs = spec.max_failed_jobs
+        docker_auth = spec.docker_auth_dict()
+        job = spec.job
+        kwargs = dict(spec.extras_dict())
+        self.logger.debug(
+            "Dev reduce ignoring hints: reduce_by=%s schema=%s max_failed=%s files=%s docker=%s env_keys=%s pool=%s",
+            reduce_by_cols,
+            output_schema is not None,
+            max_failed_jobs,
+            len(files),
+            docker_auth is not None,
+            len(env),
+            resources.pool,
+        )
         _kw = dict(kwargs)
         pop_secure_env_client_kwargs(_kw)
         reducer_leg = resolve_aliased_job(

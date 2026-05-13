@@ -27,7 +27,7 @@ def _map_stage_context(tmp_path: Path) -> StageContext:
     fake_yt = MagicMock(spec=BaseYTClient)
     op = MagicMock()
     op.id = "op-map-1"
-    fake_yt.run_map.return_value = op
+    fake_yt.run_map_submit.return_value = op
     fake_yt.wait_for_operation.return_value = True
     deps = PipelineStageDependencies(
         yt_client=fake_yt,
@@ -93,8 +93,8 @@ def test_run_map_forwards_string_operation_description_as_title(
         }
     )
     assert run_map(ctx, cfg) is True
-    call_kw = ctx.deps.yt_client.run_map.call_args.kwargs
-    assert call_kw.get("title") == "my-label"
+    spec = ctx.deps.yt_client.run_map_submit.call_args[0][0]
+    assert spec.extras_dict().get("title") == "my-label"
 
 
 def test_run_map_forwards_dict_operation_description(tmp_path: Path) -> None:
@@ -108,8 +108,8 @@ def test_run_map_forwards_dict_operation_description(tmp_path: Path) -> None:
         }
     )
     assert run_map(ctx, cfg) is True
-    call_kw = ctx.deps.yt_client.run_map.call_args.kwargs
-    assert call_kw.get("operation_description") == {"foo": 1}
+    spec = ctx.deps.yt_client.run_map_submit.call_args[0][0]
+    assert spec.extras_dict().get("operation_description") == {"foo": 1}
 
 
 def test_run_map_forwards_max_row_weight_override(tmp_path: Path) -> None:
@@ -123,8 +123,8 @@ def test_run_map_forwards_max_row_weight_override(tmp_path: Path) -> None:
         }
     )
     assert run_map(ctx, cfg) is True
-    call_kw = ctx.deps.yt_client.run_map.call_args.kwargs
-    assert call_kw.get("max_row_weight") == "64M"
+    spec = ctx.deps.yt_client.run_map_submit.call_args[0][0]
+    assert spec.extras_dict().get("max_row_weight") == "64M"
 
 
 def test_run_map_passes_append_from_operation_config(tmp_path: Path) -> None:
@@ -138,8 +138,8 @@ def test_run_map_passes_append_from_operation_config(tmp_path: Path) -> None:
         }
     )
     assert run_map(ctx, cfg) is True
-    call_kw = ctx.deps.yt_client.run_map.call_args.kwargs
-    assert call_kw.get("append") is True
+    spec = ctx.deps.yt_client.run_map_submit.call_args[0][0]
+    assert spec.append is True
 
 
 @patch(
