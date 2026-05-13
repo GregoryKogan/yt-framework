@@ -121,7 +121,7 @@ def dev_find_checkpoint_in_config(stage_config: DictConfig | ListConfig) -> str 
     return dev_find_checkpoint_in_operations(stage_config)
 
 
-def dev_try_checkpoint_from_stage_config_file(
+def dev_try_checkpoint_from_stage_cfg(
     stage_config_path: Path,
     logger: logging.Logger,
     find_in_config: Callable[[DictConfig | ListConfig], str | None],
@@ -161,7 +161,7 @@ def dev_scan_stages_dir_for_checkpoint(
             stage_config_path = _dev_stage_config_path_if_any(stage_dir)
             if stage_config_path is None:
                 continue
-            found = dev_try_checkpoint_from_stage_config_file(
+            found = dev_try_checkpoint_from_stage_cfg(
                 stage_config_path,
                 logger,
                 find_in_config,

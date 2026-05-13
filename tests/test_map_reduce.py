@@ -9,7 +9,9 @@ from omegaconf import OmegaConf
 
 from yt_framework.core.dependencies import PipelineStageDependencies
 from yt_framework.core.stage import StageContext
-from yt_framework.operations.dependency_strategy import DependencyBuildResult
+from yt_framework.operations._internal.dependency_strategy import (
+    DependencyBuildResult,
+)
 from yt_framework.operations.map_reduce import run_map_reduce, run_reduce
 from yt_framework.yt.client_base import BaseYTClient
 

@@ -149,7 +149,7 @@ YQL operations are implemented as methods on `BaseYTClient` and its subclasses (
 ### Tokenizer artifact
 
 ```{eval-rst}
-.. automodule:: yt_framework.operations.tokenizer_artifact
+.. automodule:: yt_framework.operations._internal.tokenizer_artifact
    :members:
    :undoc-members:
    :show-inheritance:

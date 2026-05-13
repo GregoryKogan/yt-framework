@@ -1,8 +1,8 @@
-"""Tests for yt_framework.operations.tar_command_wiring helpers."""
+"""Tests for yt_framework.operations._internal.tar_command_wiring helpers."""
 
 import logging
 
-from yt_framework.operations.tar_command_wiring import (
+from yt_framework.operations._internal.tar_command_wiring import (
     bootstrap_shell_run_wrapper,
     map_reduce_wrapper_names,
     reduce_wrapper_name,

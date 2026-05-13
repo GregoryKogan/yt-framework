@@ -1,4 +1,4 @@
-"""Tests for yt_framework.operations.tokenizer_artifact name resolution helpers."""
+"""Tests for yt_framework.operations._internal.tokenizer_artifact name resolution helpers."""
 
 import logging
 from pathlib import Path
@@ -9,7 +9,7 @@ from omegaconf import OmegaConf
 
 from yt_framework.core.dependencies import PipelineStageDependencies
 from yt_framework.core.stage import StageContext
-from yt_framework.operations.tokenizer_artifact import (
+from yt_framework.operations._internal.tokenizer_artifact import (
     _prepare_local_archive,
     init_tokenizer_artifact_directory,
     resolve_tokenizer_archive_name,

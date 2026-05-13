@@ -61,7 +61,7 @@ def promote_secure_vault_environment() -> None:
         os.environ.setdefault(inner, v)
 
 
-def wrap_shell_command_with_secure_vault_promotion(inner: str) -> str:
+def wrap_shell_cmd_secure_vault_promote(inner: str) -> str:
     """Prefix a shell command so vault vars are promoted then the user command runs under bash.
 
     Uses only the Python stdlib (no ``yt_framework`` import) for minimal job sandboxes.

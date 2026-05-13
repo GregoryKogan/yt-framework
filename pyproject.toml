@@ -92,12 +92,17 @@ ignore = [
 # Subprocess jobs run bash -c with pipeline-built commands (Bandit cannot verify).
 "yt_framework/yt/client_dev.py" = ["ARG002", "PLR0913"]
 # Complexity: remaining high-arity API surfaces are isolated to explicit modules.
-"yt_framework/operations/dependency_strategy.py" = ["PLR0913"]
+"yt_framework/operations/_internal/dependency_strategy.py" = ["PLR0913"]
 "yt_framework/operations/map_reduce.py" = ["PLR0913"]
 "yt_framework/operations/s3.py" = ["PLR0913"]
 "yt_framework/operations/upload.py" = ["PLR0913"]
 "yt_framework/yt/client_base.py" = ["PLR0913"]
 "yt_framework/yt/client_prod.py" = ["PLR0913"]
+# Split-out client bodies: same API arity and dev unused-arg rules as monolithic clients.
+"yt_framework/yt/_client_split/_client_dev_ops_mixin.py" = ["ARG002", "PLR0913"]
+"yt_framework/yt/_client_split/_client_dev_yql_mixin.py" = ["PLR0913"]
+"yt_framework/yt/_client_split/_client_prod_ops_mixin.py" = ["PLR0913"]
+"yt_framework/yt/_client_split/_client_prod_yql_mixin.py" = ["PLR0913"]
 "yt_framework/yt/_client_prod_runtime.py" = ["PLR0913", "ANN401", "TC003", "TC001"]
 "yt_framework/yt/_client_dev_runtime.py" = ["PLR0913", "ANN401", "TC003"]
 "yt_framework/yt/yql_builder.py" = ["PLR0913"]
@@ -200,17 +205,17 @@ line-ending = "auto"
 
 [tool.yt_framework.pre_commit.max_file_lines]
 enabled = true
-limit = 1500
+limit = 800
 roots = ["yt_framework", "ytjobs"]
 
 [tool.yt_framework.pre_commit.max_dir_entries]
 enabled = true
-limit = 15
+limit = 12
 roots = ["yt_framework", "ytjobs"]
 
 [tool.yt_framework.pre_commit.max_snake_binding_words]
 enabled = true
-limit = 8
+limit = 6
 roots = ["yt_framework", "ytjobs"]
 
 [tool.vulture]
