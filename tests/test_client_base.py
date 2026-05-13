@@ -88,88 +88,36 @@ class _StubBaseClient(BaseYTClient):
     ) -> None:
         del query, pool, max_row_weight
 
-    def join_tables(
-        self,
-        left_table: str,
-        right_table: str,
-        output_table: str,
-        on: Any,
-        how: Any = "left",
-        select_columns: list[str] | None = None,
-        dry_run: bool = False,
-    ) -> str | None:
-        del left_table, right_table, output_table, on, how, select_columns, dry_run
+    def join_tables_request(self, req: Any) -> str | None:
+        del req
         return None
 
-    def filter_table(
-        self,
-        input_table: str,
-        output_table: str,
-        condition: str,
-        dry_run: bool = False,
-    ) -> str | None:
-        del input_table, output_table, condition, dry_run
+    def filter_table_request(self, req: Any) -> str | None:
+        del req
         return None
 
-    def select_columns(
-        self,
-        input_table: str,
-        output_table: str,
-        columns: list[str],
-        dry_run: bool = False,
-    ) -> str | None:
-        del input_table, output_table, columns, dry_run
+    def select_columns_request(self, req: Any) -> str | None:
+        del req
         return None
 
-    def group_by_aggregate(
-        self,
-        input_table: str,
-        output_table: str,
-        group_by: Any,
-        aggregations: dict[str, Any],
-        dry_run: bool = False,
-    ) -> str | None:
-        del input_table, output_table, group_by, aggregations, dry_run
+    def group_by_aggregate_request(self, req: Any) -> str | None:
+        del req
         return None
 
-    def union_tables(
-        self,
-        tables: list[str],
-        output_table: str,
-        dry_run: bool = False,
-    ) -> str | None:
-        del tables, output_table, dry_run
+    def union_tables_request(self, req: Any) -> str | None:
+        del req
         return None
 
-    def distinct(
-        self,
-        input_table: str,
-        output_table: str,
-        columns: list[str] | None = None,
-        dry_run: bool = False,
-    ) -> str | None:
-        del input_table, output_table, columns, dry_run
+    def distinct_request(self, req: Any) -> str | None:
+        del req
         return None
 
-    def sort_table(
-        self,
-        input_table: str,
-        output_table: str,
-        order_by: Any,
-        ascending: bool = True,
-        dry_run: bool = False,
-    ) -> str | None:
-        del input_table, output_table, order_by, ascending, dry_run
+    def sort_table_request(self, req: Any) -> str | None:
+        del req
         return None
 
-    def limit_table(
-        self,
-        input_table: str,
-        output_table: str,
-        limit: int,
-        dry_run: bool = False,
-    ) -> str | None:
-        del input_table, output_table, limit, dry_run
+    def limit_table_request(self, req: Any) -> str | None:
+        del req
         return None
 
     def upload_file(
@@ -189,103 +137,16 @@ class _StubBaseClient(BaseYTClient):
         del local_dir, yt_dir, pattern
         return []
 
-    def run_map(
-        self,
-        command: Any,
-        input_table: str,
-        output_table: str,
-        files: list[tuple[str, str]],
-        resources: OperationResources,
-        env: dict[str, str],
-        output_schema: Any = None,
-        max_failed_jobs: int = 1,
-        docker_auth: dict[str, str] | None = None,
-        job: Any = None,
-        append: bool = False,
-        **kwargs: Any,
-    ) -> Any:
-        del (
-            command,
-            input_table,
-            output_table,
-            files,
-            resources,
-            env,
-            output_schema,
-            max_failed_jobs,
-            docker_auth,
-            job,
-            append,
-            kwargs,
-        )
+    def run_map_submit(self, spec: Any) -> Any:
+        del spec
         return MagicMock()
 
-    def run_map_reduce(
-        self,
-        mapper: Any,
-        reducer: Any,
-        input_table: str,
-        output_table: str,
-        reduce_by: list[str],
-        files: list[tuple[str, str]],
-        resources: OperationResources,
-        env: dict[str, str],
-        sort_by: list[str] | None = None,
-        output_schema: Any = None,
-        max_failed_jobs: int = 1,
-        docker_auth: dict[str, str] | None = None,
-        map_job: Any = None,
-        reduce_job: Any = None,
-        **kwargs: Any,
-    ) -> Any:
-        del (
-            mapper,
-            reducer,
-            input_table,
-            output_table,
-            reduce_by,
-            files,
-            resources,
-            env,
-            sort_by,
-            output_schema,
-            max_failed_jobs,
-            docker_auth,
-            map_job,
-            reduce_job,
-            kwargs,
-        )
+    def run_map_reduce_submit(self, spec: Any) -> Any:
+        del spec
         return MagicMock()
 
-    def run_reduce(
-        self,
-        reducer: Any,
-        input_table: str,
-        output_table: str,
-        reduce_by: list[str],
-        files: list[tuple[str, str]],
-        resources: OperationResources,
-        env: dict[str, str],
-        output_schema: Any = None,
-        max_failed_jobs: int = 1,
-        docker_auth: dict[str, str] | None = None,
-        job: Any = None,
-        **kwargs: Any,
-    ) -> Any:
-        del (
-            reducer,
-            input_table,
-            output_table,
-            reduce_by,
-            files,
-            resources,
-            env,
-            output_schema,
-            max_failed_jobs,
-            docker_auth,
-            job,
-            kwargs,
-        )
+    def run_reduce_submit(self, spec: Any) -> Any:
+        del spec
         return MagicMock()
 
     def run_sort(
@@ -298,16 +159,8 @@ class _StubBaseClient(BaseYTClient):
     ) -> None:
         del table_path, sort_by, pool, pool_tree, kwargs
 
-    def run_vanilla(
-        self,
-        command: Any,
-        files: list[tuple[str, str]],
-        env: dict[str, str],
-        task_name: str,
-        job: Any = None,
-        **kwargs: Any,
-    ) -> Any:
-        del command, files, env, task_name, job, kwargs
+    def run_vanilla_submit(self, spec: Any) -> Any:
+        del spec
         return MagicMock()
 
 

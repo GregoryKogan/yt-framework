@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from omegaconf import DictConfig, OmegaConf
 
 from yt_framework.operations._internal.dependency_strategy import (
+    DependencyBuildContext,
     TarArchiveDependencyBuilder,
 )
 from yt_framework.operations.common import (
@@ -19,6 +20,13 @@ from yt_framework.operations.common import (
     extract_secure_env_client_kwargs,
 )
 from yt_framework.utils.logging import log_header, log_success
+from yt_framework.yt.clients.operation_specs import (
+    VanillaSubmitSpec,
+    docker_auth_tuple,
+    env_pairs_tuple,
+    extras_tuple,
+    file_pairs_tuple,
+)
 
 if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
@@ -70,13 +78,15 @@ def _prepare_vanilla_operation(
     """
     builder = TarArchiveDependencyBuilder()
     dep = builder.build_dependencies(
-        operation_type="vanilla",
-        stage_dir=stage_dir,
-        archive_name="source.tar.gz",
-        build_folder=pipeline_config.pipeline.build_folder,
-        operation_config=operation_config,
-        stage_config=stage_config,
-        logger=logger,
+        DependencyBuildContext(
+            operation_type="vanilla",
+            stage_dir=stage_dir,
+            archive_name="source.tar.gz",
+            build_folder=pipeline_config.pipeline.build_folder,
+            operation_config=operation_config,
+            stage_config=stage_config,
+            logger=logger,
+        ),
     )
 
     return VanillaOperationData(
@@ -188,16 +198,22 @@ def run_vanilla(
         ),
     )
 
-    operation = context.deps.yt_client.run_vanilla(
-        command=command,
-        files=vanilla_operation_data.dependencies,
-        env=vanilla_operation_data.environment,
-        task_name=task_name,
-        resources=resources,
-        docker_auth=vanilla_operation_data.docker_auth,
-        max_failed_jobs=max_failed_jobs,
+    merged_v: dict[str, object] = {
         **extract_secure_env_client_kwargs(operation_config),
         **vanilla_kwargs,
+    }
+    operation = context.deps.yt_client.run_vanilla_submit(
+        VanillaSubmitSpec(
+            command=command,
+            files=file_pairs_tuple(vanilla_operation_data.dependencies),
+            env=env_pairs_tuple(vanilla_operation_data.environment),
+            task_name=task_name,
+            resources=resources,
+            docker_auth=docker_auth_tuple(vanilla_operation_data.docker_auth),
+            max_failed_jobs=max_failed_jobs,
+            job=job,
+            extras=extras_tuple(merged_v),
+        ),
     )
 
     if operation is None:

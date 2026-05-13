@@ -9,6 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Protocol
 
+if TYPE_CHECKING:
+    import logging
+    from pathlib import Path
+
 from omegaconf import DictConfig, ListConfig
 
 from yt_framework.job_command import (
@@ -26,10 +30,6 @@ from yt_framework.operations._internal.tokenizer_artifact import (
     resolve_tokenizer_artifact_name,
 )
 from yt_framework.utils import log_header
-
-if TYPE_CHECKING:
-    import logging
-    from pathlib import Path
 
 _FILE_PATH_PAIR_MIN_LEN = 2
 
@@ -64,6 +64,21 @@ class DependencyBuildResult:
     """Map-reduce reducer or reduce-only leg string (tar + wrapper) when set."""
 
 
+@dataclass(frozen=True)
+class DependencyBuildContext:
+    """Inputs for :meth:`DependencyBuilder.build_dependencies`."""
+
+    operation_type: Literal["map", "vanilla", "map_reduce", "reduce"]
+    stage_dir: Path
+    archive_name: str
+    build_folder: str
+    operation_config: DictConfig
+    stage_config: DictConfig
+    logger: logging.Logger
+    mapper: object = None
+    reducer: object = None
+
+
 class DependencyBuilder(Protocol):
     """Protocol for dependency building strategies.
 
@@ -71,23 +86,12 @@ class DependencyBuilder(Protocol):
     Each concrete implementation handles a specific deployment strategy.
     """
 
-    def build_dependencies(
-        self,
-        operation_type: Literal["map", "vanilla", "map_reduce", "reduce"],
-        stage_dir: Path,
-        archive_name: str,
-        build_folder: str,
-        operation_config: DictConfig,
-        stage_config: DictConfig,
-        logger: logging.Logger,
-        *,
-        mapper: object = None,
-        reducer: object = None,
-    ) -> DependencyBuildResult:
+    def build_dependencies(self, ctx: DependencyBuildContext) -> DependencyBuildResult:
         """Build dependencies for an operation.
 
-        Optional ``mapper`` / ``reducer`` are used for map_reduce / reduce tar command
-        bootstrap when ``tar_command_bootstrap`` is enabled in ``operation_config``.
+        Optional ``mapper`` / ``reducer`` on ``ctx`` are used for map_reduce / reduce
+        tar command bootstrap when ``tar_command_bootstrap`` is enabled in
+        ``operation_config``.
         """
         ...
 
@@ -114,20 +118,17 @@ class TarArchiveDependencyBuilder:
     This strategy works for both map and vanilla operations using unified wrapper scripts.
     """
 
-    def build_dependencies(
-        self,
-        operation_type: Literal["map", "vanilla", "map_reduce", "reduce"],
-        stage_dir: Path,
-        archive_name: str,
-        build_folder: str,
-        operation_config: DictConfig,
-        stage_config: DictConfig,
-        logger: logging.Logger,
-        *,
-        mapper: object = None,
-        reducer: object = None,
-    ) -> DependencyBuildResult:
+    def build_dependencies(self, ctx: DependencyBuildContext) -> DependencyBuildResult:
         """Build dependencies using tar archive strategy."""
+        operation_type = ctx.operation_type
+        stage_dir = ctx.stage_dir
+        archive_name = ctx.archive_name
+        build_folder = ctx.build_folder
+        operation_config = ctx.operation_config
+        stage_config = ctx.stage_config
+        logger = ctx.logger
+        mapper = ctx.mapper
+        reducer = ctx.reducer
         effective_type = (
             "map" if operation_type in ("map_reduce", "reduce") else operation_type
         )

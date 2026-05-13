@@ -27,8 +27,8 @@ def _mr_stage_context(tmp_path: Path, name: str = "mr_stage") -> StageContext:
     fake_yt = MagicMock(spec=BaseYTClient)
     op = MagicMock()
     op.id = "op-mr-1"
-    fake_yt.run_map_reduce.return_value = op
-    fake_yt.run_reduce.return_value = op
+    fake_yt.run_map_reduce_submit.return_value = op
+    fake_yt.run_reduce_submit.return_value = op
     fake_yt.wait_for_operation.return_value = True
     deps = PipelineStageDependencies(
         yt_client=fake_yt,
@@ -153,9 +153,9 @@ def test_run_map_reduce_replaces_string_legs_when_both_tar_bootstrap_commands_se
     ctx = _mr_stage_context(tmp_path)
     cfg = _minimal_map_reduce_cfg()
     assert run_map_reduce(ctx, cfg, map_job="m", reduce_job="r") is True
-    kwargs = ctx.deps.yt_client.run_map_reduce.call_args.kwargs
-    assert kwargs["mapper"] == "bash -c mapper-wrap"
-    assert kwargs["reducer"] == "bash -c reducer-wrap"
+    spec = ctx.deps.yt_client.run_map_reduce_submit.call_args[0][0]
+    assert spec.mapper == "bash -c mapper-wrap"
+    assert spec.reducer == "bash -c reducer-wrap"
 
 
 def test_run_map_reduce_forwards_string_operation_description_as_title(
@@ -172,8 +172,8 @@ def test_run_map_reduce_forwards_string_operation_description_as_title(
         }
     )
     assert run_map_reduce(ctx, cfg, map_job="m", reduce_job="r") is True
-    kw = ctx.deps.yt_client.run_map_reduce.call_args.kwargs
-    assert kw.get("title") == "mr-label"
+    spec = ctx.deps.yt_client.run_map_reduce_submit.call_args[0][0]
+    assert spec.extras_dict().get("title") == "mr-label"
 
 
 def test_run_map_reduce_forwards_dict_operation_description(
@@ -190,8 +190,8 @@ def test_run_map_reduce_forwards_dict_operation_description(
         }
     )
     assert run_map_reduce(ctx, cfg, map_job="m", reduce_job="r") is True
-    kw = ctx.deps.yt_client.run_map_reduce.call_args.kwargs
-    assert kw.get("operation_description") == {"kind": "mr"}
+    spec = ctx.deps.yt_client.run_map_reduce_submit.call_args[0][0]
+    assert spec.extras_dict().get("operation_description") == {"kind": "mr"}
 
 
 def test_run_map_reduce_forwards_max_row_weight_override(tmp_path: Path) -> None:
@@ -206,8 +206,8 @@ def test_run_map_reduce_forwards_max_row_weight_override(tmp_path: Path) -> None
         }
     )
     assert run_map_reduce(ctx, cfg, map_job="m", reduce_job="r") is True
-    kw = ctx.deps.yt_client.run_map_reduce.call_args.kwargs
-    assert kw.get("max_row_weight") == "64M"
+    spec = ctx.deps.yt_client.run_map_reduce_submit.call_args[0][0]
+    assert spec.extras_dict().get("max_row_weight") == "64M"
 
 
 def test_run_reduce_raises_when_reduce_by_empty(tmp_path: Path) -> None:
@@ -252,7 +252,8 @@ def test_run_map_reduce_calls_client_with_map_job_count(tmp_path: Path) -> None:
         }
     )
     assert run_map_reduce(ctx, cfg, map_job="m", reduce_job="r") is True
-    assert ctx.deps.yt_client.run_map_reduce.call_args.kwargs.get("map_job_count") == 7
+    spec = ctx.deps.yt_client.run_map_reduce_submit.call_args[0][0]
+    assert spec.extras_dict().get("map_job_count") == 7
 
 
 def test_run_reduce_returns_false_when_wait_reports_failure(
@@ -282,8 +283,8 @@ def test_run_reduce_forwards_dict_operation_description(tmp_path: Path) -> None:
         }
     )
     assert run_reduce(ctx, cfg, job="my-reducer") is True
-    kw = ctx.deps.yt_client.run_reduce.call_args.kwargs
-    assert kw.get("operation_description") == {"label": "x"}
+    spec = ctx.deps.yt_client.run_reduce_submit.call_args[0][0]
+    assert spec.extras_dict().get("operation_description") == {"label": "x"}
 
 
 def test_run_reduce_forwards_string_operation_description_as_title(
@@ -300,8 +301,8 @@ def test_run_reduce_forwards_string_operation_description_as_title(
         }
     )
     assert run_reduce(ctx, cfg, job="r") is True
-    kw = ctx.deps.yt_client.run_reduce.call_args.kwargs
-    assert kw.get("title") == "reduce-title"
+    spec = ctx.deps.yt_client.run_reduce_submit.call_args[0][0]
+    assert spec.extras_dict().get("title") == "reduce-title"
 
 
 def test_run_reduce_forwards_max_row_weight_override(tmp_path: Path) -> None:
@@ -316,8 +317,8 @@ def test_run_reduce_forwards_max_row_weight_override(tmp_path: Path) -> None:
         }
     )
     assert run_reduce(ctx, cfg, job="r") is True
-    kw = ctx.deps.yt_client.run_reduce.call_args.kwargs
-    assert kw.get("max_row_weight") == "64M"
+    spec = ctx.deps.yt_client.run_reduce_submit.call_args[0][0]
+    assert spec.extras_dict().get("max_row_weight") == "64M"
 
 
 @patch(
@@ -335,5 +336,5 @@ def test_run_reduce_replaces_reducer_when_tar_bootstrap_command_set(
     ctx = _mr_stage_context(tmp_path, name="red_tar")
     cfg = _minimal_reduce_cfg()
     assert run_reduce(ctx, cfg, job="orig") is True
-    kw = ctx.deps.yt_client.run_reduce.call_args.kwargs
-    assert kw["reducer"] == "bash -c reduce-wrap"
+    spec = ctx.deps.yt_client.run_reduce_submit.call_args[0][0]
+    assert spec.reducer == "bash -c reduce-wrap"

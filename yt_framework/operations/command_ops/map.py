@@ -9,6 +9,7 @@ from omegaconf import DictConfig, OmegaConf
 from yt.wrapper.schema import TableSchema
 
 from yt_framework.operations._internal.dependency_strategy import (
+    DependencyBuildContext,
     TarArchiveDependencyBuilder,
 )
 from yt_framework.operations.common import (
@@ -20,6 +21,13 @@ from yt_framework.operations.common import (
     extract_secure_env_client_kwargs,
 )
 from yt_framework.utils.logging import log_header, log_success
+from yt_framework.yt.clients.operation_specs import (
+    MapSubmitSpec,
+    docker_auth_tuple,
+    env_pairs_tuple,
+    extras_tuple,
+    file_pairs_tuple,
+)
 
 if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
@@ -72,13 +80,15 @@ def _prepare_map_operation(
     """
     builder = TarArchiveDependencyBuilder()
     dep = builder.build_dependencies(
-        operation_type="map",
-        stage_dir=stage_dir,
-        archive_name="source.tar.gz",
-        build_folder=pipeline_config.pipeline.build_folder,
-        operation_config=operation_config,
-        stage_config=stage_config,
-        logger=logger,
+        DependencyBuildContext(
+            operation_type="map",
+            stage_dir=stage_dir,
+            archive_name="source.tar.gz",
+            build_folder=pipeline_config.pipeline.build_folder,
+            operation_config=operation_config,
+            stage_config=stage_config,
+            logger=logger,
+        ),
     )
 
     return MapOperationData(
@@ -240,19 +250,24 @@ def run_map(
     }
     map_kwargs.update(collect_passthrough_kwargs(operation_config, reserved_keys))
 
-    operation = context.deps.yt_client.run_map(
-        command=mapper_leg,
-        input_table=operation_config.input_table,
-        output_table=operation_config.output_table,
-        files=map_operation_data.dependencies,
-        resources=resources,
-        env=map_operation_data.environment,
-        output_schema=output_schema,
-        max_failed_jobs=max_failed_jobs,
-        docker_auth=map_operation_data.docker_auth,
-        append=append_output,
+    merged_extras: dict[str, object] = {
         **extract_secure_env_client_kwargs(operation_config),
         **map_kwargs,
+    }
+    operation = context.deps.yt_client.run_map_submit(
+        MapSubmitSpec(
+            command=mapper_leg,
+            input_table=str(operation_config.input_table),
+            output_table=str(operation_config.output_table),
+            files=file_pairs_tuple(map_operation_data.dependencies),
+            resources=resources,
+            env=env_pairs_tuple(map_operation_data.environment),
+            output_schema=output_schema,
+            max_failed_jobs=max_failed_jobs,
+            docker_auth=docker_auth_tuple(map_operation_data.docker_auth),
+            append=append_output,
+            extras=extras_tuple(merged_extras),
+        ),
     )
 
     # Wait for completion

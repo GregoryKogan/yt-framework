@@ -402,7 +402,7 @@ self.logger.info("Validate operation completed")
 
 The examples above chain **`run_map`** and **`run_vanilla`**. The same **sequential** pattern applies to other entry points:
 
-- **YQL**: call methods on `self.deps.yt_client` (for example `join_tables`, `filter_table`) with config-driven paths—see [YQL operations](../operations/yql.md).
+- **YQL**: call `join_tables_request`, `filter_table_request`, and related helpers on `self.deps.yt_client` with request objects from `yt_framework.yt.clients.yql_requests`—see [YQL operations](../operations/yql.md).
 - **Map-reduce / reduce**: use `run_map_reduce` or `run_reduce` from `yt_framework.operations.command_ops.map_reduce` with `self.context` and `self.config.client.operations.*`—see [TypedJob map-reduce](../operations/map-reduce-typed-jobs.md) and [Command mode](../operations/command-mode-map-reduce.md).
 - **Sort**: use `run_sort` from `yt_framework.operations.command_ops.sort`—see [Sort operations](../operations/sort.md).
 

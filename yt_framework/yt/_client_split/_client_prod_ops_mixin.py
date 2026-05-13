@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from yt.wrapper import FilePath, TablePath
 
@@ -12,7 +12,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from yt.wrapper import Operation
-    from yt.wrapper.schema import TableSchema
+
+    from yt_framework.yt.clients.operation_specs import MapSubmitSpec, VanillaSubmitSpec
 
 from yt_framework.job_command import resolve_aliased_job as _resolve_aliased_job
 from yt_framework.utils.ignore import YTIgnoreMatcher
@@ -29,7 +30,6 @@ from yt_framework.yt._client_split._client_prod_cmd_helpers import (
 from yt_framework.yt._client_split._client_prod_mr_reduce_sort_mixin import (
     ClientProdMrReduceSortMixin,
 )
-from yt_framework.yt.clients.client_base import OperationResources
 from yt_framework.yt.max_row_weight import validate_max_row_weight
 from yt_framework.yt.operation_secure_env import (
     merge_secure_vault,
@@ -118,50 +118,20 @@ class ClientProdOpsMixin(ClientProdMrReduceSortMixin):
             logger=self.logger,
         )
 
-    def run_map(
-        self,
-        command: object,
-        input_table: str,
-        output_table: str,
-        files: list[tuple[str, str]],
-        resources: OperationResources,
-        env: dict[str, str],
-        output_schema: TableSchema | None = None,
-        max_failed_jobs: int = 1,
-        docker_auth: dict[str, str] | None = None,
-        job: object = None,
-        *,
-        append: bool = False,
-        **kwargs: object,
-    ) -> Operation:
-        """Run a map operation on YT cluster.
-
-        Submits a map operation that processes each row of the input table independently
-        and writes results to the output table. The operation runs on the YT cluster
-        with the specified resources and dependencies.
-
-        Args:
-            command: Legacy mapper job argument (TypedJob instance or command string).
-            input_table: Input YT table path.
-            output_table: Output YT table path.
-            files: List of (yt_path, local_path) tuples for dependencies.
-            resources: Operation resource configuration (memory, CPU, GPU, etc.).
-            env: Environment variables dictionary.
-            output_schema: Optional output table schema for typed output.
-            max_failed_jobs: Maximum failed jobs allowed before operation fails.
-            docker_auth: Optional Docker authentication for private registries.
-            job: Preferred mapper job alias.
-            append: If True, append mapper output to an existing output table.
-            **kwargs: SpecBuilder chain options (e.g. ``weight``, ``title``) and
-                ``run_operation`` flags such as ``sync``.
-
-        Returns:
-            Operation: YT operation object that can be monitored and waited on.
-
-        Raises:
-            Exception: If operation submission fails.
-
-        """
+    def run_map_submit(self, spec: MapSubmitSpec) -> Operation:
+        """Run a map operation on YT cluster."""
+        command = spec.command
+        input_table = spec.input_table
+        output_table = spec.output_table
+        files = spec.files_list()
+        resources = spec.resources
+        env = spec.env_dict()
+        output_schema = spec.output_schema
+        max_failed_jobs = spec.max_failed_jobs
+        docker_auth = spec.docker_auth_dict()
+        job = spec.job
+        append = spec.append
+        kwargs = dict(spec.extras_dict())
         self.logger.info("Submitting map operation")
         self.logger.info("  Input: %s", input_table)
         self.logger.info("  Output: %s", output_table)
@@ -228,49 +198,17 @@ class ClientProdOpsMixin(ClientProdMrReduceSortMixin):
         else:
             return operation
 
-    def run_vanilla(
-        self,
-        command: object,
-        files: list[tuple[str, str]],
-        env: dict[str, str],
-        task_name: str,
-        job: object = None,
-        **kwargs: object,
-    ) -> Operation | None:
-        """Run a vanilla operation on YT cluster.
-
-        Submits a vanilla operation that runs a standalone job without input/output tables.
-        The operation runs on the YT cluster with the specified resources and dependencies.
-
-        ``resources``, ``docker_auth``, and ``max_failed_jobs`` are passed via ``kwargs``
-        (see :func:`yt_framework.operations.command_ops.vanilla.run_vanilla`).
-
-        Args:
-            command: Legacy command argument (typically bash command with script path).
-            files: List of (yt_path, local_path) tuples for dependencies.
-            env: Environment variables dictionary.
-            task_name: Task name for the operation.
-            job: Preferred command alias.
-            **kwargs: Must include ``resources=OperationResources``; may include
-                ``docker_auth``, ``max_failed_jobs``, and SpecBuilder / ``run_operation`` keys.
-
-        Returns:
-            Operation object or None when submission fails.
-
-        Raises:
-            TypeError: If ``resources`` is missing or not an :class:`OperationResources`.
-
-        """
-        kw = dict(kwargs)
-        resources_obj = kw.pop("resources", None)
-        if not isinstance(resources_obj, OperationResources):
-            msg = "run_vanilla requires resources=OperationResources in kwargs"
-            raise TypeError(msg)
-        resources = resources_obj
-        docker_auth = cast("dict[str, str] | None", kw.pop("docker_auth", None))
-        max_failed_jobs = int(cast("Any", kw.pop("max_failed_jobs", 1)))
-        kwargs = kw
-
+    def run_vanilla_submit(self, spec: VanillaSubmitSpec) -> Operation | None:
+        """Run a vanilla operation on YT cluster."""
+        command = spec.command
+        files = spec.files_list()
+        env = spec.env_dict()
+        task_name = spec.task_name
+        job = spec.job
+        resources = spec.resources
+        max_failed_jobs = spec.max_failed_jobs
+        docker_auth = spec.docker_auth_dict()
+        kwargs = dict(spec.extras_dict())
         self.logger.info("Submitting vanilla operation")
         self.logger.info("  Task Name: %s", task_name)
         self.logger.info("  Command: %s", command)

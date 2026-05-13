@@ -26,6 +26,12 @@ Typical uses:
 YQL expresses set logic declaratively. Map runs your Python on each row stream.
 ```
 
+## Request API
+
+Each helper is a `*_request` method on the YT client. It takes a single frozen dataclass from `yt_framework.yt.clients.yql_requests` (for example `JoinTablesRequest`). The same types are what `yt_framework.yt.yql_builder` uses to build SQL strings.
+
+For filter, union, sort, and limit, you can leave `columns` unset on the request; the client fills them from the input table schema when needed.
+
 ## Row Weight Defaults
 
 All YQL helpers and raw `run_yql(...)` execution include:
@@ -39,12 +45,16 @@ by default.
 Override per call when needed (must not exceed `128M`; larger values raise `ValueError`):
 
 ```python
-self.deps.yt_client.join_tables(
-    left_table="//tmp/a",
-    right_table="//tmp/b",
-    output_table="//tmp/out",
-    on="id",
-    max_row_weight="64M",
+from yt_framework.yt.clients.yql_requests import JoinTablesRequest
+
+self.deps.yt_client.join_tables_request(
+    JoinTablesRequest(
+        left_table="//tmp/a",
+        right_table="//tmp/b",
+        output_table="//tmp/out",
+        on="id",
+        max_row_weight="64M",
+    ),
 )
 ```
 
@@ -66,23 +76,27 @@ If the SQL already contains `PRAGMA yt.MaxRowWeight`, that value is checked too;
 Join two tables on a common column.
 
 ```python
-self.deps.yt_client.join_tables(
-    left_table="//tmp/my_pipeline/orders",
-    right_table="//tmp/my_pipeline/users",
-    output_table="//tmp/my_pipeline/joined",
-    on="user_id",
-    how="left",  # or "inner", "right", "full"
-    select_columns=[
-        "a.order_id",
-        "a.user_id",
-        "a.amount",
-        "b.name",
-        "b.email",
-    ],
+from yt_framework.yt.clients.yql_requests import JoinTablesRequest
+
+self.deps.yt_client.join_tables_request(
+    JoinTablesRequest(
+        left_table="//tmp/my_pipeline/orders",
+        right_table="//tmp/my_pipeline/users",
+        output_table="//tmp/my_pipeline/joined",
+        on="user_id",
+        how="left",  # or "inner", "right", "full"
+        select_columns=[
+            "a.order_id",
+            "a.user_id",
+            "a.amount",
+            "b.name",
+            "b.email",
+        ],
+    ),
 )
 ```
 
-**Parameters:**
+**`JoinTablesRequest` fields:**
 
 - **`left_table`**: Left table path
 - **`right_table`**: Right table path
@@ -99,32 +113,41 @@ self.deps.yt_client.join_tables(
 Filter rows based on a condition.
 
 ```python
-self.deps.yt_client.filter_table(
-    input_table="//tmp/my_pipeline/orders",
-    output_table="//tmp/my_pipeline/filtered",
-    condition="amount > 100",
+from yt_framework.yt.clients.yql_requests import FilterTableRequest
+
+self.deps.yt_client.filter_table_request(
+    FilterTableRequest(
+        input_table="//tmp/my_pipeline/orders",
+        output_table="//tmp/my_pipeline/filtered",
+        condition="amount > 100",
+    ),
 )
 ```
 
-**Parameters:**
+**`FilterTableRequest` fields:**
 
 - **`input_table`**: Input table path
 - **`output_table`**: Output table path
 - **`condition`**: SQL-like condition (e.g., `"amount > 100"`, `"status == 'active'"`)
+- **`columns`**: Optional; when omitted, the client resolves columns from the table
 
 ### Select Columns
 
 Select specific columns from a table.
 
 ```python
-self.deps.yt_client.select_columns(
-    input_table="//tmp/my_pipeline/users",
-    output_table="//tmp/my_pipeline/selected",
-    columns=["user_id", "name", "email"],
+from yt_framework.yt.clients.yql_requests import SelectColumnsRequest
+
+self.deps.yt_client.select_columns_request(
+    SelectColumnsRequest(
+        input_table="//tmp/my_pipeline/users",
+        output_table="//tmp/my_pipeline/selected",
+        columns=["user_id", "name", "email"],
+    ),
 )
 ```
 
-**Parameters:**
+**`SelectColumnsRequest` fields:**
 
 - **`input_table`**: Input table path
 - **`output_table`**: Output table path
@@ -135,21 +158,25 @@ self.deps.yt_client.select_columns(
 Group rows and compute aggregations.
 
 ```python
-self.deps.yt_client.group_by_aggregate(
-    input_table="//tmp/my_pipeline/orders",
-    output_table="//tmp/my_pipeline/aggregated",
-    group_by="user_id",
-    aggregations={
-        "order_count": "count",
-        "total_amount": "sum",
-        "avg_amount": "avg",
-        "max_amount": "max",
-        "min_amount": "min",
-    },
+from yt_framework.yt.clients.yql_requests import GroupByAggregateRequest
+
+self.deps.yt_client.group_by_aggregate_request(
+    GroupByAggregateRequest(
+        input_table="//tmp/my_pipeline/orders",
+        output_table="//tmp/my_pipeline/aggregated",
+        group_by="user_id",
+        aggregations={
+            "order_count": "count",
+            "total_amount": "sum",
+            "avg_amount": "avg",
+            "max_amount": "max",
+            "min_amount": "min",
+        },
+    ),
 )
 ```
 
-**Parameters:**
+**`GroupByAggregateRequest` fields:**
 
 - **`input_table`**: Input table path
 - **`output_table`**: Output table path
@@ -169,19 +196,24 @@ self.deps.yt_client.group_by_aggregate(
 Combine multiple tables into one.
 
 ```python
-self.deps.yt_client.union_tables(
-    tables=[
-        "//tmp/my_pipeline/orders_2023",
-        "//tmp/my_pipeline/orders_2024",
-    ],
-    output_table="//tmp/my_pipeline/all_orders",
+from yt_framework.yt.clients.yql_requests import UnionTablesRequest
+
+self.deps.yt_client.union_tables_request(
+    UnionTablesRequest(
+        tables=(
+            "//tmp/my_pipeline/orders_2023",
+            "//tmp/my_pipeline/orders_2024",
+        ),
+        output_table="//tmp/my_pipeline/all_orders",
+    ),
 )
 ```
 
-**Parameters:**
+**`UnionTablesRequest` fields:**
 
-- **`tables`**: List of table paths to union
+- **`tables`**: Tuple of table paths to union
 - **`output_table`**: Output table path
+- **`columns`**: Optional; when omitted, the client uses the first table's columns
 
 **Note:** All tables must have the same schema.
 
@@ -190,84 +222,104 @@ self.deps.yt_client.union_tables(
 Get distinct values from columns.
 
 ```python
-self.deps.yt_client.distinct(
-    input_table="//tmp/my_pipeline/users",
-    output_table="//tmp/my_pipeline/distinct_cities",
-    columns=["city"],
+from yt_framework.yt.clients.yql_requests import DistinctRequest
+
+self.deps.yt_client.distinct_request(
+    DistinctRequest(
+        input_table="//tmp/my_pipeline/users",
+        output_table="//tmp/my_pipeline/distinct_cities",
+        columns=["city"],
+    ),
 )
 ```
 
-**Parameters:**
+**`DistinctRequest` fields:**
 
 - **`input_table`**: Input table path
 - **`output_table`**: Output table path
-- **`columns`**: List of column names for distinct operation
+- **`columns`**: List of column names for distinct operation (optional; omit for `SELECT DISTINCT *`)
 
 ### Sort Table
 
 Sort table by one or more columns.
 
 ```python
-self.deps.yt_client.sort_table(
-    input_table="//tmp/my_pipeline/orders",
-    output_table="//tmp/my_pipeline/sorted",
-    order_by="amount",
-    ascending=False,  # True for ascending, False for descending
+from yt_framework.yt.clients.yql_requests import SortTableRequest
+
+self.deps.yt_client.sort_table_request(
+    SortTableRequest(
+        input_table="//tmp/my_pipeline/orders",
+        output_table="//tmp/my_pipeline/sorted",
+        order_by="amount",
+        ascending=False,  # True for ascending, False for descending
+    ),
 )
 ```
 
-**Parameters:**
+**`SortTableRequest` fields:**
 
 - **`input_table`**: Input table path
 - **`output_table`**: Output table path
 - **`order_by`**: Column name(s) to sort by
 - **`ascending`**: Sort order (default: `True`)
+- **`columns`**: Optional; when omitted, the client resolves columns from the input table
 
 ### Limit Table
 
 Limit the number of rows in a table.
 
 ```python
-self.deps.yt_client.limit_table(
-    input_table="//tmp/my_pipeline/orders",
-    output_table="//tmp/my_pipeline/limited",
-    limit=100,
+from yt_framework.yt.clients.yql_requests import LimitTableRequest
+
+self.deps.yt_client.limit_table_request(
+    LimitTableRequest(
+        input_table="//tmp/my_pipeline/orders",
+        output_table="//tmp/my_pipeline/limited",
+        limit=100,
+    ),
 )
 ```
 
-**Parameters:**
+**`LimitTableRequest` fields:**
 
 - **`input_table`**: Input table path
 - **`output_table`**: Output table path
 - **`limit`**: Maximum number of rows to include
+- **`columns`**: Optional; when omitted, the client resolves columns from the input table
 
 ## Dry Run
 
 All YQL operations support dry run mode to preview queries before execution:
 
 ```python
+from yt_framework.yt.clients.yql_requests import JoinTablesRequest
+
 # Preview query without executing
-query = self.deps.yt_client.join_tables(
-    left_table="//tmp/my_pipeline/orders",
-    right_table="//tmp/my_pipeline/users",
-    output_table="//tmp/my_pipeline/joined",
-    on="user_id",
-    how="left",
-    select_columns=["a.order_id", "b.name"],
-    dry_run=True,  # Enable dry run
+query = self.deps.yt_client.join_tables_request(
+    JoinTablesRequest(
+        left_table="//tmp/my_pipeline/orders",
+        right_table="//tmp/my_pipeline/users",
+        output_table="//tmp/my_pipeline/joined",
+        on="user_id",
+        how="left",
+        select_columns=["a.order_id", "b.name"],
+        dry_run=True,
+    ),
 )
 
 self.logger.info(f"Query preview:\n{query}")
 
 # Execute actual query
-self.deps.yt_client.join_tables(
-    left_table="//tmp/my_pipeline/orders",
-    right_table="//tmp/my_pipeline/users",
-    output_table="//tmp/my_pipeline/joined",
-    on="user_id",
-    how="left",
-    select_columns=["a.order_id", "b.name"],
-    dry_run=False,  # Execute query
+self.deps.yt_client.join_tables_request(
+    JoinTablesRequest(
+        left_table="//tmp/my_pipeline/orders",
+        right_table="//tmp/my_pipeline/users",
+        output_table="//tmp/my_pipeline/joined",
+        on="user_id",
+        how="left",
+        select_columns=["a.order_id", "b.name"],
+        dry_run=False,
+    ),
 )
 ```
 
@@ -275,95 +327,7 @@ Dry run returns the YQL query string without executing it.
 
 ## Complete Example
 
-```python
-from yt_framework.core.pipeline import DebugContext
-from yt_framework.core.stage import BaseStage
-from yt_framework.utils.logging import log_header
-
-class YqlExamplesStage(BaseStage):
-    def run(self, debug: DebugContext) -> DebugContext:
-        # 1. Join tables
-        log_header(self.logger, "YQL", "1. JOIN TABLES")
-        self.deps.yt_client.join_tables(
-            left_table=self.config.client.orders_table,
-            right_table=self.config.client.users_table,
-            output_table=self.config.client.output.joined,
-            on="user_id",
-            how="left",
-            select_columns=[
-                "a.order_id",
-                "a.user_id",
-                "a.amount",
-                "b.name",
-                "b.email",
-            ],
-        )
-        
-        # 2. Filter table
-        log_header(self.logger, "YQL", "2. FILTER TABLE")
-        self.deps.yt_client.filter_table(
-            input_table=self.config.client.orders_table,
-            output_table=self.config.client.output.filtered,
-            condition="amount > 100",
-        )
-        
-        # 3. Select columns
-        log_header(self.logger, "YQL", "3. SELECT COLUMNS")
-        self.deps.yt_client.select_columns(
-            input_table=self.config.client.users_table,
-            output_table=self.config.client.output.selected,
-            columns=["user_id", "name"],
-        )
-        
-        # 4. Group by aggregate
-        log_header(self.logger, "YQL", "4. GROUP BY AGGREGATE")
-        self.deps.yt_client.group_by_aggregate(
-            input_table=self.config.client.orders_table,
-            output_table=self.config.client.output.aggregated,
-            group_by="user_id",
-            aggregations={
-                "order_count": "count",
-                "total_amount": "sum",
-            },
-        )
-        
-        # 5. Union tables
-        log_header(self.logger, "YQL", "5. UNION TABLES")
-        self.deps.yt_client.union_tables(
-            tables=[
-                self.config.client.orders_table,
-                self.config.client.archive_orders_table,
-            ],
-            output_table=self.config.client.output.united,
-        )
-        
-        # 6. Distinct
-        log_header(self.logger, "YQL", "6. DISTINCT")
-        self.deps.yt_client.distinct(
-            input_table=self.config.client.users_table,
-            output_table=self.config.client.output.distinct,
-            columns=["city"],
-        )
-        
-        # 7. Sort table
-        log_header(self.logger, "YQL", "7. SORT TABLE")
-        self.deps.yt_client.sort_table(
-            input_table=self.config.client.orders_table,
-            output_table=self.config.client.output.sorted,
-            order_by="amount",
-            ascending=False,
-        )
-        
-        # 8. Limit table
-        log_header(self.logger, "YQL", "8. LIMIT TABLE")
-        self.deps.yt_client.limit_table(
-            input_table=self.config.client.output.sorted,
-            output_table=self.config.client.output.limited,
-            limit=10,
-        )
-        
-        return debug
-```
+The live example under `examples/03_yql_operations` imports request types and calls `*_request` methods from the stage. See that tree for the full listing.
 
 See [Example: 03_yql_operations](https://github.com/GregoryKogan/yt-framework/tree/main/examples/03_yql_operations/) for a complete example with all operations.
 
@@ -413,55 +377,73 @@ In dev mode, YQL operations are simulated using DuckDB:
 ### Multi-Table Join
 
 ```python
-# Join multiple tables sequentially
-joined1 = self.deps.yt_client.join_tables(
-    left_table="table1",
-    right_table="table2",
-    output_table="temp_joined",
-    on="id",
+from yt_framework.yt.clients.yql_requests import JoinTablesRequest
+
+joined1 = self.deps.yt_client.join_tables_request(
+    JoinTablesRequest(
+        left_table="table1",
+        right_table="table2",
+        output_table="temp_joined",
+        on="id",
+    ),
 )
 
-joined2 = self.deps.yt_client.join_tables(
-    left_table="temp_joined",
-    right_table="table3",
-    output_table="final_joined",
-    on="id",
+joined2 = self.deps.yt_client.join_tables_request(
+    JoinTablesRequest(
+        left_table="temp_joined",
+        right_table="table3",
+        output_table="final_joined",
+        on="id",
+    ),
 )
 ```
 
 ### Filtered Aggregation
 
 ```python
-# Filter then aggregate
-filtered = self.deps.yt_client.filter_table(
-    input_table="orders",
-    output_table="temp_filtered",
-    condition="amount > 100",
+from yt_framework.yt.clients.yql_requests import (
+    FilterTableRequest,
+    GroupByAggregateRequest,
 )
 
-aggregated = self.deps.yt_client.group_by_aggregate(
-    input_table="temp_filtered",
-    output_table="result",
-    group_by="user_id",
-    aggregations={"total": "sum"},
+filtered = self.deps.yt_client.filter_table_request(
+    FilterTableRequest(
+        input_table="orders",
+        output_table="temp_filtered",
+        condition="amount > 100",
+    ),
+)
+
+aggregated = self.deps.yt_client.group_by_aggregate_request(
+    GroupByAggregateRequest(
+        input_table="temp_filtered",
+        output_table="result",
+        group_by="user_id",
+        aggregations={"total": "sum"},
+    ),
 )
 ```
 
 ### Top N Results
 
 ```python
-# Sort then limit
-sorted_table = self.deps.yt_client.sort_table(
-    input_table="orders",
-    output_table="temp_sorted",
-    order_by="amount",
-    ascending=False,
+from yt_framework.yt.clients.yql_requests import LimitTableRequest, SortTableRequest
+
+sorted_table = self.deps.yt_client.sort_table_request(
+    SortTableRequest(
+        input_table="orders",
+        output_table="temp_sorted",
+        order_by="amount",
+        ascending=False,
+    ),
 )
 
-top_n = self.deps.yt_client.limit_table(
-    input_table="temp_sorted",
-    output_table="top_orders",
-    limit=10,
+top_n = self.deps.yt_client.limit_table_request(
+    LimitTableRequest(
+        input_table="temp_sorted",
+        output_table="top_orders",
+        limit=10,
+    ),
 )
 ```
 

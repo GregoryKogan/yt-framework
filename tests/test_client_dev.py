@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -11,6 +12,16 @@ from yt.wrapper import TypedJob  # pyright: ignore[reportMissingImports]
 
 from yt_framework.yt.clients.client_base import OperationResources
 from yt_framework.yt.clients.client_dev import YTDevClient
+from yt_framework.yt.clients.yql_requests import (
+    DistinctRequest,
+    FilterTableRequest,
+    GroupByAggregateRequest,
+    JoinTablesRequest,
+    LimitTableRequest,
+    SelectColumnsRequest,
+    SortTableRequest,
+    UnionTablesRequest,
+)
 
 
 def _null_logger(name: str) -> logging.Logger:
@@ -236,6 +247,7 @@ def test_dev_client_run_vanilla_rewrites_double_slash_build_prefix_to_local_stag
         [("//yt/deps/hello.py", rel)],
         {},
         task,
+        resources=OperationResources(),
     )
     assert op.get_state() == "completed", (
         "dev should map //…/build/stages/… to sandbox stages/…"
@@ -267,6 +279,7 @@ def test_dev_client_run_vanilla_falls_back_to_plain_replace_when_no_double_slash
         [("//yt/deps/x.py", rel)],
         {},
         task,
+        resources=OperationResources(),
     )
     assert (
         op.get_state() == "completed" and "converted command (fallback)" in caplog.text
@@ -279,7 +292,7 @@ def test_dev_client_run_vanilla_succeeds_for_trivial_bash_command(
     client = YTDevClient(
         _null_logger("tests.client_dev.vanilla"), pipeline_dir=tmp_path
     )
-    op = client.run_vanilla("true", [], {}, "noop_task")
+    op = client.run_vanilla("true", [], {}, "noop_task", resources=OperationResources())
     assert op.get_state() == "completed"
 
 
@@ -289,7 +302,9 @@ def test_dev_client_run_vanilla_failed_command_exposes_failed_state_and_error(
     client = YTDevClient(
         _null_logger("tests.client_dev.vanilla_fail"), pipeline_dir=tmp_path
     )
-    op = client.run_vanilla("false", [], {}, "fail_task")
+    op = client.run_vanilla(
+        "false", [], {}, "fail_task", resources=OperationResources()
+    )
     op.wait()
     err = op.get_error()
     assert (
@@ -308,7 +323,7 @@ def test_dev_client_run_vanilla_warns_when_stage_config_missing(
     client = YTDevClient(
         _null_logger("tests.client_dev.vanilla_cfg"), pipeline_dir=tmp_path
     )
-    client.run_vanilla("true", [], {}, "missing_cfg")
+    client.run_vanilla("true", [], {}, "missing_cfg", resources=OperationResources())
     assert "config file not found" in caplog.text
 
 
@@ -620,15 +635,17 @@ def test_dev_client_join_tables_materializes_joined_rows_in_output_jsonl(
     client = YTDevClient(_null_logger("tests.client_dev.join"), pipeline_dir=tmp_path)
     client.write_table("//tmp/j_left", [{"id": 1, "v": "a"}], append=False)
     client.write_table("//tmp/j_right", [{"id": 1, "w": "b"}], append=False)
-    client.join_tables(
-        "//tmp/j_left",
-        "//tmp/j_right",
-        "//tmp/j_out",
-        "id",
-        dry_run=False,
+    client.join_tables_request(
+        JoinTablesRequest(
+            left_table="//tmp/j_left",
+            right_table="//tmp/j_right",
+            output_table="//tmp/j_out",
+            on="id",
+            dry_run=False,
+        ),
     )
     assert client.read_table("//tmp/j_out") == [{"id": 1, "v": "a", "w": "b"}], (
-        "dev join_tables should run YQL via DuckDB and write output jsonl"
+        "dev join_tables_request should run YQL via DuckDB and write output jsonl"
     )
 
 
@@ -639,11 +656,13 @@ def test_dev_client_filter_table_materializes_where_result_in_output_jsonl(
     client.write_table(
         "//tmp/f_in", [{"id": 1, "keep": True}, {"id": 2, "keep": False}]
     )
-    client.filter_table(
-        "//tmp/f_in",
-        "//tmp/f_out",
-        '"keep" = true',
-        dry_run=False,
+    client.filter_table_request(
+        FilterTableRequest(
+            input_table="//tmp/f_in",
+            output_table="//tmp/f_out",
+            condition='"keep" = true',
+            dry_run=False,
+        ),
     )
     assert client.read_table("//tmp/f_out") == [{"id": 1, "keep": True}]
 
@@ -657,11 +676,13 @@ def test_dev_client_select_columns_materializes_subset_columns_in_output_jsonl(
         [{"id": 1, "name": "a", "extra": 9}],
         append=False,
     )
-    client.select_columns(
-        "//tmp/sel_in",
-        "//tmp/sel_out",
-        ["id", "name"],
-        dry_run=False,
+    client.select_columns_request(
+        SelectColumnsRequest(
+            input_table="//tmp/sel_in",
+            output_table="//tmp/sel_out",
+            columns=["id", "name"],
+            dry_run=False,
+        ),
     )
     assert client.read_table("//tmp/sel_out") == [{"id": 1, "name": "a"}]
 
@@ -672,7 +693,13 @@ def test_dev_client_union_tables_materializes_stacked_rows_in_output_jsonl(
     client = YTDevClient(_null_logger("tests.client_dev.un"), pipeline_dir=tmp_path)
     client.write_table("//tmp/u_a", [{"k": 1}], append=False)
     client.write_table("//tmp/u_b", [{"k": 2}], append=False)
-    client.union_tables(["//tmp/u_a", "//tmp/u_b"], "//tmp/u_out", dry_run=False)
+    client.union_tables_request(
+        UnionTablesRequest(
+            tables=("//tmp/u_a", "//tmp/u_b"),
+            output_table="//tmp/u_out",
+            dry_run=False,
+        ),
+    )
     assert client.read_table("//tmp/u_out") == [{"k": 1}, {"k": 2}]
 
 
@@ -685,7 +712,14 @@ def test_dev_client_distinct_materializes_deduplicated_rows_in_output_jsonl(
         [{"x": 1, "y": 1}, {"x": 1, "y": 2}, {"x": 2, "y": 1}],
         append=False,
     )
-    client.distinct("//tmp/d_in", "//tmp/d_out", columns=["x"], dry_run=False)
+    client.distinct_request(
+        DistinctRequest(
+            input_table="//tmp/d_in",
+            output_table="//tmp/d_out",
+            columns=["x"],
+            dry_run=False,
+        ),
+    )
     rows = client.read_table("//tmp/d_out")
     assert sorted(rows, key=lambda r: r["x"]) == [{"x": 1}, {"x": 2}]
 
@@ -701,12 +735,14 @@ def test_dev_client_sort_table_materializes_ordered_rows_in_output_jsonl(
         [{"rank": 2, "label": "b"}, {"rank": 1, "label": "a"}],
         append=False,
     )
-    client.sort_table(
-        "//tmp/st_in",
-        "//tmp/st_out",
-        order_by="rank",
-        ascending=True,
-        dry_run=False,
+    client.sort_table_request(
+        SortTableRequest(
+            input_table="//tmp/st_in",
+            output_table="//tmp/st_out",
+            order_by="rank",
+            ascending=True,
+            dry_run=False,
+        ),
     )
     assert client.read_table("//tmp/st_out") == [
         {"rank": 1, "label": "a"},
@@ -723,7 +759,14 @@ def test_dev_client_limit_table_materializes_first_n_rows_in_output_jsonl(
         [{"i": 1}, {"i": 2}, {"i": 3}],
         append=False,
     )
-    client.limit_table("//tmp/lim_in", "//tmp/lim_out", limit=2, dry_run=False)
+    client.limit_table_request(
+        LimitTableRequest(
+            input_table="//tmp/lim_in",
+            output_table="//tmp/lim_out",
+            limit=2,
+            dry_run=False,
+        ),
+    )
     assert client.read_table("//tmp/lim_out") == [{"i": 1}, {"i": 2}]
 
 
@@ -740,73 +783,79 @@ def test_dev_client_group_by_aggregate_materializes_grouped_rows_in_output_jsonl
         ],
         append=False,
     )
-    client.group_by_aggregate(
-        "//tmp/gb_in",
-        "//tmp/gb_out",
-        "region",
-        {"n": "count", "total": ("sum", "amount")},
-        dry_run=False,
+    client.group_by_aggregate_request(
+        GroupByAggregateRequest(
+            input_table="//tmp/gb_in",
+            output_table="//tmp/gb_out",
+            group_by="region",
+            aggregations={"n": "count", "total": ("sum", "amount")},
+            dry_run=False,
+        ),
     )
     rows = client.read_table("//tmp/gb_out")
     by_region = {r["region"]: r for r in rows}
     assert by_region == {
         "east": {"region": "east", "n": 2, "total": 30},
         "west": {"region": "west", "n": 1, "total": 5},
-    }, "dev group_by_aggregate should aggregate via DuckDB into output jsonl"
+    }, "dev group_by_aggregate_request should aggregate via DuckDB into output jsonl"
 
 
 @pytest.mark.parametrize(
-    ("method_name", "kwargs"),
+    ("method_name", "build_req"),
     [
         (
-            "join_tables",
-            {
-                "left_table": "//l",
-                "right_table": "//r",
-                "output_table": "//o",
-                "on": "id",
-            },
+            "join_tables_request",
+            lambda: JoinTablesRequest(
+                left_table="//l",
+                right_table="//r",
+                output_table="//o",
+                on="id",
+            ),
         ),
         (
-            "filter_table",
-            {
-                "input_table": "//i",
-                "output_table": "//o",
-                "condition": "id > 0",
-            },
+            "filter_table_request",
+            lambda: FilterTableRequest(
+                input_table="//i",
+                output_table="//o",
+                condition="id > 0",
+            ),
         ),
         (
-            "select_columns",
-            {
-                "input_table": "//i",
-                "output_table": "//o",
-                "columns": ["id"],
-            },
+            "select_columns_request",
+            lambda: SelectColumnsRequest(
+                input_table="//i",
+                output_table="//o",
+                columns=["id"],
+            ),
         ),
         (
-            "group_by_aggregate",
-            {
-                "input_table": "//i",
-                "output_table": "//o",
-                "group_by": "id",
-                "aggregations": {"n": "count"},
-            },
+            "group_by_aggregate_request",
+            lambda: GroupByAggregateRequest(
+                input_table="//i",
+                output_table="//o",
+                group_by="id",
+                aggregations={"n": "count"},
+            ),
         ),
         (
-            "union_tables",
-            {"tables": ["//a", "//b"], "output_table": "//o"},
+            "union_tables_request",
+            lambda: UnionTablesRequest(tables=("//a", "//b"), output_table="//o"),
         ),
         (
-            "distinct",
-            {"input_table": "//i", "output_table": "//o", "columns": ["id"]},
+            "distinct_request",
+            lambda: DistinctRequest(
+                input_table="//i", output_table="//o", columns=["id"]
+            ),
         ),
         (
-            "sort_table",
-            {"input_table": "//i", "output_table": "//o", "order_by": "id"},
+            "sort_table_request",
+            lambda: SortTableRequest(
+                input_table="//i", output_table="//o", order_by="id"
+            ),
         ),
         (
-            "limit_table",
-            {"input_table": "//i", "output_table": "//o", "limit": 5},
+            "limit_table_request",
+            lambda: LimitTableRequest(input_table="//i", output_table="//o", limit=5),
         ),
     ],
 )
@@ -814,7 +863,7 @@ def test_dev_yql_helpers_forward_max_row_weight_to_run_yql(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     method_name: str,
-    kwargs: dict[str, object],
+    build_req: object,
 ) -> None:
     client = YTDevClient(
         _null_logger("tests.client_dev.yql_helpers_mrw"), pipeline_dir=tmp_path
@@ -823,5 +872,5 @@ def test_dev_yql_helpers_forward_max_row_weight_to_run_yql(
     run_yql = MagicMock()
     monkeypatch.setattr(client, "run_yql", run_yql)
     method = getattr(client, method_name)
-    method(max_row_weight="64M", **kwargs)
+    method(replace(build_req(), max_row_weight="64M"))
     assert run_yql.call_args.kwargs.get("max_row_weight") == "64M"

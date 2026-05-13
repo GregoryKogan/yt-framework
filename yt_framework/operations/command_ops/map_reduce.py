@@ -13,6 +13,7 @@ from yt.wrapper import Operation
 
 from yt_framework.job_command import require_consistent_map_reduce_legs
 from yt_framework.operations._internal.dependency_strategy import (
+    DependencyBuildContext,
     TarArchiveDependencyBuilder,
 )
 from yt_framework.operations.common import (
@@ -24,6 +25,14 @@ from yt_framework.operations.common import (
     extract_secure_env_client_kwargs,
 )
 from yt_framework.utils.logging import log_header, log_success
+from yt_framework.yt.clients.operation_specs import (
+    MapReduceSubmitSpec,
+    ReduceSubmitSpec,
+    docker_auth_tuple,
+    env_pairs_tuple,
+    extras_tuple,
+    file_pairs_tuple,
+)
 
 if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema
@@ -138,15 +147,17 @@ def _prepare_map_reduce_dependencies(
 ) -> tuple[list[tuple[str, str]], object, object]:
     builder = TarArchiveDependencyBuilder()
     dep = builder.build_dependencies(
-        operation_type="map_reduce",
-        stage_dir=context.stage_dir,
-        archive_name="source.tar.gz",
-        build_folder=context.deps.pipeline_config.pipeline.build_folder,
-        operation_config=operation_config,
-        stage_config=context.config,
-        logger=context.logger,
-        mapper=mapper,
-        reducer=reducer,
+        DependencyBuildContext(
+            operation_type="map_reduce",
+            stage_dir=context.stage_dir,
+            archive_name="source.tar.gz",
+            build_folder=context.deps.pipeline_config.pipeline.build_folder,
+            operation_config=operation_config,
+            stage_config=context.config,
+            logger=context.logger,
+            mapper=mapper,
+            reducer=reducer,
+        ),
     )
     if dep.mapper_command is not None and dep.reducer_command is not None:
         context.logger.info(
@@ -261,14 +272,16 @@ def _tar_reduce_dependencies(
 ) -> tuple[list[tuple[str, str]], object]:
     builder = TarArchiveDependencyBuilder()
     dep = builder.build_dependencies(
-        operation_type="reduce",
-        stage_dir=context.stage_dir,
-        archive_name="source.tar.gz",
-        build_folder=context.deps.pipeline_config.pipeline.build_folder,
-        operation_config=operation_config,
-        stage_config=context.config,
-        logger=logger,
-        reducer=reducer,
+        DependencyBuildContext(
+            operation_type="reduce",
+            stage_dir=context.stage_dir,
+            archive_name="source.tar.gz",
+            build_folder=context.deps.pipeline_config.pipeline.build_folder,
+            operation_config=operation_config,
+            stage_config=context.config,
+            logger=logger,
+            reducer=reducer,
+        ),
     )
     dependencies = dep.dependencies
     if dep.reducer_command is not None:
@@ -343,21 +356,29 @@ def run_map_reduce(
 
     spec_kwargs = _build_map_reduce_spec_kwargs(operation_config, logger)
 
-    operation = context.deps.yt_client.run_map_reduce(
-        mapper=mapper,
-        reducer=reducer,
-        input_table=input_table,
-        output_table=output_table,
-        reduce_by=reduce_by,
-        files=dependencies,
-        resources=resources,
-        env=env,
-        sort_by=sort_by or None,
-        output_schema=output_schema,
-        max_failed_jobs=max_failed_jobs,
-        docker_auth=docker_auth,
+    sort_by_list = sort_by or None
+    merged_mr: dict[str, object] = {
         **extract_secure_env_client_kwargs(operation_config),
         **spec_kwargs,
+    }
+    operation = context.deps.yt_client.run_map_reduce_submit(
+        MapReduceSubmitSpec(
+            mapper=mapper,
+            reducer=reducer,
+            input_table=input_table,
+            output_table=output_table,
+            reduce_by=tuple(reduce_by),
+            files=file_pairs_tuple(dependencies),
+            resources=resources,
+            env=env_pairs_tuple(env),
+            sort_by=None if sort_by_list is None else tuple(sort_by_list),
+            output_schema=output_schema,
+            max_failed_jobs=max_failed_jobs,
+            docker_auth=docker_auth_tuple(docker_auth),
+            map_job=map_job,
+            reduce_job=reduce_job,
+            extras=extras_tuple(merged_mr),
+        ),
     )
 
     return _wait_operation_with_log(
@@ -448,19 +469,25 @@ def run_reduce(
     )
     reduce_kw.update(passthrough)
 
-    operation = context.deps.yt_client.run_reduce(
-        reducer=reducer,
-        input_table=input_table,
-        output_table=output_table,
-        reduce_by=reduce_by,
-        files=dependencies,
-        resources=resources,
-        env=env,
-        output_schema=output_schema,
-        max_failed_jobs=max_failed_jobs,
-        docker_auth=docker_auth,
+    merged_r: dict[str, object] = {
         **extract_secure_env_client_kwargs(operation_config),
         **reduce_kw,
+    }
+    operation = context.deps.yt_client.run_reduce_submit(
+        ReduceSubmitSpec(
+            reducer=reducer,
+            input_table=input_table,
+            output_table=output_table,
+            reduce_by=tuple(reduce_by),
+            files=file_pairs_tuple(dependencies),
+            resources=resources,
+            env=env_pairs_tuple(env),
+            output_schema=output_schema,
+            max_failed_jobs=max_failed_jobs,
+            docker_auth=docker_auth_tuple(docker_auth),
+            job=job,
+            extras=extras_tuple(merged_r),
+        ),
     )
 
     return _wait_operation_with_log(

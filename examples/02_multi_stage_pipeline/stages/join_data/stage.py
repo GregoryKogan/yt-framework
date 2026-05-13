@@ -1,5 +1,6 @@
 from yt_framework.core.pipeline import DebugContext
 from yt_framework.core.stage import BaseStage
+from yt_framework.yt.clients.yql_requests import JoinTablesRequest
 
 
 class JoinDataStage(BaseStage):
@@ -13,20 +14,22 @@ class JoinDataStage(BaseStage):
         self.logger.info("Users table: %s", users_table)
         self.logger.info("Orders table: %s", orders_table)
 
-        self.deps.yt_client.join_tables(
-            left_table=orders_table,
-            right_table=users_table,
-            output_table=self.config.client.output_table,
-            on="user_id",
-            how="left",
-            select_columns=[
-                "a.order_id",
-                "a.user_id",
-                "a.product",
-                "a.amount",
-                "b.name",
-                "b.email",
-            ],
+        self.deps.yt_client.join_tables_request(
+            JoinTablesRequest(
+                left_table=orders_table,
+                right_table=users_table,
+                output_table=self.config.client.output_table,
+                on="user_id",
+                how="left",
+                select_columns=[
+                    "a.order_id",
+                    "a.user_id",
+                    "a.product",
+                    "a.amount",
+                    "b.name",
+                    "b.email",
+                ],
+            ),
         )
 
         row_count = self.deps.yt_client.row_count(self.config.client.output_table)
