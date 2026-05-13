@@ -11,6 +11,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.precommit.checks import max_dir_entries as max_dir_entries_check
 from scripts.precommit.checks import max_file_lines as max_file_lines_check
 
 
@@ -49,6 +50,18 @@ def main() -> int:
         roots = [str(x) for x in roots_raw]
         failures.extend(
             max_file_lines_check.collect_violations(repo_root, roots, limit)
+        )
+
+    mde = table.get("max_dir_entries")
+    if isinstance(mde, dict) and mde.get("enabled", True):
+        limit_de = int(mde.get("limit", 15))
+        roots_de_raw = mde.get("roots", ["yt_framework", "ytjobs"])
+        if not isinstance(roots_de_raw, list):
+            msg = "max_dir_entries.roots must be a TOML array of strings"
+            raise TypeError(msg)
+        roots_de = [str(x) for x in roots_de_raw]
+        failures.extend(
+            max_dir_entries_check.collect_violations(repo_root, roots_de, limit_de)
         )
 
     if failures:
