@@ -1,11 +1,11 @@
-"""Tests for yt_framework.yt.dev_simulator helpers and YQL conversion."""
+"""Tests for ``yt_framework.yt.support.dev_simulator`` helpers and YQL conversion."""
 
 import logging
 from pathlib import Path
 
 import pytest
 
-from yt_framework.yt.dev_simulator import (
+from yt_framework.yt.support.dev_simulator import (
     DuckDBSimulator,
     extract_output_table,
     extract_table_references,

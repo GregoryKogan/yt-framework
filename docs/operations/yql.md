@@ -28,7 +28,7 @@ YQL expresses set logic declaratively. Map runs your Python on each row stream.
 
 ## Request API
 
-Each helper is a `*_request` method on the YT client. It takes a single frozen dataclass from `yt_framework.yt.clients.yql_requests` (for example `JoinTablesRequest`). The same types are what `yt_framework.yt.yql_builder` uses to build SQL strings.
+Each helper is a `*_request` method on the YT client. It takes a single frozen dataclass from `yt_framework.yt.clients.yql.yql_requests` (for example `JoinTablesRequest`). The same types are what `yt_framework.yt.clients.yql.yql_builder` uses to build SQL strings.
 
 For filter, union, sort, and limit, you can leave `columns` unset on the request; the client fills them from the input table schema when needed.
 
@@ -45,7 +45,7 @@ by default.
 Override per call when needed (must not exceed `128M`; larger values raise `ValueError`):
 
 ```python
-from yt_framework.yt.clients.yql_requests import JoinTablesRequest
+from yt_framework.yt.clients.yql.yql_requests import JoinTablesRequest
 
 self.deps.yt_client.join_tables_request(
     JoinTablesRequest(
@@ -76,7 +76,7 @@ If the SQL already contains `PRAGMA yt.MaxRowWeight`, that value is checked too;
 Join two tables on a common column.
 
 ```python
-from yt_framework.yt.clients.yql_requests import JoinTablesRequest
+from yt_framework.yt.clients.yql.yql_requests import JoinTablesRequest
 
 self.deps.yt_client.join_tables_request(
     JoinTablesRequest(
@@ -113,7 +113,7 @@ self.deps.yt_client.join_tables_request(
 Filter rows based on a condition.
 
 ```python
-from yt_framework.yt.clients.yql_requests import FilterTableRequest
+from yt_framework.yt.clients.yql.yql_requests import FilterTableRequest
 
 self.deps.yt_client.filter_table_request(
     FilterTableRequest(
@@ -136,7 +136,7 @@ self.deps.yt_client.filter_table_request(
 Select specific columns from a table.
 
 ```python
-from yt_framework.yt.clients.yql_requests import SelectColumnsRequest
+from yt_framework.yt.clients.yql.yql_requests import SelectColumnsRequest
 
 self.deps.yt_client.select_columns_request(
     SelectColumnsRequest(
@@ -158,7 +158,7 @@ self.deps.yt_client.select_columns_request(
 Group rows and compute aggregations.
 
 ```python
-from yt_framework.yt.clients.yql_requests import GroupByAggregateRequest
+from yt_framework.yt.clients.yql.yql_requests import GroupByAggregateRequest
 
 self.deps.yt_client.group_by_aggregate_request(
     GroupByAggregateRequest(
@@ -196,7 +196,7 @@ self.deps.yt_client.group_by_aggregate_request(
 Combine multiple tables into one.
 
 ```python
-from yt_framework.yt.clients.yql_requests import UnionTablesRequest
+from yt_framework.yt.clients.yql.yql_requests import UnionTablesRequest
 
 self.deps.yt_client.union_tables_request(
     UnionTablesRequest(
@@ -222,7 +222,7 @@ self.deps.yt_client.union_tables_request(
 Get distinct values from columns.
 
 ```python
-from yt_framework.yt.clients.yql_requests import DistinctRequest
+from yt_framework.yt.clients.yql.yql_requests import DistinctRequest
 
 self.deps.yt_client.distinct_request(
     DistinctRequest(
@@ -244,7 +244,7 @@ self.deps.yt_client.distinct_request(
 Sort table by one or more columns.
 
 ```python
-from yt_framework.yt.clients.yql_requests import SortTableRequest
+from yt_framework.yt.clients.yql.yql_requests import SortTableRequest
 
 self.deps.yt_client.sort_table_request(
     SortTableRequest(
@@ -269,7 +269,7 @@ self.deps.yt_client.sort_table_request(
 Limit the number of rows in a table.
 
 ```python
-from yt_framework.yt.clients.yql_requests import LimitTableRequest
+from yt_framework.yt.clients.yql.yql_requests import LimitTableRequest
 
 self.deps.yt_client.limit_table_request(
     LimitTableRequest(
@@ -292,7 +292,7 @@ self.deps.yt_client.limit_table_request(
 All YQL operations support dry run mode to preview queries before execution:
 
 ```python
-from yt_framework.yt.clients.yql_requests import JoinTablesRequest
+from yt_framework.yt.clients.yql.yql_requests import JoinTablesRequest
 
 # Preview query without executing
 query = self.deps.yt_client.join_tables_request(
@@ -377,7 +377,7 @@ In dev mode, YQL operations are simulated using DuckDB:
 ### Multi-Table Join
 
 ```python
-from yt_framework.yt.clients.yql_requests import JoinTablesRequest
+from yt_framework.yt.clients.yql.yql_requests import JoinTablesRequest
 
 joined1 = self.deps.yt_client.join_tables_request(
     JoinTablesRequest(
@@ -401,7 +401,7 @@ joined2 = self.deps.yt_client.join_tables_request(
 ### Filtered Aggregation
 
 ```python
-from yt_framework.yt.clients.yql_requests import (
+from yt_framework.yt.clients.yql.yql_requests import (
     FilterTableRequest,
     GroupByAggregateRequest,
 )
@@ -427,7 +427,7 @@ aggregated = self.deps.yt_client.group_by_aggregate_request(
 ### Top N Results
 
 ```python
-from yt_framework.yt.clients.yql_requests import LimitTableRequest, SortTableRequest
+from yt_framework.yt.clients.yql.yql_requests import LimitTableRequest, SortTableRequest
 
 sorted_table = self.deps.yt_client.sort_table_request(
     SortTableRequest(

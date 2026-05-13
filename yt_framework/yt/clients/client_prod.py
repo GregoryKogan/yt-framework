@@ -8,17 +8,21 @@ from typing import Any, Literal, cast
 from yt.wrapper import TablePath, YtClient
 from yt.wrapper import format as yt_format
 
-from yt_framework.yt._client_prod_runtime import (
+from yt_framework.yt.clients._client_split._client_prod_ops_mixin import (
+    ClientProdOpsMixin,
+)
+from yt_framework.yt.clients._client_split._client_prod_yql_mixin import (
+    ClientProdYqlMixin,
+)
+from yt_framework.yt.clients.client_base import BaseYTClient
+from yt_framework.yt.support._client_prod_runtime import (
     _raise_runtime_error,
     disable_yt_proxy_discovery,
     prod_create_table_parent,
     prod_write_table_replace_create,
     read_required_yt_secret,
 )
-from yt_framework.yt._client_split._client_prod_ops_mixin import ClientProdOpsMixin
-from yt_framework.yt._client_split._client_prod_yql_mixin import ClientProdYqlMixin
-from yt_framework.yt.clients.client_base import BaseYTClient
-from yt_framework.yt.max_row_weight import (
+from yt_framework.yt.support.max_row_weight import (
     build_max_row_weight_pragma,
     ensure_max_row_weight_pragma,
 )

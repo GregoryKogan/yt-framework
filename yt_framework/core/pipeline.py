@@ -7,19 +7,29 @@ Subclass ``BasePipeline``, implement ``setup()`` to register stages with
 
 from __future__ import annotations
 
-import argparse
 import logging
 import sys
-import traceback
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal
 
-from omegaconf import DictConfig, ListConfig, OmegaConf
+from omegaconf import DictConfig
 
-from yt_framework.core.debug_context import DebugContext  # noqa: TC001
+from yt_framework.core.debug_context import DebugContext
 from yt_framework.core.dependencies import PipelineStageDependencies
 from yt_framework.core.discovery import discover_stages
+from yt_framework.core.pipeline_cli import (
+    build_pipeline_cli_parser,
+    load_dict_config_or_exit,
+    read_pipeline_mode_for_header,
+    resolve_pipeline_config_path,
+    run_pipeline_instance_or_exit,
+)
+from yt_framework.core.pipeline_config import (
+    enabled_stage_names,
+    normalize_upload_modules,
+    normalize_upload_paths,
+    pickling_dict_from_config,
+    yt_mode_from_pipeline_config,
+)
 from yt_framework.core.registry import StageRegistry
 from yt_framework.operations.upload import upload_all_code
 from yt_framework.utils.env import load_secrets
@@ -31,168 +41,18 @@ from yt_framework.utils.logging import (
 )
 from yt_framework.yt.factory import create_yt_client
 
+__all__ = [
+    "BasePipeline",
+    "DebugContext",
+    "DefaultPipeline",
+    "_normalize_upload_modules",
+    "_normalize_upload_paths",
+    "normalize_upload_modules",
+    "normalize_upload_paths",
+]
 
-def _single_nonempty_module_name(raw: str) -> list[str]:
-    s = raw.strip()
-    return [s] if s else []
-
-
-def _upload_modules_from_sequence(
-    raw: list[object] | tuple[object, ...] | ListConfig,
-) -> list[str]:
-    return [str(m).strip() for m in raw if str(m).strip()]
-
-
-def _normalize_upload_modules(raw: object) -> list[str]:
-    """Normalize upload_modules config: accept list, tuple, or single string."""
-    if raw is None:
-        return []
-    if isinstance(raw, (list, tuple, ListConfig)):
-        return _upload_modules_from_sequence(raw)
-    if isinstance(raw, str):
-        return _single_nonempty_module_name(raw)
-    msg = "upload_modules must be a list of module names or a single string."
-    raise ValueError(msg)
-
-
-def _coerce_upload_path_mapping(idx: int, element: object) -> dict[str, str]:
-    item: object = element
-    if isinstance(item, DictConfig):
-        item = OmegaConf.to_container(item, resolve=True)
-    if not isinstance(item, Mapping):
-        msg = (
-            f"upload_paths[{idx}] must be a mapping with at least a 'source' key, "
-            f"got {type(item).__name__!r}."
-        )
-        raise TypeError(msg)
-    if "source" not in item:
-        msg = f"upload_paths[{idx}] is missing required 'source' key."
-        raise ValueError(msg)
-    return {k: str(v) for k, v in item.items()}
-
-
-def _normalize_upload_paths(raw: object) -> list[dict[str, str]]:
-    """Normalize upload_paths config: must be a list of {source, target?} mappings."""
-    if raw is None:
-        return []
-
-    if not isinstance(raw, (list, tuple, ListConfig)):
-        msg = "upload_paths must be a list of {source, target?} dicts."
-        raise TypeError(msg)
-
-    return [_coerce_upload_path_mapping(i, el) for i, el in enumerate(raw)]
-
-
-def _yt_mode_from_pipeline_config(raw: object) -> Literal["prod", "dev"] | None:
-    """Coerce ``pipeline.mode`` to a literal prod/dev or None (caller may default)."""
-    if raw is None:
-        return None
-    s = str(raw).strip().lower()
-    if s == "prod":
-        return "prod"
-    if s == "dev":
-        return "dev"
-    msg = f"pipeline.mode must be 'prod' or 'dev', got {raw!r}"
-    raise ValueError(msg)
-
-
-def _pickling_dict_from_config(pickling_cfg: object) -> dict[str, Any]:
-    """Return a plain dict for ``create_yt_client(..., pickling=...)``."""
-    if not pickling_cfg:
-        return {}
-    raw = OmegaConf.to_container(pickling_cfg, resolve=True)
-    if raw is None:
-        return {}
-    if isinstance(raw, Mapping):
-        return dict(raw)
-    msg = (
-        "pipeline.pickling must be a mapping-compatible config, "
-        f"got {type(raw).__name__}"
-    )
-    raise TypeError(msg)
-
-
-def _enabled_from_sequence(
-    enabled: list[object] | tuple[object, ...] | ListConfig,
-) -> list[str]:
-    return [str(x) for x in enabled]
-
-
-def _enabled_stage_names(enabled: object) -> list[str]:
-    """Normalize ``stages.enabled_stages`` to a list of directory names."""
-    if enabled is None:
-        return []
-    if isinstance(enabled, (list, tuple, ListConfig)):
-        return _enabled_from_sequence(enabled)
-    if isinstance(enabled, str):
-        s = enabled.strip()
-        return [s] if s else []
-    return [str(enabled)]
-
-
-def _build_pipeline_cli_parser(cls_name: str) -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=f"Run {cls_name}")
-    parser.add_argument(
-        "--config",
-        type=str,
-        default="configs/config.yaml",
-        help="Path to config file (default: configs/config.yaml)",
-    )
-    return parser
-
-
-def _resolve_pipeline_config_path(pipeline_dir: Path, config_arg: str) -> Path:
-    config_path = Path(config_arg)
-    if not config_path.is_absolute():
-        config_path = pipeline_dir / config_path
-    return config_path
-
-
-def _read_pipeline_mode_for_header(config_path: Path, logger: logging.Logger) -> str:
-    try:
-        temp_config = OmegaConf.load(config_path)
-    except Exception:
-        logger.exception("Failed to determine mode")
-        return "dev"
-    if isinstance(temp_config, DictConfig):
-        return str(temp_config.pipeline.get("mode", "dev"))
-    return "dev"
-
-
-def _load_dict_config_or_exit(
-    config_path: Path,
-    logger: logging.Logger,
-) -> DictConfig:
-    try:
-        loaded_cfg = OmegaConf.load(config_path)
-    except Exception:
-        logger.exception("Failed to load config")
-        traceback.print_exc()
-        sys.exit(1)
-    if not isinstance(loaded_cfg, DictConfig):
-        logger.error(
-            "Config file must contain a dictionary, got %s",
-            type(loaded_cfg).__name__,
-        )
-        sys.exit(1)
-    return loaded_cfg
-
-
-def _run_pipeline_instance_or_exit(
-    cls: type[BasePipeline],
-    config: DictConfig,
-    pipeline_dir: Path,
-    logger: logging.Logger,
-) -> None:
-    try:
-        pipeline = cls(config=config, pipeline_dir=pipeline_dir)
-        pipeline.run()
-        log_success(logger, "Pipeline completed successfully")
-        sys.exit(0)
-    except Exception:
-        logger.exception("Pipeline failed")
-        traceback.print_exc()
-        sys.exit(1)
+_normalize_upload_modules = normalize_upload_modules
+_normalize_upload_paths = normalize_upload_paths
 
 
 class BasePipeline:
@@ -251,8 +111,8 @@ class BasePipeline:
         secrets = load_secrets(self.configs_dir)
 
         # Initialize YT client
-        mode = _yt_mode_from_pipeline_config(self.config.pipeline.get("mode"))
-        pickling_dict = _pickling_dict_from_config(self.config.pipeline.get("pickling"))
+        mode = yt_mode_from_pipeline_config(self.config.pipeline.get("mode"))
+        pickling_dict = pickling_dict_from_config(self.config.pipeline.get("pickling"))
         self.yt = create_yt_client(
             logger=self.logger,
             mode=mode,
@@ -318,7 +178,7 @@ class BasePipeline:
             True if any enabled stage needs code execution, False otherwise
 
         """
-        enabled_stages = _enabled_stage_names(self.config.stages.enabled_stages)
+        enabled_stages = enabled_stage_names(self.config.stages.enabled_stages)
         if not enabled_stages:
             return False
 
@@ -375,10 +235,10 @@ class BasePipeline:
         resolved_folder = self._resolve_upload_build_folder(build_folder)
 
         # Get upload_modules and upload_paths from config
-        upload_modules = _normalize_upload_modules(
+        upload_modules = normalize_upload_modules(
             self.config.pipeline.get("upload_modules"),
         )
-        upload_paths = _normalize_upload_paths(self.config.pipeline.get("upload_paths"))
+        upload_paths = normalize_upload_paths(self.config.pipeline.get("upload_paths"))
 
         upload_all_code(
             yt_client=self.yt,
@@ -412,7 +272,7 @@ class BasePipeline:
         self.upload_code()
 
         # Get enabled stages from config
-        enabled_stages = _enabled_stage_names(self.config.stages.enabled_stages)
+        enabled_stages = enabled_stage_names(self.config.stages.enabled_stages)
         if not enabled_stages:
             msg = (
                 "No enabled_stages found in stages config section. "
@@ -484,16 +344,16 @@ class BasePipeline:
         """
         logger = setup_logging(level=logging.INFO, name=cls.__name__)
 
-        parser = _build_pipeline_cli_parser(cls.__name__)
+        parser = build_pipeline_cli_parser(cls.__name__)
         args = parser.parse_args(argv)
         pipeline_dir = Path(sys.argv[0]).parent.resolve()
 
-        config_path = _resolve_pipeline_config_path(pipeline_dir, args.config)
+        config_path = resolve_pipeline_config_path(pipeline_dir, args.config)
         if not config_path.exists():
             logger.error("Config file not found: %s", config_path)
             sys.exit(1)
 
-        mode = _read_pipeline_mode_for_header(config_path, logger)
+        mode = read_pipeline_mode_for_header(config_path, logger)
 
         config_rel_path = (
             config_path.relative_to(pipeline_dir)
@@ -506,8 +366,8 @@ class BasePipeline:
             f"Pipeline: {pipeline_dir} | Config: {config_rel_path} | Mode: {mode}",
         )
 
-        config = _load_dict_config_or_exit(config_path, logger)
-        _run_pipeline_instance_or_exit(cls, config, pipeline_dir, logger)
+        config = load_dict_config_or_exit(config_path, logger)
+        run_pipeline_instance_or_exit(cls, config, pipeline_dir, logger)
 
 
 class DefaultPipeline(BasePipeline):

@@ -90,12 +90,43 @@ cannot_depend_on = [
 ]
 
 [[modules]]
-path = "yt_framework.yt"
+path = "yt_framework.yt.support"
+depends_on = ["yt_framework", "ytjobs"]
+layer = "yt"
+cannot_depend_on = [
+    "yt_framework.core",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.yt",
+    "yt_framework.yt.clients",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+]
+
+[[modules]]
+path = "yt_framework.yt.clients"
 depends_on = [
-    "yt_framework",
     "yt_framework.job_command",
     "yt_framework.utils",
-    "ytjobs",
+    "yt_framework.yt.support",
+]
+layer = "yt"
+cannot_depend_on = [
+    "yt_framework.core",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+]
+
+[[modules]]
+path = "yt_framework.yt"
+depends_on = [
+    "yt_framework.yt.clients",
 ]
 layer = "yt"
 cannot_depend_on = [
@@ -113,7 +144,7 @@ path = "yt_framework.operations"
 depends_on = [
     "yt_framework.job_command",
     "yt_framework.utils",
-    "yt_framework.yt",
+    "yt_framework.yt.clients",
     "ytjobs",
     "ytjobs.s3",
 ]
@@ -134,6 +165,7 @@ depends_on = [
     "yt_framework.operations",
     "yt_framework.utils",
     "yt_framework.yt",
+    "yt_framework.yt.clients",
 ]
 layer = "core"
 cannot_depend_on = [

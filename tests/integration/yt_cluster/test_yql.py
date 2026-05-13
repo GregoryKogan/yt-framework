@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from yt_framework.yt.clients.yql_requests import (
+from yt_framework.yt.clients.yql.yql_requests import (
     DistinctRequest,
     FilterTableRequest,
     GroupByAggregateRequest,

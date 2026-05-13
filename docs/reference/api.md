@@ -13,7 +13,7 @@ Use the sidebar headings for modules. Anything not listed is still in the source
 - **Core** — pipeline, stage, registry, discovery, `self.deps` injection
 - **Operations** — map, vanilla, map-reduce/reduce, S3 helpers, table helpers, checkpoint upload, sort, tokenizer artifact wiring; stage contracts (`stage_contracts`) shared with `core` without reversing the dependency
 - **Typed jobs** — `StageBootstrapTypedJob`
-- **YT** — client factory, dev and prod clients (YQL helpers live on the clients)
+- **YT** — `yt.support` (shared runtime helpers), `yt.clients` (public client API and mixins), and `yt` entry (`factory`, package exports)
 - **Utils** — env files, logging setup, ignore patterns
 - **Packaging** — upload helpers shared by operations
 - **`ytjobs`** — [Job-side reference](ytjobs.md)
@@ -30,6 +30,24 @@ How-to guides under `docs/operations`, `docs/configuration`, and `docs/advanced`
 
 ```{eval-rst}
 .. automodule:: yt_framework.core.pipeline
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+### Pipeline config helpers
+
+```{eval-rst}
+.. automodule:: yt_framework.core.pipeline_config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+### Pipeline CLI helpers
+
+```{eval-rst}
+.. automodule:: yt_framework.core.pipeline_cli
    :members:
    :undoc-members:
    :show-inheritance:
@@ -112,7 +130,7 @@ How-to guides under `docs/operations`, `docs/configuration`, and `docs/advanced`
 
 ### YQL Operations
 
-YQL operations are ``*_request`` methods on the YT client, each taking a frozen request type from ``yt_framework.yt.clients.yql_requests`` (for example ``JoinTablesRequest``). See :doc:`../operations/yql`.
+YQL operations are ``*_request`` methods on the YT client, each taking a frozen request type from ``yt_framework.yt.clients.yql.yql_requests`` (for example ``JoinTablesRequest``). See :doc:`../operations/yql`.
 
 ```{note}
 **YQL Operations Location**

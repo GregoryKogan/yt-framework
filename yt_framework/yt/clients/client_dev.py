@@ -6,14 +6,18 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
-from yt_framework.yt._client_dev_runtime import (
+from yt_framework.yt.clients._client_split._client_dev_ops_mixin import (
+    ClientDevOpsMixin,
+)
+from yt_framework.yt.clients._client_split._client_dev_yql_mixin import (
+    ClientDevYqlMixin,
+)
+from yt_framework.yt.clients.client_base import BaseYTClient
+from yt_framework.yt.support._client_dev_runtime import (
     dev_columns_from_first_row,
     dev_run_yql_simulation,
 )
-from yt_framework.yt._client_split._client_dev_ops_mixin import ClientDevOpsMixin
-from yt_framework.yt._client_split._client_dev_yql_mixin import ClientDevYqlMixin
-from yt_framework.yt.clients.client_base import BaseYTClient
-from yt_framework.yt.max_row_weight import ensure_max_row_weight_pragma
+from yt_framework.yt.support.max_row_weight import ensure_max_row_weight_pragma
 
 
 class YTDevClient(ClientDevYqlMixin, ClientDevOpsMixin, BaseYTClient):

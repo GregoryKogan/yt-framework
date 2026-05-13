@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Collection
 
-from yt_framework.yt.operation_secure_env import (
+from yt_framework.yt.support.operation_secure_env import (
     partition_env_for_yt_spec,
     wrap_shell_cmd_vault_promote,
 )

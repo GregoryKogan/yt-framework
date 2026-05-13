@@ -49,7 +49,7 @@ def run(self, debug: DebugContext) -> DebugContext:
 
 A short **allowlist** keeps clearly non-secret keys in plain `environment` (for example `YT_STAGE_NAME` and tokenizer artifact path variables). To expose additional non-secret keys in the UI, set `environment_public_keys` on that operation’s config. The insecure rollback is `use_plain_environment_for_secrets: true` (not recommended).
 
-**TypedJob** legs do not get that automatic shim: call `promote_secure_vault_environment()` from `yt_framework.yt.operation_secure_env` at the start of your job, or use a string command.
+**TypedJob** legs do not get that automatic shim: call `promote_secure_vault_environment()` from `yt_framework.yt.support.operation_secure_env` at the start of your job, or use a string command.
 
 Do not put secrets in command lines; upstream discussions ([ytsaurus#780](https://github.com/ytsaurus/ytsaurus/issues/780), [ytsaurus#990](https://github.com/ytsaurus/ytsaurus/issues/990)) note that commands are another surface that may leak values in the UI.
 

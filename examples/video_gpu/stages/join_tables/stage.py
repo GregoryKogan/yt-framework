@@ -1,7 +1,7 @@
 from yt_framework.core.pipeline import DebugContext
 from yt_framework.core.stage import BaseStage
 from yt_framework.utils.logging import log_header
-from yt_framework.yt.clients.yql_requests import JoinTablesRequest
+from yt_framework.yt.clients.yql.yql_requests import JoinTablesRequest
 
 
 class JoinTablesStage(BaseStage):

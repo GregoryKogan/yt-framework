@@ -10,7 +10,7 @@ from .operation_specs import (
     ReduceSubmitSpec,
     VanillaSubmitSpec,
 )
-from .yql_requests import (
+from .yql.yql_requests import (
     DistinctRequest,
     FilterTableRequest,
     GroupByAggregateRequest,

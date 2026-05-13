@@ -11,8 +11,8 @@ from yt.wrapper import FilePath, MapSpecBuilder, TablePath, TypedJob, VanillaSpe
 from yt.wrapper import format as yt_format
 from yt.wrapper.spec_builders import MapReduceSpecBuilder, ReduceSpecBuilder
 
-from yt_framework.yt.clients.client_base import OperationResources
-from yt_framework.yt.max_row_weight import parse_max_row_weight_bytes
+from yt_framework.yt.support.max_row_weight import parse_max_row_weight_bytes
+from yt_framework.yt.support.operation_resources import OperationResources
 
 # YtClient.run_operation() only accepts these keyword args; everything else must be
 # applied via SpecBuilder chain methods (weight, title, description, …).

@@ -1,11 +1,11 @@
-"""Unit tests for ``yt_framework.yt.operation_secure_env``."""
+"""Unit tests for ``yt_framework.yt.support.operation_secure_env``."""
 
 from __future__ import annotations
 
 import os
 import shlex
 
-from yt_framework.yt.operation_secure_env import (
+from yt_framework.yt.support.operation_secure_env import (
     DEFAULT_PUBLIC_ENV_KEYS,
     merge_secure_vault,
     partition_env_for_yt_spec,

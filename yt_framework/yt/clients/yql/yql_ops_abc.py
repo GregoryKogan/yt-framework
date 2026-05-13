@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from yt_framework.yt.clients.yql_requests import (
+    from yt_framework.yt.clients.yql.yql_requests import (
         DistinctRequest,
         FilterTableRequest,
         GroupByAggregateRequest,

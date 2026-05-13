@@ -412,7 +412,9 @@ def test_main_uses_dev_mode_when_config_probe_load_fails(
             self.set_stage_registry(StageRegistry().add_stage(stage_cls))
 
     stage_cfg = OmegaConf.create({"k": 1})
-    with patch("yt_framework.core.pipeline.OmegaConf.load", MagicMock()) as mock_load:
+    with patch(
+        "yt_framework.core.pipeline_cli.OmegaConf.load", MagicMock()
+    ) as mock_load:
         mock_load.side_effect = [RuntimeError("probe"), loaded, stage_cfg]
         with pytest.raises(SystemExit) as exc_info:
             _ProbeOkPipeline.main(["--config", "configs/config.yaml"])
