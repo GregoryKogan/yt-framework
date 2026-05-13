@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 from omegaconf import DictConfig, ListConfig, OmegaConf
 from yt.wrapper import Operation
 
+from yt_framework.job_command import require_consistent_map_reduce_legs
 from yt_framework.utils.logging import log_header, log_success
 
 from .common import (
@@ -22,7 +23,6 @@ from .common import (
     extract_secure_env_client_kwargs,
 )
 from .dependency_strategy import TarArchiveDependencyBuilder
-from .job_command import require_consistent_map_reduce_legs
 
 if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema

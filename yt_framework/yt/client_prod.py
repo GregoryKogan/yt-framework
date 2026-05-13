@@ -21,7 +21,7 @@ from yt.wrapper import (
 )
 from yt.wrapper.schema import TableSchema
 
-from yt_framework.operations.job_command import (
+from yt_framework.job_command import (
     resolve_aliased_job as _resolve_aliased_job,
 )
 from yt_framework.utils.ignore import YTIgnoreMatcher

@@ -67,7 +67,7 @@ If omitted, the uploader picks defaults (e.g. first existing among `reducer.py`,
 
 ## Removability
 
-- Logic lives mainly in `yt_framework/operations/tar_command_wiring.py`, `job_command.py`, and branches in `dependency_strategy.py` / `map_reduce.py`.
+- Logic lives mainly in `yt_framework/operations/tar_command_wiring.py`, `yt_framework/job_command/`, and branches in `dependency_strategy.py` / `map_reduce.py`.
 - Disable by omitting `tar_command_bootstrap` or setting it `false`.
 
 ## Dev client

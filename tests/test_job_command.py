@@ -5,7 +5,7 @@ import builtins
 import pytest
 from yt.wrapper import TypedJob  # pyright: ignore[reportMissingImports]
 
-from yt_framework.operations.job_command import (
+from yt_framework.job_command import (
     is_typed_job,
     map_reduce_leg_kind,
     require_consistent_map_reduce_legs,

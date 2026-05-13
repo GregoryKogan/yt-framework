@@ -11,6 +11,7 @@ This file is the maintainer checklist: environment, tests, docs build, and revie
 - [Development Setup](#development-setup)
 - [Project Structure](#project-structure)
 - [Development Workflow](#development-workflow)
+  - [Module boundaries (Tach)](#module-boundaries-tach)
 - [Code Style and Conventions](#code-style-and-conventions)
 - [Testing](#testing)
   - [Coverage badge (maintainers)](#coverage-badge-maintainers)
@@ -81,7 +82,7 @@ Contributions come in many forms:
    pre-commit install
    ```
 
-   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Ruff](https://docs.astral.sh/ruff/) (`ruff check --fix` and `ruff format`), strict [BasedPyright](https://docs.basedpyright.com/), [Vulture](https://github.com/jendrikseipp/vulture) (dead-code scan for `yt_framework` and `ytjobs`; see `[tool.vulture]` in `pyproject.toml`), [Xenon](https://github.com/rubik/xenon) (cyclomatic complexity on those packages; thresholds in [.pre-commit-config.yaml](.pre-commit-config.yaml)), [Tach](https://github.com/tach-org/tach) via [gauge-sh/tach-pre-commit](https://github.com/gauge-sh/tach-pre-commit) (`tach check` against [tach.toml](tach.toml): `yt_framework` may depend on `ytjobs`, not the reverse; unused declared edges and cycles between those modules fail the check), and **`python -m pytest -m "not yt_cluster"`** from the `pytest` hook in [.pre-commit-config.yaml](.pre-commit-config.yaml) (`language: python` with `additional_dependencies` aligned to `[project] dependencies` in `pyproject.toml`, not `language: system` / Conda). You can still run `conda run -n yt-framework -- python -m pytest …` locally when you prefer the Conda env. To skip hooks in an emergency, use `git commit --no-verify` or `git push --no-verify`. To run checks manually before commit, use:
+   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Ruff](https://docs.astral.sh/ruff/) (`ruff check --fix` and `ruff format`), strict [BasedPyright](https://docs.basedpyright.com/), [Vulture](https://github.com/jendrikseipp/vulture) (dead-code scan for `yt_framework` and `ytjobs`; see `[tool.vulture]` in `pyproject.toml`), [Xenon](https://github.com/rubik/xenon) (cyclomatic complexity on those packages; thresholds in [.pre-commit-config.yaml](.pre-commit-config.yaml)), [Tach](https://github.com/tach-org/tach) as local hooks `tach-check` and `tach-external` (`tach check` for internal module boundaries and `tach check-external` so third-party imports match `[project] dependencies` in `pyproject.toml`; Tach is pinned to the same version as in the dev extra), and **`python -m pytest -m "not yt_cluster"`** from the `pytest` hook in [.pre-commit-config.yaml](.pre-commit-config.yaml) (`language: python` with `additional_dependencies` aligned to `[project] dependencies` in `pyproject.toml`, not `language: system` / Conda). You can still run `conda run -n yt-framework -- python -m pytest …` locally when you prefer the Conda env. To skip hooks in an emergency, use `git commit --no-verify` or `git push --no-verify`. To run checks manually before commit, use:
 
    ```bash
    pre-commit run ruff-check --all-files
@@ -89,11 +90,12 @@ Contributions come in many forms:
    pre-commit run basedpyright --all-files
    pre-commit run vulture --all-files
    pre-commit run xenon --all-files
-   pre-commit run tach --all-files
+   pre-commit run tach-check --all-files
+   pre-commit run tach-external --all-files
    pre-commit run pytest --all-files
    ```
 
-   Or directly (same Conda env): `conda run -n yt-framework -- ruff check .`, `conda run -n yt-framework -- ruff format .`, `conda run -n yt-framework -- basedpyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`, `conda run -n yt-framework -- vulture`, `conda run -n yt-framework -- xenon --max-absolute=A --max-modules=A --max-average=A yt_framework ytjobs`, `conda run -n yt-framework -- tach check`, and `conda run -n yt-framework -- python -m pytest -m "not yt_cluster"`.
+   Or directly (same Conda env): `conda run -n yt-framework -- ruff check .`, `conda run -n yt-framework -- ruff format .`, `conda run -n yt-framework -- basedpyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`, `conda run -n yt-framework -- vulture`, `conda run -n yt-framework -- xenon --max-absolute=A --max-modules=A --max-average=A yt_framework ytjobs`, `conda run -n yt-framework -- tach check`, `conda run -n yt-framework -- tach check-external`, and `conda run -n yt-framework -- python -m pytest -m "not yt_cluster"`.
 
    When you change runtime dependencies under `[project] dependencies` in `pyproject.toml`, update the `pytest` hook’s `additional_dependencies` in [.pre-commit-config.yaml](.pre-commit-config.yaml) so the hook’s venv matches.
 
@@ -173,6 +175,14 @@ python pipeline.py
 
 This helps ensure you haven't broken existing functionality.
 
+### Module boundaries (Tach)
+
+[Tach](https://github.com/tach-org/tach) enforces which subpackages under `yt_framework` and `ytjobs` may import each other. [tach.toml](tach.toml) lists every module with explicit `depends_on`, layer ordering, `layers_explicit_depends_on`, unused-edge detection (`exact`), and no circular first-party cycles. Anything under `tests/`, `examples/`, `docs/`, and `tools/` is excluded from that graph.
+
+If your change adds or removes imports across those boundaries, update `tach.toml` in the same branch. Run `tach check` after substantive edits; if the graph drifted, run `tach sync` and then trim redundant `depends_on` entries so `exact` stays satisfied. Run `tach check-external` when you touch third-party imports so they stay aligned with `pyproject.toml`.
+
+Widening excludes, turning modules into utilities, or disabling checks requires maintainer agreement—do not do that to get a green build.
+
 ### Code Organization Principles
 
 - **Separation of Concerns**: Keep core logic, operations, and utilities separate
@@ -189,7 +199,7 @@ This helps ensure you haven't broken existing functionality.
 - Use **BasedPyright** for strict static typing (`pyrightconfig.json`). The checked tree is `yt_framework` and `ytjobs` (see `include` / `exclude` there); tests and `examples/` are excluded from that pass.
 - Use **Vulture** for unused code at 100% confidence (`[tool.vulture]` in `pyproject.toml`). If static analysis flags code that is used dynamically, add a small whitelist module and list it under `[tool.vulture]` `paths` (see [Vulture’s docs](https://github.com/jendrikseipp/vulture#handling-false-positives)).
 - Use **Xenon** (Radon-backed) for cyclomatic complexity on `yt_framework` and `ytjobs`. Thresholds are `--max-absolute=A`, `--max-modules=A`, `--max-average=A` (see [.pre-commit-config.yaml](.pre-commit-config.yaml) and the CI lint job). See [Xenon](https://github.com/rubik/xenon) and [Radon ranks](https://radon.readthedocs.io/en/latest/commandline.html#the-cc-command).
-- Use **Tach** ([tach-org/tach](https://github.com/tach-org/tach)) so first-party imports between `yt_framework` and `ytjobs` stay explicit: only `yt_framework` is allowed to depend on `ytjobs` ([tach.toml](tach.toml)). Tests, examples, docs, and `tools/` are excluded from the graph.
+- Use **Tach** ([tach-org/tach](https://github.com/tach-org/tach)) so imports between `yt_framework.*` and `ytjobs.*` match [tach.toml](tach.toml): explicit `depends_on` per module, layers, no `ytjobs` → `yt_framework` edges, and `tach check-external` against declared runtime dependencies. Tests, examples, docs, and `tools/` stay out of the graph.
 - Use type hints where appropriate
 
 ### Naming Conventions
