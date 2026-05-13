@@ -20,7 +20,8 @@ if TYPE_CHECKING:
     )
 
 from yt_framework.job_command import is_typed_job, resolve_aliased_job
-from yt_framework.yt._client_dev_runtime import (
+from yt_framework.yt.clients._client_split.dev_operation import DevOperation
+from yt_framework.yt.support._client_dev_runtime import (
     dev_apply_stage_checkpoint_fallback,
     dev_find_checkpoint_in_config,
     dev_pythonpath_entries,
@@ -28,8 +29,7 @@ from yt_framework.yt._client_dev_runtime import (
     dev_scan_stages_checkpoint,
     dev_try_upload_one_dependency,
 )
-from yt_framework.yt._client_split.dev_operation import DevOperation
-from yt_framework.yt.operation_secure_env import pop_secure_env_client_kwargs
+from yt_framework.yt.support.operation_secure_env import pop_secure_env_client_kwargs
 
 
 class ClientDevMrReduceSortMixin:

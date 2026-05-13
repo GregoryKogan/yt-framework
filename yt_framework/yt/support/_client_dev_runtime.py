@@ -16,7 +16,7 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 
 import yt_framework
 import ytjobs
-from yt_framework.yt.dev_simulator import (
+from yt_framework.yt.support.dev_simulator import (
     DuckDBSimulator,
     extract_output_table,
     extract_table_references,

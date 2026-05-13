@@ -20,7 +20,11 @@ if TYPE_CHECKING:
     )
 
 from yt_framework.job_command import resolve_aliased_job as _resolve_aliased_job
-from yt_framework.yt._client_prod_runtime import (
+from yt_framework.yt.clients._client_split._client_prod_cmd_helpers import (
+    _partition_and_maybe_wrap_leg,
+    maybe_wrap_cmd_for_vault,
+)
+from yt_framework.yt.support._client_prod_runtime import (
     _apply_command_leg_format,
     _optional_str_kw,
     _spec_builder_secure_vault,
@@ -31,12 +35,8 @@ from yt_framework.yt._client_prod_runtime import (
     prod_reduce_open_spec_builder,
     prod_submit_operation_with_kwargs,
 )
-from yt_framework.yt._client_split._client_prod_cmd_helpers import (
-    _partition_and_maybe_wrap_leg,
-    maybe_wrap_cmd_for_vault,
-)
-from yt_framework.yt.max_row_weight import validate_max_row_weight
-from yt_framework.yt.operation_secure_env import (
+from yt_framework.yt.support.max_row_weight import validate_max_row_weight
+from yt_framework.yt.support.operation_secure_env import (
     merge_secure_vault,
     pop_secure_env_client_kwargs,
 )

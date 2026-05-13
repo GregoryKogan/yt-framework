@@ -7,16 +7,16 @@ from __future__ import annotations
 import shutil
 from typing import TYPE_CHECKING, cast
 
-from yt_framework.yt._client_dev_runtime import (
+from yt_framework.yt.clients._client_split._client_dev_mr_reduce_sort_mixin import (
+    ClientDevMrReduceSortMixin,
+)
+from yt_framework.yt.clients._client_split.dev_operation import DevOperation
+from yt_framework.yt.support._client_dev_runtime import (
     dev_rewrite_build_path_cmd,
     dev_run_map_subprocess,
     dev_run_vanilla_subprocess,
 )
-from yt_framework.yt._client_split._client_dev_mr_reduce_sort_mixin import (
-    ClientDevMrReduceSortMixin,
-)
-from yt_framework.yt._client_split.dev_operation import DevOperation
-from yt_framework.yt.operation_secure_env import pop_secure_env_client_kwargs
+from yt_framework.yt.support.operation_secure_env import pop_secure_env_client_kwargs
 
 if TYPE_CHECKING:
     from pathlib import Path

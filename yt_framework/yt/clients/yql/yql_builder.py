@@ -3,7 +3,9 @@
 Utilities compose INSERT/SELECT statements with pragmas and escaped paths.
 """
 
-from yt_framework.yt.clients.yql_requests import (
+from yt_framework.yt.support.max_row_weight import build_max_row_weight_pragma
+
+from .yql_requests import (
     DistinctRequest,
     FilterTableRequest,
     GroupByAggregateRequest,
@@ -13,7 +15,6 @@ from yt_framework.yt.clients.yql_requests import (
     SortTableRequest,
     UnionTablesRequest,
 )
-from yt_framework.yt.max_row_weight import build_max_row_weight_pragma
 
 _AGG_SPEC_TUPLE_LEN = 2
 _UNION_MIN_TABLES = 2

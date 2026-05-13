@@ -1,18 +1,8 @@
-"""Tests for yt_framework.yt.yql_builder pure formatting helpers."""
+"""Tests for ``yt_framework.yt.clients.yql.yql_builder`` pure formatting helpers."""
 
 import pytest
 
-from yt_framework.yt.clients.yql_requests import (
-    DistinctRequest,
-    FilterTableRequest,
-    GroupByAggregateRequest,
-    JoinTablesRequest,
-    LimitTableRequest,
-    SelectColumnsRequest,
-    SortTableRequest,
-    UnionTablesRequest,
-)
-from yt_framework.yt.yql_builder import (
+from yt_framework.yt.clients.yql.yql_builder import (
     _escape_table_name,
     _format_aggregations,
     _format_column_list,
@@ -27,6 +17,16 @@ from yt_framework.yt.yql_builder import (
     build_select_query,
     build_sort_query,
     build_union_query,
+)
+from yt_framework.yt.clients.yql.yql_requests import (
+    DistinctRequest,
+    FilterTableRequest,
+    GroupByAggregateRequest,
+    JoinTablesRequest,
+    LimitTableRequest,
+    SelectColumnsRequest,
+    SortTableRequest,
+    UnionTablesRequest,
 )
 
 

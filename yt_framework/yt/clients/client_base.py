@@ -22,7 +22,7 @@ from .operation_specs import (
     extras_tuple,
     file_pairs_tuple,
 )
-from .yql_ops_abc import YqlOpsABC
+from .yql.yql_ops_abc import YqlOpsABC
 
 if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema

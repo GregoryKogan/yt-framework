@@ -12,7 +12,7 @@ from yt.wrapper import TypedJob  # pyright: ignore[reportMissingImports]
 
 from yt_framework.yt.clients.client_base import OperationResources
 from yt_framework.yt.clients.client_dev import YTDevClient
-from yt_framework.yt.clients.yql_requests import (
+from yt_framework.yt.clients.yql.yql_requests import (
     DistinctRequest,
     FilterTableRequest,
     GroupByAggregateRequest,
@@ -514,7 +514,7 @@ def test_dev_client_run_yql_adds_default_max_row_weight_pragma_when_missing(
         return [], None
 
     monkeypatch.setattr(
-        "yt_framework.yt.dev_simulator.DuckDBSimulator.execute_yql",
+        "yt_framework.yt.support.dev_simulator.DuckDBSimulator.execute_yql",
         _exec,
     )
     client.run_yql("SELECT 1;")
@@ -535,7 +535,7 @@ def test_dev_client_run_yql_does_not_duplicate_existing_max_row_weight_pragma(
         return [], None
 
     monkeypatch.setattr(
-        "yt_framework.yt.dev_simulator.DuckDBSimulator.execute_yql",
+        "yt_framework.yt.support.dev_simulator.DuckDBSimulator.execute_yql",
         _exec,
     )
     client.run_yql('PRAGMA yt.MaxRowWeight = "64M";\nSELECT 1;')

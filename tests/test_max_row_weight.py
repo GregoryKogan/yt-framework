@@ -2,7 +2,7 @@
 
 import pytest
 
-from yt_framework.yt.max_row_weight import (
+from yt_framework.yt.support.max_row_weight import (
     MAX_ALLOWED_BYTES,
     ensure_max_row_weight_pragma,
     parse_max_row_weight_bytes,
