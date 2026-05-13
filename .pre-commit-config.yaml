@@ -37,3 +37,21 @@ repos:
       - id: tach
         pass_filenames: false
         always_run: true
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (isolated venv)
+        entry: python -m pytest
+        language: python
+        pass_filenames: false
+        always_run: true
+        args: ["-m", "not yt_cluster", "-q"]
+        additional_dependencies:
+          - botocore==1.35.99
+          - boto3==1.35.99
+          - ytsaurus-client>=0.13.0
+          - python-decouple>=3.8
+          - duckdb>=1.0.0
+          - omegaconf>=2.3.0
+          - pytest>=7.0.0
