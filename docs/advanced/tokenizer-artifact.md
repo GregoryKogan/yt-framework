@@ -47,7 +47,7 @@ client:
 
 ## API
 
-- `init_tokenizer_artifact_directory` and helpers: **Tokenizer artifact** in [API Reference](../reference/api.md) (`yt_framework.operations.tokenizer_artifact`).
+- `init_tokenizer_artifact_directory` and helpers: **Tokenizer artifact** in [API Reference](../reference/api.md) (`yt_framework.operations._internal.tokenizer_artifact`).
 - Exported on `yt_framework.operations` for advanced callers.
 
 ## See also

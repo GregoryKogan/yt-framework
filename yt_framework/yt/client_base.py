@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema
 
 
-def _stderr_inner_text_from_job_stderr_entry(first: object) -> str | None:
+def _stderr_text_from_job_stderr(first: object) -> str | None:
     if not isinstance(first, dict):
         return None
     err = first.get("error")
@@ -37,7 +37,7 @@ def _stderr_text_from_yt_exception_attrs(exception: Exception) -> str | None:
     stderrs = attrs["stderrs"]
     if not stderrs or len(stderrs) == 0:
         return None
-    return _stderr_inner_text_from_job_stderr_entry(stderrs[0])
+    return _stderr_text_from_job_stderr(stderrs[0])
 
 
 def _require_positive_resource(name: str, value: int) -> None:

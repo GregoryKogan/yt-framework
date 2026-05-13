@@ -8,18 +8,20 @@ from pathlib import Path
 
 import pytest
 
-from yt_framework.operations.upload import (
+from yt_framework.operations._internal.upload_helpers import (
     _copy_module_to_build_dir,
     _copy_path_to_build_dir,
     _copy_stage_to_build_dir,
+    _load_stage_job_section,
+    _resolve_upload_target,
+    _validate_upload_config,
+)
+from yt_framework.operations.upload import (
     _create_map_reduce_command_wrappers,
     _create_wrappers_for_stage,
-    _load_stage_job_section,
     _resolve_build_code_dir,
     _resolve_map_reduce_command_scripts,
     _resolve_reduce_command_script,
-    _resolve_upload_target,
-    _validate_upload_config,
     build_code_locally,
     create_code_archive,
     upload_all_code,

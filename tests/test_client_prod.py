@@ -11,8 +11,8 @@ from yt.wrapper import schema as yt_schema  # pyright: ignore[reportMissingImpor
 
 from yt_framework.yt._client_prod_runtime import (
     _apply_command_leg_format,
-    _apply_max_row_weight_to_spec_builder,
-    _apply_spec_options_and_split_run_operation_kwargs,
+    _apply_max_row_weight_spec_builder,
+    _apply_spec_options_split_run_kwargs,
 )
 from yt_framework.yt.client_base import OperationResources
 from yt_framework.yt.client_prod import YTProdClient
@@ -52,7 +52,7 @@ class _FakeSpecBuilder:
 
 def test_apply_spec_options_splits_run_operation_kwargs_from_builder_chain() -> None:
     b = _FakeSpecBuilder()
-    b2, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+    b2, run_op = _apply_spec_options_split_run_kwargs(
         b,
         {"title": "my_job", "sync": True},
     )
@@ -64,7 +64,7 @@ def test_apply_spec_options_splits_run_operation_kwargs_from_builder_chain() -> 
 def test_apply_spec_options_raises_value_error_on_unknown_operation_kwarg() -> None:
     b = _FakeSpecBuilder()
     with pytest.raises(ValueError, match="Unknown YT operation option 'bad_kw'"):
-        _apply_spec_options_and_split_run_operation_kwargs(b, {"bad_kw": 1})
+        _apply_spec_options_split_run_kwargs(b, {"bad_kw": 1})
 
 
 class _LegBuilderWithFormat:
@@ -134,7 +134,7 @@ def _prod_client_with_run_operation_id(
 
 def _stub_split_run_operation_kwargs(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "yt_framework.yt._client_prod_runtime._apply_spec_options_and_split_run_operation_kwargs",
+        "yt_framework.yt._client_prod_runtime._apply_spec_options_split_run_kwargs",
         lambda sb, kw: (sb, {}),
     )
 
@@ -152,25 +152,23 @@ def test_apply_command_leg_format_skips_format_for_typed_job_leg() -> None:
     assert b.format_specs == []
 
 
-def test_apply_max_row_weight_to_spec_builder_writes_bytes_to_table_writer() -> None:
+def test_apply_max_row_weight_spec_builder_writes_bytes_to_table_writer() -> None:
     b = _BuilderWithTableWriter()
-    out = _apply_max_row_weight_to_spec_builder(b, "128M")
+    out = _apply_max_row_weight_spec_builder(b, "128M")
     assert out is b
     assert b.payload == {"max_row_weight": 134217728}
 
 
-def test_apply_max_row_weight_to_spec_builder_uses_job_io_fallback_with_bytes() -> None:
+def test_apply_max_row_weight_spec_builder_uses_job_io_fallback_with_bytes() -> None:
     b = _BuilderWithJobIo()
-    out = _apply_max_row_weight_to_spec_builder(b, "64M")
+    out = _apply_max_row_weight_spec_builder(b, "64M")
     assert out is b
     assert b.payload == {"table_writer": {"max_row_weight": 67108864}}
 
 
-def test_apply_max_row_weight_to_spec_builder_prefers_table_writer_over_job_io() -> (
-    None
-):
+def test_apply_max_row_weight_spec_builder_prefers_table_writer_over_job_io() -> None:
     b = _BuilderWithTableWriterAndJobIo()
-    out = _apply_max_row_weight_to_spec_builder(b, "64M")
+    out = _apply_max_row_weight_spec_builder(b, "64M")
     assert out is b
     assert b.table_writer_payload == {"max_row_weight": 67108864}
     assert b.job_io_payload is None
@@ -286,7 +284,7 @@ def test_yt_prod_client_run_map_partitions_env_into_vault_and_wraps_string_comma
         "yt_framework.yt._client_prod_runtime.MapSpecBuilder", lambda: spec
     )
     monkeypatch.setattr(
-        "yt_framework.yt._client_prod_runtime._apply_spec_options_and_split_run_operation_kwargs",
+        "yt_framework.yt._client_prod_runtime._apply_spec_options_split_run_kwargs",
         lambda sb, kw: (sb, {}),
     )
 
@@ -485,7 +483,7 @@ def test_yt_prod_client_run_map_sets_output_table_path_append_when_requested(
     )
 
     monkeypatch.setattr(
-        "yt_framework.yt._client_prod_runtime._apply_spec_options_and_split_run_operation_kwargs",
+        "yt_framework.yt._client_prod_runtime._apply_spec_options_split_run_kwargs",
         lambda sb, kw: (sb, {}),
     )
 

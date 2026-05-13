@@ -15,13 +15,13 @@ from yt_framework.job_command import (
     map_reduce_leg_kind,
     require_consistent_map_reduce_legs,
 )
-from yt_framework.operations.tar_command_wiring import (
+from yt_framework.operations._internal.tar_command_wiring import (
     bootstrap_shell_run_wrapper,
     map_reduce_wrapper_names,
     reduce_wrapper_name,
     wrap_bootstrap_as_bash_c,
 )
-from yt_framework.operations.tokenizer_artifact import (
+from yt_framework.operations._internal.tokenizer_artifact import (
     resolve_tokenizer_archive_name,
     resolve_tokenizer_artifact_name,
 )

@@ -1,4 +1,4 @@
-"""Tests for yt_framework.operations.dependency_strategy.TarArchiveDependencyBuilder."""
+"""Tests for yt_framework.operations._internal.dependency_strategy.TarArchiveDependencyBuilder."""
 
 import logging
 from pathlib import Path
@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 from omegaconf import OmegaConf
 
-from yt_framework.operations.dependency_strategy import TarArchiveDependencyBuilder
+from yt_framework.operations._internal.dependency_strategy import (
+    TarArchiveDependencyBuilder,
+)
 
 _LOG = logging.getLogger("tests.dependency_strategy")
 

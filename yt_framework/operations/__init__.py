@@ -2,6 +2,7 @@
 
 # S3 operations
 # Checkpoint operations
+from ._internal.tokenizer_artifact import init_tokenizer_artifact_directory
 from .checkpoint import init_checkpoint_directory
 
 # Common utilities
@@ -27,7 +28,6 @@ from .sort import run_sort
 
 # Table operations
 from .table import download_table, get_row_count, read_table
-from .tokenizer_artifact import init_tokenizer_artifact_directory
 
 # Upload operations
 from .upload import (

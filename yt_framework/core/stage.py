@@ -44,7 +44,7 @@ class StageContext:
 
         Use this in multi-operation stages when a later operation needs a
         slightly different context (e.g., a different ``stage_dir`` so that
-        :class:`~yt_framework.operations.dependency_strategy.TarArchiveDependencyBuilder`
+        :class:`~yt_framework.operations._internal.dependency_strategy.TarArchiveDependencyBuilder`
         resolves wrapper scripts from the correct location).
 
         Only ``name`` and ``stage_dir`` can be overridden; all other fields

@@ -10,7 +10,7 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 from yt_framework.utils.env import load_secrets
 from yt_framework.yt.client_base import OperationResources
 
-from .tokenizer_artifact import (
+from ._internal.tokenizer_artifact import (
     init_tokenizer_artifact_directory,
     resolve_tokenizer_archive_name,
     resolve_tokenizer_artifact_name,

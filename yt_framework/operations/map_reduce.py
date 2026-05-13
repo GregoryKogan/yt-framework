@@ -14,6 +14,7 @@ from yt.wrapper import Operation
 from yt_framework.job_command import require_consistent_map_reduce_legs
 from yt_framework.utils.logging import log_header, log_success
 
+from ._internal.dependency_strategy import TarArchiveDependencyBuilder
 from .common import (
     build_operation_environment,
     collect_passthrough_kwargs,
@@ -22,7 +23,6 @@ from .common import (
     extract_operation_resources,
     extract_secure_env_client_kwargs,
 )
-from .dependency_strategy import TarArchiveDependencyBuilder
 
 if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema

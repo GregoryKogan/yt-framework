@@ -76,7 +76,7 @@ def _apply_one_spec_kw_to_builder(
     raise ValueError(msg)
 
 
-def _apply_spec_options_and_split_run_operation_kwargs(
+def _apply_spec_options_split_run_kwargs(
     spec_builder: object,
     kwargs: dict[str, Any],
 ) -> tuple[Any, dict[str, Any]]:
@@ -103,7 +103,7 @@ def _apply_command_leg_format(
     return cast("Any", leg_builder).format(yt_format.JsonFormat(encode_utf8=False))
 
 
-def _apply_max_row_weight_to_spec_builder(
+def _apply_max_row_weight_spec_builder(
     spec_builder: object,
     max_row_weight: str | None,
 ) -> object:
@@ -150,7 +150,7 @@ def disable_yt_proxy_discovery_best_effort(
         logger.debug("YT Client initialized with proxy: %s", yt_proxy)
 
 
-def prod_maybe_create_parent_for_table_path(
+def prod_create_table_parent_if_missing(
     *,
     make_parents: bool,
     table_path: str,
@@ -169,7 +169,7 @@ def prod_maybe_create_parent_for_table_path(
     create_path(parent_dir, "map_node")
 
 
-def prod_write_table_create_or_replace_if_needed(
+def prod_write_table_replace_or_create(
     client: Any,
     *,
     append: bool,
@@ -482,11 +482,11 @@ def prod_submit_operation_with_kwargs(
     none_message: str,
     log_message: str,
 ) -> Any:
-    spec_builder = _apply_max_row_weight_to_spec_builder(
+    spec_builder = _apply_max_row_weight_spec_builder(
         spec_builder,
         _optional_str_kw(kwargs.get("max_row_weight")),
     )
-    spec_builder, run_op = _apply_spec_options_and_split_run_operation_kwargs(
+    spec_builder, run_op = _apply_spec_options_split_run_kwargs(
         spec_builder,
         kwargs,
     )
@@ -500,22 +500,22 @@ def prod_submit_operation_with_kwargs(
 
 __all__ = [
     "_apply_command_leg_format",
-    "_apply_max_row_weight_to_spec_builder",
-    "_apply_spec_options_and_split_run_operation_kwargs",
+    "_apply_max_row_weight_spec_builder",
+    "_apply_spec_options_split_run_kwargs",
     "_optional_str_kw",
     "_raise_runtime_error",
     "_spec_builder_secure_vault",
     "disable_yt_proxy_discovery_best_effort",
     "prod_assemble_map_spec_with_vault",
     "prod_assemble_vanilla_spec_with_vault",
+    "prod_create_table_parent_if_missing",
     "prod_map_reduce_after_legs",
     "prod_map_reduce_open_spec_builder",
-    "prod_maybe_create_parent_for_table_path",
     "prod_merge_sort_spec_into_kwargs",
     "prod_reduce_finish_reducer_leg",
     "prod_reduce_open_spec_builder",
     "prod_submit_operation_with_kwargs",
     "prod_upload_directory_files",
-    "prod_write_table_create_or_replace_if_needed",
+    "prod_write_table_replace_or_create",
     "read_required_yt_secret",
 ]
