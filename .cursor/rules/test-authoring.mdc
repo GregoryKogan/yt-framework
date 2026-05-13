@@ -18,7 +18,7 @@ Cross-links: proof obligations in [testing.mdc](testing.mdc); Conda commands in 
 
 ## Naming and file placement
 
-- Prefer **`tests/test_<module_basename>.py`** mapping to a single primary **system under test** (SUT), e.g. `test_job_command.py` for `yt_framework.operations.job_command`.
+- Prefer **`tests/test_<module_basename>.py`** mapping to a single primary **system under test** (SUT), e.g. `test_job_command.py` for `yt_framework.job_command`.
 - For flows that **do not** map 1:1 to one module, use **`tests/integration/`** (or `tests/it/`) and **scenario-oriented** module names (IT-style), still with clear docstrings.
 - Test function names describe **behavior or rule**, not `test1` / `test_foo` (layout-of-tests).
 

@@ -43,6 +43,9 @@ jobs:
       - name: Tach
         run: tach check
 
+      - name: Tach external
+        run: tach check-external
+
   typecheck:
     runs-on: ubuntu-latest
     steps:

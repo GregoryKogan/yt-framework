@@ -13,12 +13,221 @@ source_roots = ["."]
 exact = true
 ignore_type_checking_imports = true
 forbid_circular_dependencies = true
+layers_explicit_depends_on = true
 root_module = "forbid"
 
-[[modules]]
-path = "ytjobs"
-depends_on = []
+layers = ["core", "operations", "yt", "foundation", "jobs"]
+
+[external]
+rename = ["yt:ytsaurus-client"]
 
 [[modules]]
 path = "yt_framework"
-depends_on = ["ytjobs"]
+depends_on = []
+layer = "foundation"
+cannot_depend_on = ["ytjobs", "ytjobs.checkpoint", "ytjobs.config", "ytjobs.logging", "ytjobs.mapper", "ytjobs.s3"]
+
+[[modules]]
+path = "yt_framework.job_command"
+depends_on = []
+layer = "foundation"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.utils",
+    "yt_framework.yt",
+    "ytjobs",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+    "ytjobs.s3",
+]
+
+[[modules]]
+path = "yt_framework.typed_jobs"
+depends_on = []
+layer = "foundation"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.job_command",
+    "yt_framework.operations",
+    "yt_framework.utils",
+    "yt_framework.yt",
+    "ytjobs",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+    "ytjobs.s3",
+]
+
+[[modules]]
+path = "yt_framework.utils"
+depends_on = []
+layer = "foundation"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.job_command",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.yt",
+    "ytjobs",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+    "ytjobs.s3",
+]
+
+[[modules]]
+path = "yt_framework.yt"
+depends_on = [
+    "yt_framework",
+    "yt_framework.job_command",
+    "yt_framework.utils",
+    "ytjobs",
+]
+layer = "yt"
+cannot_depend_on = [
+    "yt_framework.core",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+]
+
+[[modules]]
+path = "yt_framework.operations"
+depends_on = [
+    "yt_framework.job_command",
+    "yt_framework.utils",
+    "yt_framework.yt",
+    "ytjobs",
+    "ytjobs.s3",
+]
+layer = "operations"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.typed_jobs",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+]
+
+[[modules]]
+path = "yt_framework.core"
+depends_on = [
+    "yt_framework.operations",
+    "yt_framework.utils",
+    "yt_framework.yt",
+]
+layer = "core"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.job_command",
+    "yt_framework.typed_jobs",
+    "ytjobs",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+    "ytjobs.s3",
+]
+
+[[modules]]
+path = "ytjobs"
+depends_on = [
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+    "ytjobs.s3",
+]
+layer = "jobs"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.job_command",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.utils",
+    "yt_framework.yt",
+]
+
+[[modules]]
+path = "ytjobs.checkpoint"
+depends_on = []
+layer = "jobs"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.job_command",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.utils",
+    "yt_framework.yt",
+]
+
+[[modules]]
+path = "ytjobs.config"
+depends_on = []
+layer = "jobs"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.job_command",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.utils",
+    "yt_framework.yt",
+]
+
+[[modules]]
+path = "ytjobs.logging"
+depends_on = []
+layer = "jobs"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.job_command",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.utils",
+    "yt_framework.yt",
+]
+
+[[modules]]
+path = "ytjobs.mapper"
+depends_on = []
+layer = "jobs"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.job_command",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.utils",
+    "yt_framework.yt",
+]
+
+[[modules]]
+path = "ytjobs.s3"
+depends_on = []
+layer = "jobs"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.job_command",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.utils",
+    "yt_framework.yt",
+]

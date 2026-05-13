@@ -24,7 +24,7 @@ When documentation work also includes writing, reviewing, or refactoring code/do
 
 ## While working
 
-- **Early**: Map edited modules/features to the relevant `docs/` pages and READMEs; read them and note gaps or drift.
+- **Early**: Map edited modules/features to the relevant `docs/` pages and READMEs; read them and note gaps or drift. When imports cross `yt_framework` / `ytjobs` package boundaries, also read [tach-architecture.mdc](tach-architecture.mdc) and the repository-root `tach.toml`.
 - **Before done**: Reconcile implementation with those docs; if public API changed, fix docstrings per `standards.mdc` and any prose that describes that API.
 
 ## Proof

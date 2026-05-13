@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Literal, Protocol
 
 from omegaconf import DictConfig, ListConfig
 
-from yt_framework.operations.job_command import (
+from yt_framework.job_command import (
     map_reduce_leg_kind,
     require_consistent_map_reduce_legs,
 )

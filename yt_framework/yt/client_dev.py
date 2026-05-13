@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, cast
 from omegaconf import DictConfig, ListConfig, OmegaConf
 from yt.wrapper import Operation
 
-from yt_framework.operations.job_command import is_typed_job, resolve_aliased_job
+from yt_framework.job_command import is_typed_job, resolve_aliased_job
 from yt_framework.yt._client_dev_runtime import (
     dev_apply_first_stage_checkpoint_fallback,
     dev_columns_from_first_row,

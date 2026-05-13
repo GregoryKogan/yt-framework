@@ -1,0 +1,11 @@
+---
+description: Tach module boundaries; agents must keep tach.toml strict and in sync
+alwaysApply: true
+---
+
+# Tach and internal architecture
+
+- First-party layout is defined in `tach.toml` at the repository root: subpackages under `yt_framework` and `ytjobs`, explicit `depends_on` on every module (never omit `depends_on`; omission allows importing any other in-repo module), layers, `layers_explicit_depends_on`, `exact`, `forbid_circular_dependencies`, and `root_module = "forbid"`. Pre-commit runs `tach check` and `tach check-external` via local hooks `tach-check` and `tach-external` (`additional_dependencies` pins Tach in `.pre-commit-config.yaml`).
+- **Same change set as imports:** if you add or change imports between these modules, update `tach.toml` in the same PR. After edits, run `conda run -n yt-framework -- tach check` and `conda run -n yt-framework -- tach check-external`, or `pre-commit run tach-check --all-files` and `pre-commit run tach-external --all-files`. You may use `tach sync` to align `depends_on` with the codebase, then trim so `exact` stays honest (no unused declared dependencies).
+- **Do not loosen Tach** without explicit maintainer approval: widening `exclude`, adding `utility: true` or `unchecked: true`, Tach ignore pragmas, removing modules, weakening layers or `layers_explicit_depends_on`, changing `root_module`, or turning off `exact` / `forbid_circular_dependencies` / `ignore_type_checking_imports` to silence violations.
+- **Do not relax other gates** without explicit maintainer approval: Ruff (including `ignore` expansion), BasedPyright/pyrightconfig, Vulture, Xenon, pytest configuration, or pre-commit hooks. Do not use `--no-verify` on commit or push to skip hooks unless a human has approved that exception for a specific case.
