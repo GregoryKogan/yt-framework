@@ -149,6 +149,8 @@ ignore = [
 ]
 # Pre-commit policy runner: sys.path bootstrap before importing ``scripts.*``.
 "scripts/precommit/run.py" = ["E402"]
+# Policy helper: subprocess runs fixed ``git check-ignore`` argv; paths are repo-relative.
+"scripts/precommit/checks/max_dir_entries.py" = ["S603"]
 # Runnable demos: not API-grade modules; keep lint focused on the library.
 "examples/**" = [
     "D101",
@@ -197,6 +199,11 @@ line-ending = "auto"
 [tool.yt_framework.pre_commit.max_file_lines]
 enabled = true
 limit = 1500
+roots = ["yt_framework", "ytjobs"]
+
+[tool.yt_framework.pre_commit.max_dir_entries]
+enabled = true
+limit = 15
 roots = ["yt_framework", "ytjobs"]
 
 [tool.vulture]
