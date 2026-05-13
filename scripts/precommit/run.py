@@ -13,6 +13,9 @@ if str(_REPO_ROOT) not in sys.path:
 
 from scripts.precommit.checks import max_dir_entries as max_dir_entries_check
 from scripts.precommit.checks import max_file_lines as max_file_lines_check
+from scripts.precommit.checks import (
+    max_snake_binding_words as max_snake_binding_words_check,
+)
 
 
 def _load_pre_commit_tool_table(repo_root: Path) -> dict[str, Any]:
@@ -62,6 +65,20 @@ def main() -> int:
         roots_de = [str(x) for x in roots_de_raw]
         failures.extend(
             max_dir_entries_check.collect_violations(repo_root, roots_de, limit_de)
+        )
+
+    msb = table.get("max_snake_binding_words")
+    if isinstance(msb, dict) and msb.get("enabled", True):
+        limit_sb = int(msb.get("limit", 10))
+        roots_sb_raw = msb.get("roots", ["yt_framework", "ytjobs"])
+        if not isinstance(roots_sb_raw, list):
+            msg = "max_snake_binding_words.roots must be a TOML array of strings"
+            raise TypeError(msg)
+        roots_sb = [str(x) for x in roots_sb_raw]
+        failures.extend(
+            max_snake_binding_words_check.collect_violations(
+                repo_root, roots_sb, limit_sb
+            )
         )
 
     if failures:

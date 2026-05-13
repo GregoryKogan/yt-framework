@@ -26,6 +26,10 @@ wc_line_count = _mfl.wc_line_count
 _mde = _load_check_module("max_dir_entries.py", "_precommit_max_dir_entries")
 collect_violations_dirs = _mde.collect_violations
 
+_msb = _load_check_module("max_snake_binding_words.py", "_precommit_max_snake")
+collect_snake_violations = _msb.collect_violations
+word_count_snake = _msb.word_count
+
 
 def _git_init(repo: Path) -> None:
     git = shutil.which("git")
@@ -95,3 +99,51 @@ def test_max_dir_entries_allows_exactly_limit_children(tmp_path: Path) -> None:
         (busy / f"f{i}.txt").write_text("x", encoding="utf-8")
     out = collect_violations_dirs(tmp_path, ["yt_framework"], 15)
     assert [x for x in out if "busy" in x] == []
+
+
+def test_word_count_snake_segments_table() -> None:
+    assert (
+        word_count_snake("a"),
+        word_count_snake("a_b"),
+        word_count_snake("__init__"),
+        word_count_snake("_"),
+    ) == (
+        1,
+        2,
+        1,
+        0,
+    )
+
+
+def test_collect_snake_reports_assign_over_limit(tmp_path: Path) -> None:
+    pkg = tmp_path / "yt_framework"
+    pkg.mkdir()
+    eleven = "_".join([f"w{i}" for i in range(11)])
+    (pkg / "m.py").write_text(f"{eleven} = 1\n", encoding="utf-8")
+    out = collect_snake_violations(tmp_path, ["yt_framework"], 10)
+    assert out == [f"yt_framework/m.py:1: name {eleven!r} has 11 words (limit 10)"]
+
+
+def test_collect_snake_assign_at_limit_passes(tmp_path: Path) -> None:
+    pkg = tmp_path / "yt_framework"
+    pkg.mkdir()
+    ten = "_".join([f"w{i}" for i in range(10)])
+    (pkg / "m.py").write_text(f"{ten} = 1\n", encoding="utf-8")
+    assert collect_snake_violations(tmp_path, ["yt_framework"], 10) == []
+
+
+def test_collect_snake_match_as_binding_over_limit(tmp_path: Path) -> None:
+    pkg = tmp_path / "yt_framework"
+    pkg.mkdir()
+    eleven = "_".join([f"m{i}" for i in range(11)])
+    (pkg / "m.py").write_text(
+        f"s = 0\nmatch s:\n    case _ as {eleven}:\n        pass\n",
+        encoding="utf-8",
+    )
+    out = collect_snake_violations(tmp_path, ["yt_framework"], 10)
+    assert out == [f"yt_framework/m.py:3: name {eleven!r} has 11 words (limit 10)"]
+
+
+def test_collect_snake_reports_missing_root(tmp_path: Path) -> None:
+    out = collect_snake_violations(tmp_path, ["yt_framework"], 10)
+    assert out == ["max_snake_binding_words: root is not a directory: yt_framework"]
