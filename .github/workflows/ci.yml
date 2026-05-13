@@ -40,6 +40,9 @@ jobs:
       - name: Xenon
         run: xenon --max-absolute=A --max-modules=A --max-average=A yt_framework ytjobs
 
+      - name: Pre-commit policy (max file lines)
+        run: python scripts/precommit/run.py
+
       - name: Tach
         run: tach check
 

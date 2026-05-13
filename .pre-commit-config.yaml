@@ -47,6 +47,12 @@ repos:
         pass_filenames: false
         always_run: true
         additional_dependencies: ["tach==0.35.0"]
+      - id: yt-framework-pre-commit-policy
+        name: yt-framework pre-commit policy
+        entry: python scripts/precommit/run.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: pytest
         name: pytest (isolated venv)
         entry: python -m pytest

@@ -147,6 +147,8 @@ ignore = [
     "PLR0915",
     "C901",
 ]
+# Pre-commit policy runner: sys.path bootstrap before importing ``scripts.*``.
+"scripts/precommit/run.py" = ["E402"]
 # Runnable demos: not API-grade modules; keep lint focused on the library.
 "examples/**" = [
     "D101",
@@ -189,6 +191,13 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.yt_framework.pre_commit]
+
+[tool.yt_framework.pre_commit.max_file_lines]
+enabled = true
+limit = 1500
+roots = ["yt_framework", "ytjobs"]
 
 [tool.vulture]
 paths = ["yt_framework", "ytjobs"]
