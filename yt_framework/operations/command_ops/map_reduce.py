@@ -5,16 +5,20 @@ from `configs/secrets.env` like other operations.
 """
 
 import logging
-import warnings
 from typing import TYPE_CHECKING, Any
 
-from omegaconf import DictConfig, ListConfig, OmegaConf
-from yt.wrapper import Operation
+from omegaconf import DictConfig, OmegaConf
 
-from yt_framework.job_command import require_consistent_map_reduce_legs
 from yt_framework.operations._internal.dependency_strategy import (
     DependencyBuildContext,
     TarArchiveDependencyBuilder,
+)
+from yt_framework.operations.command_ops.map_reduce_support import (
+    resolve_map_reduce_legs,
+    str_list_from_config,
+    validate_map_reduce_inputs,
+    wait_operation_with_log,
+    warn_deprecated_map_reduce_aliases,
 )
 from yt_framework.operations.common import (
     build_operation_environment,
@@ -24,7 +28,7 @@ from yt_framework.operations.common import (
     extract_operation_resources,
     extract_secure_env_client_kwargs,
 )
-from yt_framework.utils.logging import log_header, log_success
+from yt_framework.utils.logging import log_header
 from yt_framework.yt.clients.operation_specs import (
     MapReduceSubmitSpec,
     ReduceSubmitSpec,
@@ -37,106 +41,7 @@ from yt_framework.yt.clients.operation_specs import (
 if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema
 
-    from yt_framework.core.stage import StageContext
-
-
-def _wait_operation_with_log(
-    context: "StageContext",
-    operation: Operation,
-    logger: logging.Logger,
-    *,
-    success_msg: str,
-    failure_msg: str,
-) -> bool:
-    success = context.deps.yt_client.wait_for_operation(operation)
-    if success:
-        log_success(logger, success_msg)
-    else:
-        logger.error(failure_msg)
-    return success
-
-
-def _str_list_from_config(value: object) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, (list, tuple, ListConfig)):
-        return [str(x) for x in value]
-    return [str(value)]
-
-
-def _map_reduce_tables_ready(
-    input_table: str,
-    output_table: str,
-    reduce_by: list[str],
-) -> bool:
-    return bool(input_table and output_table and reduce_by)
-
-
-def _validate_map_reduce_inputs(
-    operation_config: DictConfig,
-) -> tuple[str, str, list[str]]:
-    input_table = str(operation_config.get("input_table") or "")
-    output_table = str(operation_config.get("output_table") or "")
-    reduce_by = _str_list_from_config(operation_config.get("reduce_by"))
-    if _map_reduce_tables_ready(input_table, output_table, reduce_by):
-        return input_table, output_table, reduce_by
-    msg = (
-        "operation_config must set input_table, output_table, and reduce_by; "
-        "expected at client.operations.map_reduce.{input_table,output_table,reduce_by}"
-    )
-    raise ValueError(msg)
-
-
-def _assert_exclusive_map_job_aliases(
-    mapper: object,
-    map_job: object,
-) -> None:
-    if mapper is not None and map_job is not None and mapper != map_job:
-        msg = "Both 'mapper' and 'map_job' are set with different values; use only one"
-        raise ValueError(msg)
-
-
-def _assert_exclusive_reduce_job_aliases(
-    reducer: object,
-    reduce_job: object,
-) -> None:
-    if reducer is not None and reduce_job is not None and reducer != reduce_job:
-        msg = "Both 'reducer' and 'reduce_job' are set with different values; use only one"
-        raise ValueError(msg)
-
-
-def _resolve_map_reduce_legs(
-    mapper: object,
-    reducer: object,
-    map_job: object,
-    reduce_job: object,
-) -> tuple[object, object]:
-    _assert_exclusive_map_job_aliases(mapper, map_job)
-    _assert_exclusive_reduce_job_aliases(reducer, reduce_job)
-    resolved_mapper = map_job if map_job is not None else mapper
-    resolved_reducer = reduce_job if reduce_job is not None else reducer
-    require_consistent_map_reduce_legs(resolved_mapper, resolved_reducer)
-    return resolved_mapper, resolved_reducer
-
-
-def _warn_deprecated_map_reduce_aliases(
-    mapper: object,
-    map_job: object,
-    reducer: object,
-    reduce_job: object,
-) -> None:
-    if mapper is not None and map_job is None:
-        warnings.warn(
-            "'mapper=' is deprecated; use 'map_job=' instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-    if reducer is not None and reduce_job is None:
-        warnings.warn(
-            "'reducer=' is deprecated; use 'reduce_job=' instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+    from yt_framework.operations.stage_contracts import StageContext
 
 
 def _prepare_map_reduce_dependencies(
@@ -223,7 +128,7 @@ def _build_map_reduce_spec_kwargs(
 def _parse_reduce_io(operation_config: DictConfig) -> tuple[str, str, list[str]]:
     input_table = str(operation_config.get("input_table") or "")
     output_table = str(operation_config.get("output_table") or "")
-    reduce_by = _str_list_from_config(operation_config.get("reduce_by"))
+    reduce_by = str_list_from_config(operation_config.get("reduce_by"))
     return input_table, output_table, reduce_by
 
 
@@ -322,7 +227,7 @@ def run_map_reduce(
         True if the operation completed successfully.
 
     """
-    _warn_deprecated_map_reduce_aliases(mapper, map_job, reducer, reduce_job)
+    warn_deprecated_map_reduce_aliases(mapper, map_job, reducer, reduce_job)
     logger = context.logger
     log_header(
         logger,
@@ -330,7 +235,7 @@ def run_map_reduce(
         f"Input: {operation_config.get('input_table')} -> Output: {operation_config.get('output_table')}",
     )
 
-    input_table, output_table, reduce_by = _validate_map_reduce_inputs(operation_config)
+    input_table, output_table, reduce_by = validate_map_reduce_inputs(operation_config)
 
     env = build_operation_environment(
         context=context,
@@ -341,7 +246,7 @@ def run_map_reduce(
     )
     resources = extract_operation_resources(operation_config, logger)
 
-    mapper, reducer = _resolve_map_reduce_legs(mapper, reducer, map_job, reduce_job)
+    mapper, reducer = resolve_map_reduce_legs(mapper, reducer, map_job, reduce_job)
     dependencies, mapper, reducer = _prepare_map_reduce_dependencies(
         context=context,
         operation_config=operation_config,
@@ -351,7 +256,7 @@ def run_map_reduce(
 
     docker_auth = docker_auth_from_op_config(operation_config, env)
 
-    sort_by = _str_list_from_config(operation_config.get("sort_by"))
+    sort_by = str_list_from_config(operation_config.get("sort_by"))
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
     spec_kwargs = _build_map_reduce_spec_kwargs(operation_config, logger)
@@ -381,7 +286,7 @@ def run_map_reduce(
         ),
     )
 
-    return _wait_operation_with_log(
+    return wait_operation_with_log(
         context,
         operation,
         logger,
@@ -490,7 +395,7 @@ def run_reduce(
         ),
     )
 
-    return _wait_operation_with_log(
+    return wait_operation_with_log(
         context,
         operation,
         logger,

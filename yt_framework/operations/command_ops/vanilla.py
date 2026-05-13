@@ -1,8 +1,8 @@
 """Driver helpers to package `src/vanilla.py` and submit YT vanilla operations."""
 
-import logging
+from __future__ import annotations
+
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from omegaconf import DictConfig, OmegaConf
@@ -29,7 +29,10 @@ from yt_framework.yt.clients.operation_specs import (
 )
 
 if TYPE_CHECKING:
-    from yt_framework.core.stage import StageContext
+    import logging
+    from pathlib import Path
+
+    from yt_framework.operations.stage_contracts import StageContext
 
 
 @dataclass
@@ -115,7 +118,7 @@ def _vanilla_operation_description_kwargs(
 
 
 def run_vanilla(
-    context: "StageContext",
+    context: StageContext,
     operation_config: DictConfig,
     job: str | None = None,
 ) -> bool:

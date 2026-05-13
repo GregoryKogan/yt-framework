@@ -12,7 +12,7 @@ exclude = [
 ]
 source_roots = ["."]
 exact = true
-ignore_type_checking_imports = true
+ignore_type_checking_imports = false
 forbid_circular_dependencies = true
 layers_explicit_depends_on = true
 root_module = "forbid"

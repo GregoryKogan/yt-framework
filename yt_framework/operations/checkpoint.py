@@ -1,12 +1,14 @@
 """Upload or reuse single-file model checkpoints and wire them into operation specs."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from omegaconf import DictConfig
 
 if TYPE_CHECKING:
-    from yt_framework.core.stage import StageContext
+    from yt_framework.operations.stage_contracts import StageContext
 
 
 def _raise_file_not_found(message: str) -> None:
@@ -27,7 +29,7 @@ def _local_checkpoint_path_from_config(checkpoint_config: DictConfig) -> str | N
     return None
 
 
-def _resolve_model_name(context: "StageContext") -> str | None:
+def _resolve_model_name(context: StageContext) -> str | None:
     job_cfg = context.config.get("job")
     if not isinstance(job_cfg, DictConfig):
         return None
@@ -38,7 +40,7 @@ def _resolve_model_name(context: "StageContext") -> str | None:
 
 
 def _upload_local_checkpoint_if_needed(
-    context: "StageContext",
+    context: StageContext,
     checkpoint_base: str,
     local_checkpoint_path: str | None,
 ) -> None:
@@ -76,7 +78,7 @@ def _upload_local_checkpoint_if_needed(
 
 
 def _validate_required_checkpoint(
-    context: "StageContext",
+    context: StageContext,
     checkpoint_base: str,
     model_name: str | None,
 ) -> None:
@@ -99,7 +101,7 @@ def _validate_required_checkpoint(
 
 
 def init_checkpoint_directory(
-    context: "StageContext",
+    context: StageContext,
     checkpoint_config: DictConfig,
 ) -> None:
     """Initialize checkpoint directory in YTsaurus if it doesn't exist.

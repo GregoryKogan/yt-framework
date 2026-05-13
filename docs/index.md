@@ -8,6 +8,7 @@ This documentation explains how to build and run data processing pipelines on YT
 :maxdepth: 3
 :titlesonly:
 
+architecture/layers
 configuration/index
 testing/yt-cluster-integration
 operations/index
