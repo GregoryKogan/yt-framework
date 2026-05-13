@@ -1,8 +1,8 @@
 """Shared helpers for map/vanilla/map-reduce (resources, secrets, tokenizer wiring)."""
 
-import logging
+from __future__ import annotations
+
 from collections.abc import Mapping
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
@@ -17,7 +17,10 @@ from ._internal.tokenizer_artifact import (
 )
 
 if TYPE_CHECKING:
-    from yt_framework.core.stage import StageContext
+    import logging
+    from pathlib import Path
+
+    from yt_framework.operations.stage_contracts import StageContext
 
 
 def _dict_config_or(node: object, *, fallback: DictConfig) -> DictConfig:
@@ -226,7 +229,7 @@ def collect_passthrough_kwargs(
 
 def _merge_tokenizer_keys_into_env(
     env: dict[str, str],
-    context: "StageContext",
+    context: StageContext,
     tokenizer_cfg_raw: DictConfig,
 ) -> None:
     init_tokenizer_artifact_directory(
@@ -262,7 +265,7 @@ def _merge_operation_env_block(
 
 
 def build_operation_environment(
-    context: "StageContext",
+    context: StageContext,
     operation_config: DictConfig,
     logger: logging.Logger,
     include_stage_name: bool = True,  # noqa: FBT001,FBT002

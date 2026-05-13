@@ -1,14 +1,16 @@
 """Submit YT sort jobs using the same `(context, operation_config)` pattern as map."""
 
-from typing import TYPE_CHECKING
+from __future__ import annotations
 
-from omegaconf import DictConfig
+from typing import TYPE_CHECKING
 
 from yt_framework.operations.common import extract_operation_resources
 from yt_framework.utils.logging import log_header, log_success
 
 if TYPE_CHECKING:
-    from yt_framework.core.stage import StageContext
+    from omegaconf import DictConfig
+
+    from yt_framework.operations.stage_contracts import StageContext
 
 
 def _sort_input_table(operation_config: DictConfig) -> str:
@@ -36,7 +38,7 @@ def _require_sort_inputs(table_path: str, sort_by: list[str]) -> None:
 
 
 def run_sort(
-    context: "StageContext",
+    context: StageContext,
     operation_config: DictConfig,
 ) -> bool:
     """Run a YT sort operation and wait for completion.

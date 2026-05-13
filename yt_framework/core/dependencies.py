@@ -1,63 +1,19 @@
-"""Injection protocol and ``PipelineStageDependencies`` for stage ``run()`` methods.
+"""Concrete ``PipelineStageDependencies`` for stage ``run()`` injection.
 
-Defines ``StageDependencies`` (protocol) and the concrete dataclass the pipeline
-passes as ``self.deps`` (YT client, pipeline config, configs directory).
+The :class:`~yt_framework.operations.stage_contracts.StageDependencies` protocol
+and :class:`~yt_framework.operations.stage_contracts.StageContext` live under
+``yt_framework.operations`` so operation drivers do not import ``core``.
 """
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
 
 from omegaconf import DictConfig
 
+from yt_framework.operations import stage_contracts
 from yt_framework.yt.clients.client_base import BaseYTClient
 
-
-class StageDependencies(Protocol):
-    """Protocol defining what dependencies stages need.
-
-    This is NOT the same as the 'context' parameter in run() methods:
-    - StageDependencies: Injected services/config (yt_client, config, etc.)
-    - context parameter: Shared data dictionary passed between stages
-
-    Benefits:
-    - Dependency Inversion: Depends on abstraction, not concrete Pipeline
-    - Interface Segregation: Only exposes what stages actually use
-    - Testability: Easy to create mock dependencies for testing
-    """
-
-    @property
-    def yt_client(self) -> BaseYTClient:
-        """YT client for operations.
-
-        Returns:
-            BaseYTClient: YT client instance (either YTDevClient or YTProdClient)
-                for performing table operations, running map/vanilla jobs, etc.
-
-        """
-        ...
-
-    @property
-    def pipeline_config(self) -> DictConfig:
-        """Pipeline-level configuration (contains build_folder and secrets).
-
-        Returns:
-            DictConfig: OmegaConf configuration object containing pipeline-wide
-                settings like mode, build_folder, and other pipeline parameters.
-
-        """
-        ...
-
-    @property
-    def configs_dir(self) -> Path:
-        """Directory containing secrets.env and other config files.
-
-        Returns:
-            Path: Absolute path to the configs directory where secrets.env
-                and other configuration files are stored.
-
-        """
-        ...
+StageDependencies = stage_contracts.StageDependencies
 
 
 @dataclass

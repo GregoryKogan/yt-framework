@@ -11,7 +11,7 @@ Use the sidebar headings for modules. Anything not listed is still in the source
 ## Layout
 
 - **Core** — pipeline, stage, registry, discovery, `self.deps` injection
-- **Operations** — map, vanilla, map-reduce/reduce, S3 helpers, table helpers, checkpoint upload, sort, tokenizer artifact wiring
+- **Operations** — map, vanilla, map-reduce/reduce, S3 helpers, table helpers, checkpoint upload, sort, tokenizer artifact wiring; stage contracts (`stage_contracts`) shared with `core` without reversing the dependency
 - **Typed jobs** — `StageBootstrapTypedJob`
 - **YT** — client factory, dev and prod clients (YQL helpers live on the clients)
 - **Utils** — env files, logging setup, ignore patterns
@@ -40,6 +40,7 @@ How-to guides under `docs/operations`, `docs/configuration`, and `docs/advanced`
 ```{eval-rst}
 .. automodule:: yt_framework.core.stage
    :members:
+   :exclude-members: StageContext
    :undoc-members:
    :show-inheritance:
 ```
@@ -72,6 +73,15 @@ How-to guides under `docs/operations`, `docs/configuration`, and `docs/advanced`
 ```
 
 ## Operations
+
+### Stage contracts (injection and context)
+
+```{eval-rst}
+.. automodule:: yt_framework.operations.stage_contracts
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
 
 ### Map Operations
 

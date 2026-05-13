@@ -1,12 +1,11 @@
 """Driver helpers to package `src/mapper.py` and submit YT map operations."""
 
-import logging
+from __future__ import annotations
+
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from omegaconf import DictConfig, OmegaConf
-from yt.wrapper.schema import TableSchema
 
 from yt_framework.operations._internal.dependency_strategy import (
     DependencyBuildContext,
@@ -30,7 +29,12 @@ from yt_framework.yt.clients.operation_specs import (
 )
 
 if TYPE_CHECKING:
-    from yt_framework.core.stage import StageContext
+    import logging
+    from pathlib import Path
+
+    from yt.wrapper.schema import TableSchema
+
+    from yt_framework.operations.stage_contracts import StageContext
     from yt_framework.yt.clients.client_base import OperationResources
 
 
@@ -164,7 +168,7 @@ def _map_operation_description_kwargs(
 
 
 def run_map(
-    context: "StageContext",
+    context: StageContext,
     operation_config: DictConfig,
     output_schema: TableSchema | None = None,
     mapper: object | None = None,

@@ -178,7 +178,7 @@ This helps ensure you haven't broken existing functionality.
 
 ### Module boundaries (Tach)
 
-[Tach](https://github.com/tach-org/tach) enforces which subpackages under `yt_framework` and `ytjobs` may import each other. [tach.toml](tach.toml) lists every module with explicit `depends_on`, layer ordering, `layers_explicit_depends_on`, unused-edge detection (`exact`), and no circular first-party cycles. Anything under `tests/`, `examples/`, `docs/`, and `tools/` is excluded from that graph.
+[Tach](https://github.com/tach-org/tach) enforces which subpackages under `yt_framework` and `ytjobs` may import each other. [tach.toml](tach.toml) lists every module with explicit `depends_on`, layer ordering, `layers_explicit_depends_on`, unused-edge detection (`exact`), and no circular first-party cycles. Anything under `tests/`, `examples/`, `docs/`, and `tools/` is excluded from that graph. Layer narrative: [docs/architecture/layers.md](docs/architecture/layers.md).
 
 If your change adds or removes imports across those boundaries, update `tach.toml` in the same branch. Run `tach check` after substantive edits; if the graph drifted, run `tach sync` and then trim redundant `depends_on` entries so `exact` stays satisfied. Run `tach check-external` when you touch third-party imports so they stay aligned with `pyproject.toml`.
 
