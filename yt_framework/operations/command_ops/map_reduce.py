@@ -12,17 +12,18 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 from yt.wrapper import Operation
 
 from yt_framework.job_command import require_consistent_map_reduce_legs
-from yt_framework.utils.logging import log_header, log_success
-
-from ._internal.dependency_strategy import TarArchiveDependencyBuilder
-from .common import (
+from yt_framework.operations._internal.dependency_strategy import (
+    TarArchiveDependencyBuilder,
+)
+from yt_framework.operations.common import (
     build_operation_environment,
     collect_passthrough_kwargs,
-    extract_docker_auth_from_operation_config,
+    docker_auth_from_op_config,
     extract_max_failed_jobs,
     extract_operation_resources,
     extract_secure_env_client_kwargs,
 )
+from yt_framework.utils.logging import log_header, log_success
 
 if TYPE_CHECKING:
     from yt.wrapper.schema import TableSchema
@@ -335,7 +336,7 @@ def run_map_reduce(
         reducer=reducer,
     )
 
-    docker_auth = extract_docker_auth_from_operation_config(operation_config, env)
+    docker_auth = docker_auth_from_op_config(operation_config, env)
 
     sort_by = _str_list_from_config(operation_config.get("sort_by"))
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
@@ -419,7 +420,7 @@ def run_reduce(
         logger,
     )
 
-    docker_auth = extract_docker_auth_from_operation_config(operation_config, env)
+    docker_auth = docker_auth_from_op_config(operation_config, env)
 
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 

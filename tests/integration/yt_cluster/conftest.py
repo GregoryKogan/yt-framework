@@ -23,8 +23,8 @@ from yt_framework.yt.factory import create_yt_client
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-    from yt_framework.yt.client_base import OperationResources
-    from yt_framework.yt.client_prod import YTProdClient
+    from yt_framework.yt.clients.client_base import OperationResources
+    from yt_framework.yt.clients.client_prod import YTProdClient
 
 
 def _null_logger(name: str) -> logging.Logger:

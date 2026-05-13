@@ -1,4 +1,4 @@
-"""Tests for yt_framework.operations.map_reduce.run_map_reduce and run_reduce."""
+"""Tests for yt_framework.operations.command_ops.map_reduce.run_map_reduce and run_reduce."""
 
 import logging
 from pathlib import Path
@@ -12,8 +12,8 @@ from yt_framework.core.stage import StageContext
 from yt_framework.operations._internal.dependency_strategy import (
     DependencyBuildResult,
 )
-from yt_framework.operations.map_reduce import run_map_reduce, run_reduce
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.operations.command_ops.map_reduce import run_map_reduce, run_reduce
+from yt_framework.yt.clients.client_base import BaseYTClient
 
 _LOG = logging.getLogger("tests.map_reduce")
 _LOG.addHandler(logging.NullHandler())
@@ -119,7 +119,7 @@ def test_run_map_reduce_raises_when_reducer_and_reduce_job_differ(
 
 
 @patch(
-    "yt_framework.operations.map_reduce.TarArchiveDependencyBuilder.build_dependencies"
+    "yt_framework.operations.command_ops.map_reduce.TarArchiveDependencyBuilder.build_dependencies"
 )
 def test_run_map_reduce_raises_on_partial_tar_bootstrap_commands(
     mock_build: MagicMock, tmp_path: Path
@@ -138,7 +138,7 @@ def test_run_map_reduce_raises_on_partial_tar_bootstrap_commands(
 
 
 @patch(
-    "yt_framework.operations.map_reduce.TarArchiveDependencyBuilder.build_dependencies"
+    "yt_framework.operations.command_ops.map_reduce.TarArchiveDependencyBuilder.build_dependencies"
 )
 def test_run_map_reduce_replaces_string_legs_when_both_tar_bootstrap_commands_set(
     mock_build: MagicMock, tmp_path: Path
@@ -321,7 +321,7 @@ def test_run_reduce_forwards_max_row_weight_override(tmp_path: Path) -> None:
 
 
 @patch(
-    "yt_framework.operations.map_reduce.TarArchiveDependencyBuilder.build_dependencies"
+    "yt_framework.operations.command_ops.map_reduce.TarArchiveDependencyBuilder.build_dependencies"
 )
 def test_run_reduce_replaces_reducer_when_tar_bootstrap_command_set(
     mock_build: MagicMock, tmp_path: Path

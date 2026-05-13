@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.yt.clients.client_base import BaseYTClient
 
 
 def get_row_count(

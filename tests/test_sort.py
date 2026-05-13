@@ -1,4 +1,4 @@
-"""Tests for yt_framework.operations.sort.run_sort."""
+"""Tests for yt_framework.operations.command_ops.sort.run_sort."""
 
 import logging
 from unittest.mock import MagicMock
@@ -8,8 +8,8 @@ from omegaconf import OmegaConf
 
 from yt_framework.core.dependencies import PipelineStageDependencies
 from yt_framework.core.stage import StageContext
-from yt_framework.operations.sort import run_sort
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.operations.command_ops.sort import run_sort
+from yt_framework.yt.clients.client_base import BaseYTClient
 
 _LOG = logging.getLogger("tests.sort")
 

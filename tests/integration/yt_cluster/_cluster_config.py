@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Final
 
 from yt_framework.utils.env import load_env_file
-from yt_framework.yt.client_base import OperationResources
+from yt_framework.yt.clients.client_base import OperationResources
 
 # tests/integration/yt_cluster/_cluster_config.py -> parents[2] == tests/
 _TESTS_DIR: Final[Path] = Path(__file__).resolve().parents[2]

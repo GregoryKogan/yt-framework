@@ -31,7 +31,7 @@ Vanilla = single script invocation. Map = streaming JSON rows through `mapper.py
 ```python
 from yt_framework.core.pipeline import DebugContext
 from yt_framework.core.stage import BaseStage
-from yt_framework.operations.vanilla import run_vanilla
+from yt_framework.operations.command_ops.vanilla import run_vanilla
 
 class SetupStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
@@ -293,7 +293,7 @@ See [Checkpoints Guide](../advanced/checkpoints.md) for details.
 Use `run_vanilla()` function:
 
 ```python
-from yt_framework.operations.vanilla import run_vanilla
+from yt_framework.operations.command_ops.vanilla import run_vanilla
 
 success = run_vanilla(
     context=self.context,

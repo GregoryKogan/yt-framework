@@ -12,7 +12,7 @@ from yt_framework.yt._client_dev_runtime import (
 )
 from yt_framework.yt._client_split._client_dev_ops_mixin import ClientDevOpsMixin
 from yt_framework.yt._client_split._client_dev_yql_mixin import ClientDevYqlMixin
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.yt.clients.client_base import BaseYTClient
 from yt_framework.yt.max_row_weight import ensure_max_row_weight_pragma
 
 

@@ -84,9 +84,7 @@ def _dev_append_distinct_pythonpath_root(
         pp_parts.append(root)
 
 
-def dev_pythonpath_entries_for_dev_env(
-    pipeline_dir: Path, env_merged: dict[str, str]
-) -> list[str]:
+def dev_pythonpath_entries(pipeline_dir: Path, env_merged: dict[str, str]) -> list[str]:
     """Ordered PYTHONPATH segments for dev subprocesses."""
     pp_parts = [str(pipeline_dir)]
     _dev_append_distinct_pythonpath_root(pp_parts, package=yt_framework)
@@ -121,7 +119,7 @@ def dev_find_checkpoint_in_config(stage_config: DictConfig | ListConfig) -> str 
     return dev_find_checkpoint_in_operations(stage_config)
 
 
-def dev_try_checkpoint_from_stage_cfg(
+def dev_try_checkpoint_stage_cfg(
     stage_config_path: Path,
     logger: logging.Logger,
     find_in_config: Callable[[DictConfig | ListConfig], str | None],
@@ -143,14 +141,14 @@ def dev_try_checkpoint_from_stage_cfg(
     return None
 
 
-def _dev_stage_config_path_if_any(stage_dir: Path) -> Path | None:
+def dev_cfg_path_for_stage(stage_dir: Path) -> Path | None:
     if not stage_dir.is_dir():
         return None
     candidate = stage_dir / "config.yaml"
     return candidate if candidate.exists() else None
 
 
-def dev_scan_stages_dir_for_checkpoint(
+def dev_scan_stages_checkpoint(
     stages_dir: Path,
     logger: logging.Logger,
     find_in_config: Callable[[DictConfig | ListConfig], str | None],
@@ -158,10 +156,10 @@ def dev_scan_stages_dir_for_checkpoint(
     """Best-effort scan of ``stages/*/config.yaml`` for a usable checkpoint path."""
     try:
         for stage_dir in stages_dir.iterdir():
-            stage_config_path = _dev_stage_config_path_if_any(stage_dir)
+            stage_config_path = dev_cfg_path_for_stage(stage_dir)
             if stage_config_path is None:
                 continue
-            found = dev_try_checkpoint_from_stage_cfg(
+            found = dev_try_checkpoint_stage_cfg(
                 stage_config_path,
                 logger,
                 find_in_config,
@@ -175,13 +173,13 @@ def dev_scan_stages_dir_for_checkpoint(
 
 def _dev_first_existing_stage_config(stages_dir: Path) -> Path | None:
     for stage_dir in stages_dir.iterdir():
-        path = _dev_stage_config_path_if_any(stage_dir)
+        path = dev_cfg_path_for_stage(stage_dir)
         if path is not None:
             return path
     return None
 
 
-def dev_apply_first_stage_checkpoint_fallback(
+def dev_apply_stage_checkpoint_fallback(
     stages_dir: Path,
     env_merged: dict[str, str],
     logger: logging.Logger,
@@ -232,7 +230,7 @@ def _dev_fallback_replace_build_segment(
     return replaced
 
 
-def dev_rewrite_build_path_in_command(
+def dev_rewrite_build_path_cmd(
     vanilla_job: str,
     *,
     build_split_parts: int,
@@ -258,7 +256,7 @@ def dev_rewrite_build_path_in_command(
     )
 
 
-def _dev_copy_map_output_to_table(
+def dev_copy_map_output_table(
     *,
     proc_returncode: int,
     sandbox_output: Path,
@@ -304,7 +302,7 @@ def dev_run_map_subprocess(
             check=False,
             shell=False,
         )
-    _dev_copy_map_output_to_table(
+    dev_copy_map_output_table(
         proc_returncode=proc.returncode,
         sandbox_output=sandbox_output,
         append=append,
@@ -397,16 +395,16 @@ def dev_run_vanilla_subprocess(
 
 
 __all__ = [
-    "dev_apply_first_stage_checkpoint_fallback",
+    "dev_apply_stage_checkpoint_fallback",
     "dev_columns_from_first_row",
     "dev_find_checkpoint_in_config",
     "dev_import_ytjobs_dir",
-    "dev_pythonpath_entries_for_dev_env",
+    "dev_pythonpath_entries",
     "dev_resolve_ytjobs_source",
-    "dev_rewrite_build_path_in_command",
+    "dev_rewrite_build_path_cmd",
     "dev_run_map_subprocess",
     "dev_run_vanilla_subprocess",
     "dev_run_yql_simulation",
-    "dev_scan_stages_dir_for_checkpoint",
+    "dev_scan_stages_checkpoint",
     "dev_try_upload_one_dependency",
 ]

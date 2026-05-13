@@ -19,8 +19,8 @@ Run a map operation followed by a vanilla validation:
 ```python
 from yt_framework.core.pipeline import DebugContext
 from yt_framework.core.stage import BaseStage
-from yt_framework.operations.map import run_map
-from yt_framework.operations.vanilla import run_vanilla
+from yt_framework.operations.command_ops.map import run_map
+from yt_framework.operations.command_ops.vanilla import run_vanilla
 
 class ProcessAndValidateStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
@@ -220,8 +220,8 @@ client:
 # stages/process_and_validate/stage.py
 from yt_framework.core.pipeline import DebugContext
 from yt_framework.core.stage import BaseStage
-from yt_framework.operations.map import run_map
-from yt_framework.operations.vanilla import run_vanilla
+from yt_framework.operations.command_ops.map import run_map
+from yt_framework.operations.command_ops.vanilla import run_vanilla
 from yt_framework.utils.logging import log_header
 
 class ProcessAndValidateStage(BaseStage):
@@ -403,8 +403,8 @@ self.logger.info("Validate operation completed")
 The examples above chain **`run_map`** and **`run_vanilla`**. The same **sequential** pattern applies to other entry points:
 
 - **YQL**: call methods on `self.deps.yt_client` (for example `join_tables`, `filter_table`) with config-driven paths—see [YQL operations](../operations/yql.md).
-- **Map-reduce / reduce**: use `run_map_reduce` or `run_reduce` from `yt_framework.operations.map_reduce` with `self.context` and `self.config.client.operations.*`—see [TypedJob map-reduce](../operations/map-reduce-typed-jobs.md) and [Command mode](../operations/command-mode-map-reduce.md).
-- **Sort**: use `run_sort` from `yt_framework.operations.sort`—see [Sort operations](../operations/sort.md).
+- **Map-reduce / reduce**: use `run_map_reduce` or `run_reduce` from `yt_framework.operations.command_ops.map_reduce` with `self.context` and `self.config.client.operations.*`—see [TypedJob map-reduce](../operations/map-reduce-typed-jobs.md) and [Command mode](../operations/command-mode-map-reduce.md).
+- **Sort**: use `run_sort` from `yt_framework.operations.command_ops.sort`—see [Sort operations](../operations/sort.md).
 
 You can mix these in one `run()` method as long as each step’s inputs (tables, configs) match the previous output.
 

@@ -24,7 +24,7 @@ Under `client.operations.sort` in the stage `config.yaml`:
 from omegaconf import OmegaConf
 from yt_framework.core.pipeline import DebugContext
 from yt_framework.core.stage import BaseStage
-from yt_framework.operations.sort import run_sort
+from yt_framework.operations.command_ops.sort import run_sort
 
 
 class SortStage(BaseStage):

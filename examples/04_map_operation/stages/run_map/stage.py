@@ -1,6 +1,6 @@
 from yt_framework.core.pipeline import DebugContext
 from yt_framework.core.stage import BaseStage
-from yt_framework.operations.map import run_map
+from yt_framework.operations.command_ops.map import run_map
 
 
 class RunMapStage(BaseStage):

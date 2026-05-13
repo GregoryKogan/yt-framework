@@ -10,7 +10,7 @@ from yt_framework.yt.operation_secure_env import (
     merge_secure_vault,
     partition_env_for_yt_spec,
     promote_secure_vault_environment,
-    wrap_shell_cmd_secure_vault_promote,
+    wrap_shell_cmd_vault_promote,
 )
 
 
@@ -67,7 +67,7 @@ def test_promote_skips_pickling_key() -> None:
 
 def test_wrap_command_roundtrip_shell_words() -> None:
     inner = "python3 mapper.py 'a b'"
-    wrapped = wrap_shell_cmd_secure_vault_promote(inner)
+    wrapped = wrap_shell_cmd_vault_promote(inner)
     assert wrapped.startswith("python3 -c ")
     assert wrapped.count(" bash -c ") == 1
     _, tail = wrapped.split(" bash -c ", 1)
@@ -75,7 +75,7 @@ def test_wrap_command_roundtrip_shell_words() -> None:
 
 
 def test_wrap_command_contract_requires_python3_and_bash() -> None:
-    wrapped = wrap_shell_cmd_secure_vault_promote("echo ok")
+    wrapped = wrap_shell_cmd_vault_promote("echo ok")
     assert wrapped.startswith("python3 -c ")
     assert " bash -c " in wrapped
 

@@ -12,7 +12,7 @@ Example:
 
 """
 
-from .client_base import BaseYTClient
+from .clients import BaseYTClient
 from .factory import create_yt_client
 
 __all__ = ["BaseYTClient", "create_yt_client"]

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 from yt_framework.yt.operation_secure_env import (
     partition_env_for_yt_spec,
-    wrap_shell_cmd_secure_vault_promote,
+    wrap_shell_cmd_vault_promote,
 )
 
 
@@ -23,11 +23,9 @@ def _public_env_keys_for_partition(raw: object) -> Collection[str] | None:
     return [str(raw)]
 
 
-def _maybe_wrap_string_command_for_vault(
-    leg: object, secure_flat: dict[str, str]
-) -> object:
+def maybe_wrap_cmd_for_vault(leg: object, secure_flat: dict[str, str]) -> object:
     if secure_flat and isinstance(leg, str):
-        return wrap_shell_cmd_secure_vault_promote(leg)
+        return wrap_shell_cmd_vault_promote(leg)
     return leg
 
 
@@ -45,5 +43,5 @@ def _partition_and_maybe_wrap_leg(
             env,
             _public_env_keys_for_partition(environment_public_keys),
         )
-    leg = _maybe_wrap_string_command_for_vault(leg, secure_flat)
+    leg = maybe_wrap_cmd_for_vault(leg, secure_flat)
     return public_env, secure_flat, leg

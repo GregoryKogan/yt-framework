@@ -31,7 +31,7 @@ Your mapper script must read from stdin and write to stdout. Each line is a JSON
 ```python
 from yt_framework.core.pipeline import DebugContext
 from yt_framework.core.stage import BaseStage
-from yt_framework.operations.map import run_map
+from yt_framework.operations.command_ops.map import run_map
 
 class ProcessDataStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:
@@ -319,7 +319,7 @@ See [Checkpoints Guide](../advanced/checkpoints.md) for details.
 Use `run_map()` function:
 
 ```python
-from yt_framework.operations.map import run_map
+from yt_framework.operations.command_ops.map import run_map
 
 success = run_map(
     context=self.context,

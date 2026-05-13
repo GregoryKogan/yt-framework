@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from yt_framework.operations.table import download_table, get_row_count, read_table
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.yt.clients.client_base import BaseYTClient
 
 _LOG = logging.getLogger("tests.table")
 

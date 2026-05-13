@@ -11,8 +11,8 @@ from yt.wrapper import FilePath, MapSpecBuilder, TablePath, TypedJob, VanillaSpe
 from yt.wrapper import format as yt_format
 from yt.wrapper.spec_builders import MapReduceSpecBuilder, ReduceSpecBuilder
 
-from yt_framework.yt.client_base import OperationResources
-from yt_framework.yt.max_row_weight import parse_max_row_weight_to_bytes
+from yt_framework.yt.clients.client_base import OperationResources
+from yt_framework.yt.max_row_weight import parse_max_row_weight_bytes
 
 # YtClient.run_operation() only accepts these keyword args; everything else must be
 # applied via SpecBuilder chain methods (weight, title, description, …).
@@ -54,7 +54,7 @@ def _pop_run_operation_kwargs(
     return kw, run_op
 
 
-def _apply_one_spec_kw_to_builder(
+def apply_one_spec_kw_builder(
     spec_builder: object,
     kw: dict[str, Any],
     key: str,
@@ -76,14 +76,14 @@ def _apply_one_spec_kw_to_builder(
     raise ValueError(msg)
 
 
-def _apply_spec_options_split_run_kwargs(
+def apply_spec_opts_run_kwargs(
     spec_builder: object,
     kwargs: dict[str, Any],
 ) -> tuple[Any, dict[str, Any]]:
     """Apply SpecBuilder kwargs and split out ``run_operation`` options."""
     kw, run_op = _pop_run_operation_kwargs(kwargs, _RUN_OPERATION_KWARGS)
     for key, val in list(kw.items()):
-        spec_builder = _apply_one_spec_kw_to_builder(
+        spec_builder = apply_one_spec_kw_builder(
             spec_builder,
             kw,
             key,
@@ -103,14 +103,14 @@ def _apply_command_leg_format(
     return cast("Any", leg_builder).format(yt_format.JsonFormat(encode_utf8=False))
 
 
-def _apply_max_row_weight_spec_builder(
+def apply_max_row_weight_builder(
     spec_builder: object,
     max_row_weight: str | None,
 ) -> object:
     """Apply max row weight to spec builder when supported."""
     if max_row_weight is None:
         return spec_builder
-    max_row_weight_bytes = parse_max_row_weight_to_bytes(max_row_weight)
+    max_row_weight_bytes = parse_max_row_weight_bytes(max_row_weight)
     sb = cast("Any", spec_builder)
     table_writer = getattr(sb, "table_writer", None)
     if callable(table_writer):
@@ -130,7 +130,7 @@ def read_required_yt_secret(
     return str(val)
 
 
-def disable_yt_proxy_discovery_best_effort(
+def disable_yt_proxy_discovery(
     client: Any, logger: logging.Logger, yt_proxy: str
 ) -> None:
     try:
@@ -150,7 +150,7 @@ def disable_yt_proxy_discovery_best_effort(
         logger.debug("YT Client initialized with proxy: %s", yt_proxy)
 
 
-def prod_create_table_parent_if_missing(
+def prod_create_table_parent(
     *,
     make_parents: bool,
     table_path: str,
@@ -169,7 +169,7 @@ def prod_create_table_parent_if_missing(
     create_path(parent_dir, "map_node")
 
 
-def prod_write_table_replace_or_create(
+def prod_write_table_replace_create(
     client: Any,
     *,
     append: bool,
@@ -281,7 +281,7 @@ def prod_upload_directory_files(
     return uploaded
 
 
-def prod_merge_sort_spec_into_kwargs(
+def prod_merge_sort_spec_kwargs(
     kwargs: dict[str, Any],
     *,
     pool: str | None,
@@ -299,7 +299,7 @@ def prod_merge_sort_spec_into_kwargs(
     return out
 
 
-def prod_assemble_map_spec_with_vault(
+def prod_map_spec_with_vault(
     *,
     input_table: str,
     output_path: TablePath,
@@ -339,7 +339,7 @@ def prod_assemble_map_spec_with_vault(
     return _spec_builder_secure_vault(spec_builder, merged_vault)
 
 
-def prod_assemble_vanilla_spec_with_vault(
+def prod_vanilla_spec_with_vault(
     *,
     resources: OperationResources,
     max_failed_jobs: int,
@@ -378,7 +378,7 @@ def prod_assemble_vanilla_spec_with_vault(
     return _spec_builder_secure_vault(spec_builder, merged_vault)
 
 
-def prod_map_reduce_open_spec_builder(
+def prod_mr_open_spec_builder(
     *,
     source_table: TablePath,
     dest_table: TablePath,
@@ -482,11 +482,11 @@ def prod_submit_operation_with_kwargs(
     none_message: str,
     log_message: str,
 ) -> Any:
-    spec_builder = _apply_max_row_weight_spec_builder(
+    spec_builder = apply_max_row_weight_builder(
         spec_builder,
         _optional_str_kw(kwargs.get("max_row_weight")),
     )
-    spec_builder, run_op = _apply_spec_options_split_run_kwargs(
+    spec_builder, run_op = apply_spec_opts_run_kwargs(
         spec_builder,
         kwargs,
     )
@@ -500,22 +500,22 @@ def prod_submit_operation_with_kwargs(
 
 __all__ = [
     "_apply_command_leg_format",
-    "_apply_max_row_weight_spec_builder",
-    "_apply_spec_options_split_run_kwargs",
     "_optional_str_kw",
     "_raise_runtime_error",
     "_spec_builder_secure_vault",
-    "disable_yt_proxy_discovery_best_effort",
-    "prod_assemble_map_spec_with_vault",
-    "prod_assemble_vanilla_spec_with_vault",
-    "prod_create_table_parent_if_missing",
+    "apply_max_row_weight_builder",
+    "apply_spec_opts_run_kwargs",
+    "disable_yt_proxy_discovery",
+    "prod_create_table_parent",
     "prod_map_reduce_after_legs",
-    "prod_map_reduce_open_spec_builder",
-    "prod_merge_sort_spec_into_kwargs",
+    "prod_map_spec_with_vault",
+    "prod_merge_sort_spec_kwargs",
+    "prod_mr_open_spec_builder",
     "prod_reduce_finish_reducer_leg",
     "prod_reduce_open_spec_builder",
     "prod_submit_operation_with_kwargs",
     "prod_upload_directory_files",
-    "prod_write_table_replace_or_create",
+    "prod_vanilla_spec_with_vault",
+    "prod_write_table_replace_create",
     "read_required_yt_secret",
 ]

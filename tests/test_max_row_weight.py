@@ -5,13 +5,13 @@ import pytest
 from yt_framework.yt.max_row_weight import (
     MAX_ALLOWED_BYTES,
     ensure_max_row_weight_pragma,
-    parse_max_row_weight_to_bytes,
+    parse_max_row_weight_bytes,
     validate_max_row_weight,
 )
 
 
-def test_parse_max_row_weight_to_bytes_uses_binary_m_suffix() -> None:
-    assert parse_max_row_weight_to_bytes("1M") == 1024**2
+def test_parse_max_row_weight_bytes_uses_binary_m_suffix() -> None:
+    assert parse_max_row_weight_bytes("1M") == 1024**2
 
 
 def test_validate_max_row_weight_none_returns_default() -> None:

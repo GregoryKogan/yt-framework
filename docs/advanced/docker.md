@@ -268,7 +268,7 @@ client:
 # stages/run_in_docker/stage.py
 from yt_framework.core.pipeline import DebugContext
 from yt_framework.core.stage import BaseStage
-from yt_framework.operations.vanilla import run_vanilla
+from yt_framework.operations.command_ops.vanilla import run_vanilla
 
 class RunInDockerStage(BaseStage):
     def run(self, debug: DebugContext) -> DebugContext:

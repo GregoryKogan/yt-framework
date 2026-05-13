@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from yt_framework.yt.client_dev import YTDevClient
-from yt_framework.yt.client_prod import YTProdClient
+from yt_framework.yt.clients.client_dev import YTDevClient
+from yt_framework.yt.clients.client_prod import YTProdClient
 from yt_framework.yt.factory import create_yt_client
 
 
