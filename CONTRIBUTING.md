@@ -81,7 +81,7 @@ Contributions come in many forms:
    pre-commit install
    ```
 
-   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Ruff](https://docs.astral.sh/ruff/) (`ruff check --fix` and `ruff format`), strict [BasedPyright](https://docs.basedpyright.com/), [Vulture](https://github.com/jendrikseipp/vulture) (dead-code scan for `yt_framework` and `ytjobs`; see `[tool.vulture]` in `pyproject.toml`), [Xenon](https://github.com/rubik/xenon) (cyclomatic complexity on those packages; thresholds in [.pre-commit-config.yaml](.pre-commit-config.yaml)), and [Tach](https://github.com/tach-org/tach) via [gauge-sh/tach-pre-commit](https://github.com/gauge-sh/tach-pre-commit) (`tach check` against [tach.toml](tach.toml): `yt_framework` may depend on `ytjobs`, not the reverse; unused declared edges and cycles between those modules fail the check). The type checker and Tach hook run in pre-commit’s managed Python environments and do not require Conda. **Tests are not run by pre-commit**; run `conda run -n yt-framework -- python -m pytest -m "not yt_cluster"` locally before you push, or rely on CI (see below). To skip hooks in an emergency, use `git commit --no-verify`. To run checks manually before commit, use:
+   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Ruff](https://docs.astral.sh/ruff/) (`ruff check --fix` and `ruff format`), strict [BasedPyright](https://docs.basedpyright.com/), [Vulture](https://github.com/jendrikseipp/vulture) (dead-code scan for `yt_framework` and `ytjobs`; see `[tool.vulture]` in `pyproject.toml`), [Xenon](https://github.com/rubik/xenon) (cyclomatic complexity on those packages; thresholds in [.pre-commit-config.yaml](.pre-commit-config.yaml)), [Tach](https://github.com/tach-org/tach) via [gauge-sh/tach-pre-commit](https://github.com/gauge-sh/tach-pre-commit) (`tach check` against [tach.toml](tach.toml): `yt_framework` may depend on `ytjobs`, not the reverse; unused declared edges and cycles between those modules fail the check), and **`python -m pytest -m "not yt_cluster"`** from the `pytest` hook in [.pre-commit-config.yaml](.pre-commit-config.yaml) (`language: python` with `additional_dependencies` aligned to `[project] dependencies` in `pyproject.toml`, not `language: system` / Conda). You can still run `conda run -n yt-framework -- python -m pytest …` locally when you prefer the Conda env. To skip hooks in an emergency, use `git commit --no-verify` or `git push --no-verify`. To run checks manually before commit, use:
 
    ```bash
    pre-commit run ruff-check --all-files
@@ -90,9 +90,12 @@ Contributions come in many forms:
    pre-commit run vulture --all-files
    pre-commit run xenon --all-files
    pre-commit run tach --all-files
+   pre-commit run pytest --all-files
    ```
 
-   Or directly (same Conda env): `conda run -n yt-framework -- ruff check .`, `conda run -n yt-framework -- ruff format .`, `conda run -n yt-framework -- basedpyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`, `conda run -n yt-framework -- vulture`, `conda run -n yt-framework -- xenon --max-absolute=A --max-modules=A --max-average=A yt_framework ytjobs`, and `conda run -n yt-framework -- tach check`.
+   Or directly (same Conda env): `conda run -n yt-framework -- ruff check .`, `conda run -n yt-framework -- ruff format .`, `conda run -n yt-framework -- basedpyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`, `conda run -n yt-framework -- vulture`, `conda run -n yt-framework -- xenon --max-absolute=A --max-modules=A --max-average=A yt_framework ytjobs`, `conda run -n yt-framework -- tach check`, and `conda run -n yt-framework -- python -m pytest -m "not yt_cluster"`.
+
+   When you change runtime dependencies under `[project] dependencies` in `pyproject.toml`, update the `pytest` hook’s `additional_dependencies` in [.pre-commit-config.yaml](.pre-commit-config.yaml) so the hook’s venv matches.
 
 6. **Set up YT credentials** (for production mode testing):
 
