@@ -1,4 +1,4 @@
-"""Contract tests for yt_framework.yt.client_prod.YTProdClient (no cluster I/O)."""
+"""Contract tests for yt_framework.yt.clients.client_prod.YTProdClient (no cluster I/O)."""
 
 import logging
 from pathlib import Path
@@ -11,11 +11,11 @@ from yt.wrapper import schema as yt_schema  # pyright: ignore[reportMissingImpor
 
 from yt_framework.yt._client_prod_runtime import (
     _apply_command_leg_format,
-    _apply_max_row_weight_spec_builder,
-    _apply_spec_options_split_run_kwargs,
+    apply_max_row_weight_builder,
+    apply_spec_opts_run_kwargs,
 )
-from yt_framework.yt.client_base import OperationResources
-from yt_framework.yt.client_prod import YTProdClient
+from yt_framework.yt.clients.client_base import OperationResources
+from yt_framework.yt.clients.client_prod import YTProdClient
 
 
 def _null_logger(name: str) -> logging.Logger:
@@ -52,7 +52,7 @@ class _FakeSpecBuilder:
 
 def test_apply_spec_options_splits_run_operation_kwargs_from_builder_chain() -> None:
     b = _FakeSpecBuilder()
-    b2, run_op = _apply_spec_options_split_run_kwargs(
+    b2, run_op = apply_spec_opts_run_kwargs(
         b,
         {"title": "my_job", "sync": True},
     )
@@ -64,7 +64,7 @@ def test_apply_spec_options_splits_run_operation_kwargs_from_builder_chain() -> 
 def test_apply_spec_options_raises_value_error_on_unknown_operation_kwarg() -> None:
     b = _FakeSpecBuilder()
     with pytest.raises(ValueError, match="Unknown YT operation option 'bad_kw'"):
-        _apply_spec_options_split_run_kwargs(b, {"bad_kw": 1})
+        apply_spec_opts_run_kwargs(b, {"bad_kw": 1})
 
 
 class _LegBuilderWithFormat:
@@ -123,7 +123,7 @@ def _prod_client_with_run_operation_id(
     fake_op.id = op_id
     fake_inner.run_operation.return_value = fake_op
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger(logger_name),
@@ -134,7 +134,7 @@ def _prod_client_with_run_operation_id(
 
 def _stub_split_run_operation_kwargs(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "yt_framework.yt._client_prod_runtime._apply_spec_options_split_run_kwargs",
+        "yt_framework.yt._client_prod_runtime.apply_spec_opts_run_kwargs",
         lambda sb, kw: (sb, {}),
     )
 
@@ -152,23 +152,23 @@ def test_apply_command_leg_format_skips_format_for_typed_job_leg() -> None:
     assert b.format_specs == []
 
 
-def test_apply_max_row_weight_spec_builder_writes_bytes_to_table_writer() -> None:
+def testapply_max_row_weight_builder_writes_bytes_to_table_writer() -> None:
     b = _BuilderWithTableWriter()
-    out = _apply_max_row_weight_spec_builder(b, "128M")
+    out = apply_max_row_weight_builder(b, "128M")
     assert out is b
     assert b.payload == {"max_row_weight": 134217728}
 
 
-def test_apply_max_row_weight_spec_builder_uses_job_io_fallback_with_bytes() -> None:
+def testapply_max_row_weight_builder_uses_job_io_fallback_with_bytes() -> None:
     b = _BuilderWithJobIo()
-    out = _apply_max_row_weight_spec_builder(b, "64M")
+    out = apply_max_row_weight_builder(b, "64M")
     assert out is b
     assert b.payload == {"table_writer": {"max_row_weight": 67108864}}
 
 
-def test_apply_max_row_weight_spec_builder_prefers_table_writer_over_job_io() -> None:
+def testapply_max_row_weight_builder_prefers_table_writer_over_job_io() -> None:
     b = _BuilderWithTableWriterAndJobIo()
-    out = _apply_max_row_weight_spec_builder(b, "64M")
+    out = apply_max_row_weight_builder(b, "64M")
     assert out is b
     assert b.table_writer_payload == {"max_row_weight": 67108864}
     assert b.job_io_payload is None
@@ -183,7 +183,7 @@ def test_yt_prod_client_run_map_configures_pool_tree_docker_and_secure_vault(
     fake_op.id = "yt-op-docker"
     fake_inner.run_operation.return_value = fake_op
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
 
     spec = MagicMock()
@@ -252,7 +252,7 @@ def test_yt_prod_client_run_map_partitions_env_into_vault_and_wraps_string_comma
     fake_op.id = "yt-op-env-vault"
     fake_inner.run_operation.return_value = fake_op
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
 
     spec = MagicMock()
@@ -284,7 +284,7 @@ def test_yt_prod_client_run_map_partitions_env_into_vault_and_wraps_string_comma
         "yt_framework.yt._client_prod_runtime.MapSpecBuilder", lambda: spec
     )
     monkeypatch.setattr(
-        "yt_framework.yt._client_prod_runtime._apply_spec_options_split_run_kwargs",
+        "yt_framework.yt._client_prod_runtime.apply_spec_opts_run_kwargs",
         lambda sb, kw: (sb, {}),
     )
 
@@ -315,7 +315,7 @@ def test_yt_prod_client_run_map_returns_operation_from_client_run_operation(
     fake_op.id = "yt-op-1"
     fake_inner.run_operation.return_value = fake_op
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.run_map"),
@@ -443,7 +443,7 @@ def test_yt_prod_client_run_map_sets_output_table_path_append_when_requested(
     fake_op.id = "yt-op-append-map"
     fake_inner.run_operation.return_value = fake_op
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
 
     spec = MagicMock()
@@ -483,7 +483,7 @@ def test_yt_prod_client_run_map_sets_output_table_path_append_when_requested(
     )
 
     monkeypatch.setattr(
-        "yt_framework.yt._client_prod_runtime._apply_spec_options_split_run_kwargs",
+        "yt_framework.yt._client_prod_runtime.apply_spec_opts_run_kwargs",
         lambda sb, kw: (sb, {}),
     )
 
@@ -510,7 +510,7 @@ def _prod_client_with_stub_run_operation(monkeypatch: pytest.MonkeyPatch) -> Any
     fake_op.id = "yt-op-stub"
     fake_inner.run_operation.return_value = fake_op
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.stub"),
@@ -579,7 +579,7 @@ def test_yt_prod_client_run_vanilla_configures_pool_tree_docker_description_and_
     fake_op.id = "yt-vanilla-docker"
     fake_inner.run_operation.return_value = fake_op
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
 
     spec = MagicMock()
@@ -807,7 +807,7 @@ def test_yt_prod_client_run_map_reduce_wires_pool_tree_slots_description_sort_ma
     fake_op.id = "mr-wired"
     fake_inner.run_operation.return_value = fake_op
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
 
     spec = MagicMock()
@@ -883,7 +883,7 @@ def test_yt_prod_client_run_map_reduce_applies_docker_secure_vault_on_mapper_and
     fake_op.id = "mr-docker"
     fake_inner.run_operation.return_value = fake_op
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
 
     spec = MagicMock()
@@ -953,7 +953,7 @@ def test_yt_prod_client_run_reduce_wires_pool_tree_slots_description_docker_vaul
     fake_op.id = "red-wired"
     fake_inner.run_operation.return_value = fake_op
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
 
     spec = MagicMock()
@@ -1026,7 +1026,7 @@ def test_yt_prod_client_run_sort_calls_client_run_sort_with_sort_columns(
 ) -> None:
     fake_inner = MagicMock()
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.run_sort"),
@@ -1051,7 +1051,7 @@ def test_yt_prod_client_write_table_creates_and_writes_via_stub_client(
     fake_inner = MagicMock()
     fake_inner.exists.return_value = False
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.write"),
@@ -1069,7 +1069,7 @@ def test_yt_prod_client_read_table_returns_materialized_rows_from_stub_client(
     fake_inner = MagicMock()
     fake_inner.read_table.return_value = iter([{"z": 2}])
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.read"),
@@ -1084,7 +1084,7 @@ def test_yt_prod_client_exists_delegates_to_stub_client(
     fake_inner = MagicMock()
     fake_inner.exists.return_value = True
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.exists"),
@@ -1100,7 +1100,7 @@ def test_yt_prod_client_row_count_delegates_to_stub_client(
     fake_inner = MagicMock()
     fake_inner.row_count.return_value = 42
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.rc"),
@@ -1114,7 +1114,7 @@ def test_yt_prod_client_create_path_calls_client_create(
 ) -> None:
     fake_inner = MagicMock()
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.cp"),
@@ -1133,7 +1133,7 @@ def test_yt_prod_client_create_path_raises_after_logging_when_create_fails(
     fake_inner = MagicMock()
     fake_inner.create.side_effect = OSError("yt create denied")
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     caplog.set_level(logging.ERROR)
     client = YTProdClient(
@@ -1152,7 +1152,7 @@ def test_yt_prod_client_exists_raises_after_logging_when_exists_fails(
     fake_inner = MagicMock()
     fake_inner.exists.side_effect = RuntimeError("network down")
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     caplog.set_level(logging.ERROR)
     client = YTProdClient(
@@ -1183,7 +1183,7 @@ def test_yt_prod_client_run_map_raises_runtime_error_when_run_operation_returns_
     fake_inner = MagicMock()
     fake_inner.run_operation.return_value = None
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.run_map_none"),
@@ -1205,7 +1205,7 @@ def _prod_client_with_fake_inner(
 ) -> tuple[Any, MagicMock]:
     fake_inner = MagicMock()
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.fake_inner"),
@@ -1628,7 +1628,7 @@ def test_yt_prod_client_init_warns_when_proxy_discovery_config_unusable(
     fake_inner = MagicMock()
     fake_inner.config = _BadCfg()
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     caplog.set_level(logging.WARNING)
     YTProdClient(
@@ -1879,7 +1879,7 @@ def test_yt_prod_client_run_vanilla_raises_when_run_operation_returns_none(
     fake_inner = MagicMock()
     fake_inner.run_operation.return_value = None
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.v_none"),
@@ -1895,7 +1895,7 @@ def test_yt_prod_client_run_map_reduce_raises_when_run_operation_returns_none(
     fake_inner = MagicMock()
     fake_inner.run_operation.return_value = None
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.mr_none"),
@@ -1920,7 +1920,7 @@ def test_yt_prod_client_run_reduce_raises_when_run_operation_returns_none(
     fake_inner = MagicMock()
     fake_inner.run_operation.return_value = None
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     client = YTProdClient(
         _null_logger("tests.client_prod.red_none"),
@@ -1937,7 +1937,7 @@ def test_yt_prod_client_run_vanilla_propagates_submit_exception_after_error_log(
     fake_inner = MagicMock()
     fake_inner.run_operation.side_effect = ValueError("bad spec")
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     caplog.set_level(logging.ERROR)
     client = YTProdClient(
@@ -1956,7 +1956,7 @@ def test_yt_prod_client_run_sort_raises_after_log_on_client_failure(
     fake_inner = MagicMock()
     fake_inner.run_sort.side_effect = OSError("sort cluster error")
     monkeypatch.setattr(
-        "yt_framework.yt.client_prod.YtClient", lambda *a, **k: fake_inner
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
     )
     caplog.set_level(logging.ERROR)
     client = YTProdClient(

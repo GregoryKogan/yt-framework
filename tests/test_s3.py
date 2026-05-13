@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from yt_framework.operations.s3 import list_s3_files, save_s3_paths_to_table
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.yt.clients.client_base import BaseYTClient
 
 
 def _log(name: str) -> logging.Logger:

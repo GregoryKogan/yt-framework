@@ -1,7 +1,7 @@
 from yt_framework.core.pipeline import DebugContext
 from yt_framework.core.stage import BaseStage
-from yt_framework.operations.map import run_map
-from yt_framework.operations.vanilla import run_vanilla
+from yt_framework.operations.command_ops.map import run_map
+from yt_framework.operations.command_ops.vanilla import run_vanilla
 from yt_framework.utils.logging import log_header
 
 

@@ -12,10 +12,10 @@ from yt_framework.operations._internal.upload_helpers import (
     _copy_module_to_build_dir,
     _copy_path_to_build_dir,
     _copy_stage_to_build_dir,
-    _load_stage_job_section,
     _resolve_upload_target,
     _validate_upload_config,
 )
+from yt_framework.operations._internal.upload_wrappers import _load_stage_job_section
 from yt_framework.operations.upload import (
     _create_map_reduce_command_wrappers,
     _create_wrappers_for_stage,
@@ -27,7 +27,7 @@ from yt_framework.operations.upload import (
     upload_all_code,
     upload_code_archive,
 )
-from yt_framework.yt.client_dev import YTDevClient
+from yt_framework.yt.clients.client_dev import YTDevClient
 
 
 class _FakeUploadYtClient:

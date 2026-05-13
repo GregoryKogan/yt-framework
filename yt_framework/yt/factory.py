@@ -4,9 +4,9 @@ import logging
 from pathlib import Path
 from typing import Any, Literal
 
-from yt_framework.yt.client_base import BaseYTClient
-from yt_framework.yt.client_dev import YTDevClient
-from yt_framework.yt.client_prod import YTProdClient
+from yt_framework.yt.clients.client_base import BaseYTClient
+from yt_framework.yt.clients.client_dev import YTDevClient
+from yt_framework.yt.clients.client_prod import YTProdClient
 
 
 def _coerce_pipeline_dir(pipeline_dir: Path | str | None) -> Path | None:

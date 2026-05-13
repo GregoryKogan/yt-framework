@@ -8,21 +8,22 @@ from typing import TYPE_CHECKING
 from omegaconf import DictConfig, OmegaConf
 from yt.wrapper.schema import TableSchema
 
-from yt_framework.utils.logging import log_header, log_success
-
-from ._internal.dependency_strategy import TarArchiveDependencyBuilder
-from .common import (
+from yt_framework.operations._internal.dependency_strategy import (
+    TarArchiveDependencyBuilder,
+)
+from yt_framework.operations.common import (
     build_operation_environment,
     collect_passthrough_kwargs,
-    extract_docker_auth_from_operation_config,
+    docker_auth_from_op_config,
     extract_max_failed_jobs,
     extract_operation_resources,
     extract_secure_env_client_kwargs,
 )
+from yt_framework.utils.logging import log_header, log_success
 
 if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
-    from yt_framework.yt.client_base import OperationResources
+    from yt_framework.yt.clients.client_base import OperationResources
 
 
 @dataclass
@@ -203,7 +204,7 @@ def run_map(
         logger=logger,
     )
     map_operation_data.environment = env
-    map_operation_data.docker_auth = extract_docker_auth_from_operation_config(
+    map_operation_data.docker_auth = docker_auth_from_op_config(
         operation_config,
         env,
     )

@@ -9,20 +9,22 @@ from pathlib import Path
 
 from yt_framework.operations._internal.upload_helpers import (
     _BUILD_CODE_DIR,
-    _bash_wrapper_script_body,
     _copy_module_to_build_dir,
     _copy_path_to_build_dir,
     _copy_stage_to_build_dir,
     _copy_ytjobs_to_build_dir,
+    _resolve_upload_target,
+    _validate_upload_config,
+)
+from yt_framework.operations._internal.upload_wrappers import (
+    _bash_wrapper_script_body,
     _create_unified_wrapper_script,
     _resolve_map_reduce_command_scripts,
     _resolve_reduce_command_script,
-    _resolve_upload_target,
-    _validate_upload_config,
     _write_wrapper_file,
 )
 from yt_framework.utils import log_header, log_success
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.yt.clients.client_base import BaseYTClient
 
 
 def _create_map_reduce_command_wrappers(

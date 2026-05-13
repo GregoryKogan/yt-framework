@@ -10,14 +10,14 @@ from yt.wrapper import format as yt_format
 
 from yt_framework.yt._client_prod_runtime import (
     _raise_runtime_error,
-    disable_yt_proxy_discovery_best_effort,
-    prod_create_table_parent_if_missing,
-    prod_write_table_replace_or_create,
+    disable_yt_proxy_discovery,
+    prod_create_table_parent,
+    prod_write_table_replace_create,
     read_required_yt_secret,
 )
 from yt_framework.yt._client_split._client_prod_ops_mixin import ClientProdOpsMixin
 from yt_framework.yt._client_split._client_prod_yql_mixin import ClientProdYqlMixin
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.yt.clients.client_base import BaseYTClient
 from yt_framework.yt.max_row_weight import (
     build_max_row_weight_pragma,
     ensure_max_row_weight_pragma,
@@ -69,7 +69,7 @@ class YTProdClient(ClientProdYqlMixin, ClientProdOpsMixin, BaseYTClient):
 
         self.client = YtClient(proxy=yt_proxy, token=yt_token)
         self._apply_pickling_config(pickling or {})
-        disable_yt_proxy_discovery_best_effort(self.client, self.logger, yt_proxy)
+        disable_yt_proxy_discovery(self.client, self.logger, yt_proxy)
 
     def _apply_pickling_config(self, pickling: dict[str, Any]) -> None:
         """Apply pickling flags from pipeline config to the YT client.
@@ -170,13 +170,13 @@ class YTProdClient(ClientProdYqlMixin, ClientProdOpsMixin, BaseYTClient):
         self.logger.info("Writing %s rows → %s (%s)", len(rows), table_path, mode_str)
 
         try:
-            prod_create_table_parent_if_missing(
+            prod_create_table_parent(
                 make_parents=make_parents,
                 table_path=table_path,
                 create_path=self.create_path,
                 logger=self.logger,
             )
-            prod_write_table_replace_or_create(
+            prod_write_table_replace_create(
                 self.client,
                 append=append,
                 table_path=table_path,
@@ -277,7 +277,7 @@ class YTProdClient(ClientProdYqlMixin, ClientProdOpsMixin, BaseYTClient):
         error_str = str(error)
         return "Failed to decode string" in error_str or "encoding" in error_str.lower()
 
-    def _infer_columns_via_temp_yql_table(self, table_path: str) -> list[str]:
+    def _infer_columns_temp_yql(self, table_path: str) -> list[str]:
         temp_output = f"{table_path}.temp_schema_{uuid.uuid4().hex[:8]}"
         try:
             query = f"""{build_max_row_weight_pragma()}
@@ -308,7 +308,7 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             "Reading failed due to binary columns, using YQL to infer schema",
         )
         try:
-            columns = self._infer_columns_via_temp_yql_table(table_path)
+            columns = self._infer_columns_temp_yql(table_path)
             if columns:
                 return columns
         except Exception as yql_error:  # noqa: BLE001

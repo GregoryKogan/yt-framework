@@ -1,4 +1,4 @@
-"""Tests for yt_framework.operations.map.run_map."""
+"""Tests for yt_framework.operations.command_ops.map.run_map."""
 
 import logging
 from pathlib import Path
@@ -12,8 +12,8 @@ from yt_framework.core.stage import StageContext
 from yt_framework.operations._internal.dependency_strategy import (
     DependencyBuildResult,
 )
-from yt_framework.operations.map import run_map
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.operations.command_ops.map import run_map
+from yt_framework.yt.clients.client_base import BaseYTClient
 
 _LOG = logging.getLogger("tests.map")
 _LOG.addHandler(logging.NullHandler())
@@ -142,7 +142,9 @@ def test_run_map_passes_append_from_operation_config(tmp_path: Path) -> None:
     assert call_kw.get("append") is True
 
 
-@patch("yt_framework.operations.map.TarArchiveDependencyBuilder.build_dependencies")
+@patch(
+    "yt_framework.operations.command_ops.map.TarArchiveDependencyBuilder.build_dependencies"
+)
 def test_run_map_raises_when_mapper_missing_and_builder_command_missing(
     mock_build: MagicMock, tmp_path: Path
 ) -> None:

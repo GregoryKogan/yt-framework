@@ -17,7 +17,8 @@ def _json_row_from_stdin_line(raw_line: str) -> object | None:
     return parse_json_line(line)
 
 
-def _iter_nonempty_json_rows_from_stdin() -> Iterator[object]:
+def iter_nonempty_json_rows_stdin() -> Iterator[object]:
+    """Yield non-empty JSON rows parsed from ``sys.stdin``."""
     for raw_line in sys.stdin:
         row_data = _json_row_from_stdin_line(raw_line)
         if row_data is not None:
@@ -188,7 +189,7 @@ class BatchMapper:
         batch: list[Any] = []
         batch_count = 0
 
-        for row_data in _iter_nonempty_json_rows_from_stdin():
+        for row_data in iter_nonempty_json_rows_stdin():
             batch.append(row_data)
             batch, batch_count = self._flush_batch_if_at_capacity(
                 batch,

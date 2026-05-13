@@ -7,17 +7,18 @@ from typing import TYPE_CHECKING, Any
 
 from omegaconf import DictConfig, OmegaConf
 
-from yt_framework.utils.logging import log_header, log_success
-
-from ._internal.dependency_strategy import TarArchiveDependencyBuilder
-from .common import (
+from yt_framework.operations._internal.dependency_strategy import (
+    TarArchiveDependencyBuilder,
+)
+from yt_framework.operations.common import (
     build_operation_environment,
     collect_passthrough_kwargs,
-    extract_docker_auth_from_operation_config,
+    docker_auth_from_op_config,
     extract_max_failed_jobs,
     extract_operation_resources,
     extract_secure_env_client_kwargs,
 )
+from yt_framework.utils.logging import log_header, log_success
 
 if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
@@ -144,7 +145,7 @@ def run_vanilla(
         logger=logger,
     )
     vanilla_operation_data.environment = env
-    vanilla_operation_data.docker_auth = extract_docker_auth_from_operation_config(
+    vanilla_operation_data.docker_auth = docker_auth_from_op_config(
         operation_config,
         env,
     )

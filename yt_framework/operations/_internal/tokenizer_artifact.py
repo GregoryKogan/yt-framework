@@ -153,7 +153,7 @@ def _upload_tokenizer_if_missing(
     return archive_local_path if archive_local_path != source else None
 
 
-def _resolved_tokenizer_artifact_name_or_raise(
+def tokenizer_artifact_name_or_raise(
     stage_config: DictConfig,
     tokenizer_artifact_config: DictConfig,
 ) -> str:
@@ -175,7 +175,7 @@ def _local_artifact_path_option(tokenizer_artifact_config: DictConfig) -> str | 
     return str(local_raw) if isinstance(local_raw, str) and local_raw else None
 
 
-def _verify_tokenizer_yt_path_or_raise(
+def verify_tokenizer_path_or_raise(
     context: StageContext,
     yt_artifact_path: str,
 ) -> None:
@@ -220,7 +220,7 @@ def init_tokenizer_artifact_directory(
     if not artifact_base:
         return
 
-    artifact_name = _resolved_tokenizer_artifact_name_or_raise(
+    artifact_name = tokenizer_artifact_name_or_raise(
         stage_config=context.config,
         tokenizer_artifact_config=tokenizer_artifact_config,
     )
@@ -243,7 +243,7 @@ def init_tokenizer_artifact_directory(
         if maybe_temp is not None:
             temp_archive = maybe_temp
 
-        _verify_tokenizer_yt_path_or_raise(context, yt_artifact_path)
+        verify_tokenizer_path_or_raise(context, yt_artifact_path)
     finally:
         if temp_archive and temp_archive.exists():
             temp_archive.unlink(missing_ok=True)

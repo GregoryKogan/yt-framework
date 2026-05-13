@@ -10,7 +10,7 @@ from typing import Protocol
 
 from omegaconf import DictConfig
 
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.yt.clients.client_base import BaseYTClient
 
 
 class StageDependencies(Protocol):

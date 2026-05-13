@@ -76,7 +76,7 @@ How-to guides under `docs/operations`, `docs/configuration`, and `docs/advanced`
 ### Map Operations
 
 ```{eval-rst}
-.. automodule:: yt_framework.operations.map
+.. automodule:: yt_framework.operations.command_ops.map
    :members:
    :undoc-members:
    :show-inheritance:
@@ -85,7 +85,7 @@ How-to guides under `docs/operations`, `docs/configuration`, and `docs/advanced`
 ### Vanilla Operations
 
 ```{eval-rst}
-.. automodule:: yt_framework.operations.vanilla
+.. automodule:: yt_framework.operations.command_ops.vanilla
    :members:
    :undoc-members:
    :show-inheritance:
@@ -94,7 +94,7 @@ How-to guides under `docs/operations`, `docs/configuration`, and `docs/advanced`
 ### Map-reduce and reduce
 
 ```{eval-rst}
-.. automodule:: yt_framework.operations.map_reduce
+.. automodule:: yt_framework.operations.command_ops.map_reduce
    :members:
    :undoc-members:
    :show-inheritance:
@@ -140,7 +140,7 @@ YQL operations are implemented as methods on `BaseYTClient` and its subclasses (
 ### Sort operations
 
 ```{eval-rst}
-.. automodule:: yt_framework.operations.sort
+.. automodule:: yt_framework.operations.command_ops.sort
    :members:
    :undoc-members:
    :show-inheritance:
@@ -218,7 +218,7 @@ These modules support code upload, file dependencies, and environment wiring. Mo
 
 ```{eval-rst}
 .. automodule:: yt_framework.operations.common
-   :members: build_environment, prepare_docker_auth, extract_operation_resources, collect_passthrough_kwargs, build_operation_environment, extract_docker_auth_from_operation_config, extract_max_failed_jobs
+   :members: build_environment, prepare_docker_auth, extract_operation_resources, collect_passthrough_kwargs, build_operation_environment, docker_auth_from_op_config, extract_max_failed_jobs
    :show-inheritance:
 ```
 
@@ -236,7 +236,7 @@ These modules support code upload, file dependencies, and environment wiring. Mo
 ### Dev Client
 
 ```{eval-rst}
-.. automodule:: yt_framework.yt.client_dev
+.. automodule:: yt_framework.yt.clients.client_dev
    :members:
    :undoc-members:
    :show-inheritance:
@@ -245,7 +245,7 @@ These modules support code upload, file dependencies, and environment wiring. Mo
 ### Production Client
 
 ```{eval-rst}
-.. automodule:: yt_framework.yt.client_prod
+.. automodule:: yt_framework.yt.clients.client_prod
    :members:
    :undoc-members:
    :show-inheritance:

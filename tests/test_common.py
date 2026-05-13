@@ -12,13 +12,13 @@ from yt_framework.operations.common import (
     build_environment,
     build_operation_environment,
     collect_passthrough_kwargs,
-    extract_docker_auth_from_operation_config,
+    docker_auth_from_op_config,
     extract_max_failed_jobs,
     extract_operation_resources,
     extract_secure_env_client_kwargs,
     prepare_docker_auth,
 )
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.yt.clients.client_base import BaseYTClient
 
 _LOG = logging.getLogger("tests.common")
 
@@ -65,10 +65,10 @@ def test_collect_passthrough_kwargs_resolves_dict_node_to_plain_dict() -> None:
     assert out == {"meta": {"a": 1}}
 
 
-def test_extract_docker_auth_from_operation_config_uses_env_credentials() -> None:
+def test_docker_auth_from_op_config_uses_env_credentials() -> None:
     cfg = OmegaConf.create({"resources": {"docker_image": "reg/img:v1"}})
     env = {"DOCKER_AUTH_USERNAME": "u", "DOCKER_AUTH_PASSWORD": "p"}
-    auth = extract_docker_auth_from_operation_config(cfg, env)
+    auth = docker_auth_from_op_config(cfg, env)
     assert auth == {"username": "u", "password": "p"}
 
 

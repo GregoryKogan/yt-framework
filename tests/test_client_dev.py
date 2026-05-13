@@ -1,4 +1,4 @@
-"""Contract tests for yt_framework.yt.client_dev.YTDevClient."""
+"""Contract tests for yt_framework.yt.clients.client_dev.YTDevClient."""
 
 import logging
 import sys
@@ -9,8 +9,8 @@ import pytest
 from omegaconf import OmegaConf
 from yt.wrapper import TypedJob  # pyright: ignore[reportMissingImports]
 
-from yt_framework.yt.client_base import OperationResources
-from yt_framework.yt.client_dev import YTDevClient
+from yt_framework.yt.clients.client_base import OperationResources
+from yt_framework.yt.clients.client_dev import YTDevClient
 
 
 def _null_logger(name: str) -> logging.Logger:

@@ -4,9 +4,8 @@ from typing import TYPE_CHECKING
 
 from omegaconf import DictConfig
 
+from yt_framework.operations.common import extract_operation_resources
 from yt_framework.utils.logging import log_header, log_success
-
-from .common import extract_operation_resources
 
 if TYPE_CHECKING:
     from yt_framework.core.stage import StageContext
@@ -66,7 +65,7 @@ def run_sort(
 
     Then in the stage::
 
-        from yt_framework.operations.sort import run_sort
+        from yt_framework.operations.command_ops.sort import run_sort
         sort_cfg = OmegaConf.merge(
             self.config.client.operations.sort,
             {"input_table": intermediate_table},

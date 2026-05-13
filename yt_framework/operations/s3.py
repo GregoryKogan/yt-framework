@@ -2,7 +2,7 @@
 
 import logging
 
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.yt.clients.client_base import BaseYTClient
 from ytjobs.s3.client import S3Client
 
 _S3_PATH_DEBUG_PREVIEW = 3

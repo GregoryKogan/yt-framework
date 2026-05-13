@@ -10,7 +10,7 @@ from omegaconf import OmegaConf
 from yt_framework.core.dependencies import PipelineStageDependencies
 from yt_framework.core.stage import StageContext
 from yt_framework.operations.checkpoint import init_checkpoint_directory
-from yt_framework.yt.client_base import BaseYTClient
+from yt_framework.yt.clients.client_base import BaseYTClient
 
 _LOG = logging.getLogger("tests.checkpoint")
 _LOG.addHandler(logging.NullHandler())

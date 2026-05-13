@@ -12,13 +12,13 @@ _MAX_ROW_WEIGHT_PRAGMA_RE = re.compile(
     r'^\s*PRAGMA\s+yt\.MaxRowWeight\s*=\s*["\'][^"\']+["\']\s*;\s*$',
     flags=re.IGNORECASE | re.MULTILINE,
 )
-_PRAGMA_MAX_ROW_WEIGHT_VALUE_RE = re.compile(
+PRAGMA_MAX_ROW_WEIGHT_RE = re.compile(
     r'PRAGMA\s+yt\.MaxRowWeight\s*=\s*["\']([^"\']+)["\']',
     flags=re.IGNORECASE,
 )
 
 
-def parse_max_row_weight_to_bytes(value: str) -> int:
+def parse_max_row_weight_bytes(value: str) -> int:
     """Parse a max-row-weight token to a byte count.
 
     Suffixes ``K``, ``M``, and ``G`` are **binary** (1024-based): KiB, MiB, GiB.
@@ -50,7 +50,7 @@ def parse_max_row_weight_to_bytes(value: str) -> int:
     raise ValueError(msg)
 
 
-MAX_ALLOWED_BYTES = parse_max_row_weight_to_bytes(MAX_ALLOWED_ROW_WEIGHT)
+MAX_ALLOWED_BYTES = parse_max_row_weight_bytes(MAX_ALLOWED_ROW_WEIGHT)
 
 
 def _canonical_max_row_weight_string(raw: str) -> str:
@@ -81,7 +81,7 @@ def validate_max_row_weight(value: str | None) -> str:
     if not resolved:
         msg = "max_row_weight override must be non-empty"
         raise ValueError(msg)
-    n = parse_max_row_weight_to_bytes(resolved)
+    n = parse_max_row_weight_bytes(resolved)
     if n > MAX_ALLOWED_BYTES:
         msg = (
             f"max_row_weight {value!r} exceeds cluster maximum "
@@ -124,7 +124,7 @@ def ensure_max_row_weight_pragma(
             )
         return f"{build_max_row_weight_pragma(validated)}\n{query}"
 
-    vm = _PRAGMA_MAX_ROW_WEIGHT_VALUE_RE.search(query)
+    vm = PRAGMA_MAX_ROW_WEIGHT_RE.search(query)
     if vm:
         validate_max_row_weight(vm.group(1))
         return query

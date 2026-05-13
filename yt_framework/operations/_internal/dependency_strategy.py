@@ -92,7 +92,7 @@ class DependencyBuilder(Protocol):
         ...
 
 
-def _tar_bootstrap_applies_to_map_reduce(
+def tar_bootstrap_applies_mr(
     *,
     tar_bootstrap_flag: bool,
     mapper: object,
@@ -251,7 +251,7 @@ class TarArchiveDependencyBuilder:
         reducer_command: str | None = None
         if mapper is not None and reducer is not None:
             require_consistent_map_reduce_legs(mapper, reducer)
-        if _tar_bootstrap_applies_to_map_reduce(
+        if tar_bootstrap_applies_mr(
             tar_bootstrap_flag=tar_bootstrap_flag,
             mapper=mapper,
             reducer=reducer,

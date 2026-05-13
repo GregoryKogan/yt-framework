@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from yt_framework.utils.env import load_secrets
-from yt_framework.yt.client_base import OperationResources
+from yt_framework.yt.clients.client_base import OperationResources
 
 from ._internal.tokenizer_artifact import (
     init_tokenizer_artifact_directory,
@@ -283,7 +283,7 @@ def build_operation_environment(
     return env
 
 
-def extract_docker_auth_from_operation_config(
+def docker_auth_from_op_config(
     operation_config: DictConfig,
     env: dict[str, str],
 ) -> dict[str, str] | None:

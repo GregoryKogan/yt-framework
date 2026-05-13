@@ -1,4 +1,4 @@
-"""Tests for yt_framework.yt.client_base (OperationResources + BaseYTClient helpers)."""
+"""Tests for yt_framework.yt.clients.client_base (OperationResources + BaseYTClient helpers)."""
 
 import logging
 from pathlib import Path
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from yt_framework.yt.client_base import BaseYTClient, OperationResources
+from yt_framework.yt.clients.client_base import BaseYTClient, OperationResources
 
 
 def _null_logger(name: str) -> logging.Logger:
