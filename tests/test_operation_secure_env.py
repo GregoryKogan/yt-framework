@@ -94,3 +94,13 @@ def test_merge_secure_vault_docker_and_user_override() -> None:
 
 def test_default_public_keys_contains_expected() -> None:
     assert "YT_STAGE_NAME" in DEFAULT_PUBLIC_ENV_KEYS
+
+
+def test_merge_secure_vault_sets_docker_auth_when_base_missing() -> None:
+    out = merge_secure_vault(
+        {"K": "v"},
+        docker_image=None,
+        docker_auth=None,
+        user_secure_vault={"docker_auth": {"username": "u"}},
+    )
+    assert out["docker_auth"] == {"username": "u"}

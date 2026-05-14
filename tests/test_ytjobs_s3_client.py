@@ -337,3 +337,13 @@ def test_s3_client_init_passes_region_name_to_boto(
         logger=_silent("t.s3.reg"),
     )
     assert mock_boto.client.call_args.kwargs["region_name"] == "eu-west-1"
+
+
+def test_s3_client_init_rejects_non_int_max_retries() -> None:
+    with pytest.raises(TypeError, match="max_retries must be an integer"):
+        S3Client("https://e", "k", "s", max_retries=True, logger=_silent("t.s3.badint"))
+
+
+def test_s3_client_init_rejects_unknown_legacy_kwargs() -> None:
+    with pytest.raises(TypeError, match="Unknown S3Client init option"):
+        S3Client("https://e", "k", "s", not_a_real_option=1, logger=_silent("t.s3.unk"))

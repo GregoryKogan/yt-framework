@@ -810,3 +810,38 @@ def test_upload_code_archive_calls_client_upload_file_with_build_folder_and_name
     assert fake.upload_calls == [
         (arch, "//yt/myproject/build/source.tar.gz", True),
     ]
+
+
+def test_build_code_locally_skips_file_entries_under_stages_dir(tmp_path: Path) -> None:
+    logger = logging.getLogger("tests.upload.st_skip")
+    logger.addHandler(logging.NullHandler())
+    stages = tmp_path / "stages"
+    stages.mkdir()
+    (stages / "readme").write_text("x", encoding="utf-8")
+    ok = stages / "ok"
+    (ok / "src").mkdir(parents=True)
+    (ok / "src" / "mapper.py").write_text("#\n", encoding="utf-8")
+    assert build_code_locally(tmp_path / "bout", tmp_path, logger) >= 1
+
+
+def test_build_code_locally_tolerates_list_root_stage_config_yaml(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.list_yaml")
+    logger.addHandler(logging.NullHandler())
+    st = tmp_path / "stages" / "list_cfg"
+    (st / "src").mkdir(parents=True)
+    (st / "src" / "mapper.py").write_text("#\n", encoding="utf-8")
+    (st / "config.yaml").write_text("[]\n", encoding="utf-8")
+    assert build_code_locally(tmp_path / "blist", tmp_path, logger) >= 1
+
+
+def test_build_code_locally_skips_empty_subdirectory_under_stage_src(
+    tmp_path: Path,
+) -> None:
+    logger = logging.getLogger("tests.upload.src_subdir")
+    logger.addHandler(logging.NullHandler())
+    st = tmp_path / "stages" / "src_tree"
+    (st / "src" / "deep").mkdir(parents=True)
+    (st / "src" / "f.py").write_text("#\n", encoding="utf-8")
+    assert build_code_locally(tmp_path / "bsub", tmp_path, logger) >= 1

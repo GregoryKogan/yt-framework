@@ -9,6 +9,7 @@ from omegaconf import OmegaConf
 from yt_framework.operations._internal.dependency_strategy import (
     DependencyBuildContext,
     TarArchiveDependencyBuilder,
+    tar_bootstrap_applies_mr,
 )
 
 _LOG = logging.getLogger("tests.dependency_strategy")
@@ -96,6 +97,76 @@ def test_tar_builder_adds_string_file_path_as_basename_local_name(
         ),
     )
     assert ("//pool/data/blob.bin", "blob.bin") in r.dependencies
+
+
+def test_tar_bootstrap_applies_mr_false_when_mapper_missing() -> None:
+    assert not tar_bootstrap_applies_mr(
+        tar_bootstrap_flag=True,
+        mapper=None,
+        reducer="./r.sh",
+    )
+
+
+def test_tar_builder_skips_checkpoint_when_job_section_has_no_model_name(
+    tmp_path: Path,
+) -> None:
+    stage_dir = tmp_path / "st"
+    stage_dir.mkdir()
+    op = OmegaConf.create({"checkpoint": {"checkpoint_base": "//ckpt"}})
+    st = OmegaConf.create({"job": {}})
+    r = _builder().build_dependencies(
+        DependencyBuildContext(
+            operation_type="map",
+            stage_dir=stage_dir,
+            archive_name="a.tar.gz",
+            build_folder="//bf",
+            operation_config=op,
+            stage_config=st,
+            logger=_LOG,
+        ),
+    )
+    assert ("//ckpt/m1", "m1") not in r.dependencies
+
+
+def test_tar_builder_skips_checkpoint_when_checkpoint_base_missing(
+    tmp_path: Path,
+) -> None:
+    stage_dir = tmp_path / "st"
+    stage_dir.mkdir()
+    op = OmegaConf.create({"checkpoint": {}})
+    st = OmegaConf.create({"job": {"model_name": "m1"}})
+    r = _builder().build_dependencies(
+        DependencyBuildContext(
+            operation_type="map",
+            stage_dir=stage_dir,
+            archive_name="a.tar.gz",
+            build_folder="//bf",
+            operation_config=op,
+            stage_config=st,
+            logger=_LOG,
+        ),
+    )
+    assert r.dependencies == [("//bf/a.tar.gz", "a.tar.gz")]
+
+
+def test_tar_builder_skips_tokenizer_when_artifact_base_is_blank_string(
+    tmp_path: Path,
+) -> None:
+    stage_dir = tmp_path / "blank_base"
+    stage_dir.mkdir()
+    op = OmegaConf.create({"tokenizer_artifact": {"artifact_base": "   "}})
+    r = _builder().build_dependencies(
+        DependencyBuildContext(
+            operation_type="map",
+            stage_dir=stage_dir,
+            archive_name="main.tar.gz",
+            build_folder="//bf",
+            operation_config=op,
+            stage_config=OmegaConf.create({}),
+            logger=_LOG,
+        ),
+    )
+    assert r.dependencies == [("//bf/main.tar.gz", "main.tar.gz")]
 
 
 def test_tar_builder_adds_checkpoint_when_job_model_and_operation_checkpoint_set(

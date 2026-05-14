@@ -54,12 +54,11 @@ repos:
         pass_filenames: false
         always_run: true
       - id: pytest
-        name: pytest (isolated venv)
-        entry: python -m pytest
+        name: pytest + line coverage gate (yt_framework + ytjobs)
+        entry: python scripts/coverage/run_pytest_line_gate.py
         language: python
         pass_filenames: false
         always_run: true
-        args: ["-m", "not yt_cluster", "-q"]
         additional_dependencies:
           - botocore==1.35.99
           - boto3==1.35.99
@@ -68,3 +67,4 @@ repos:
           - omegaconf>=2.3.0
           - PyYAML>=6.0
           - pytest>=7.0.0
+          - pytest-cov>=4.0.0

@@ -2058,3 +2058,61 @@ def test_yt_prod_client_run_sort_raises_after_log_on_client_failure(
     with pytest.raises(OSError, match="sort cluster error"):
         client.run_sort("//tmp/t", ["c"])
     assert "Failed to sort table" in caplog.text
+
+
+def test_yt_prod_client_pickling_applies_ignore_system_modules_and_upload_filter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_inner = MagicMock()
+    fake_inner.config = {}
+    monkeypatch.setattr(
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+    YTProdClient(
+        _null_logger("tests.client_prod.pickling"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+        pickling={
+            "ignore_system_modules": True,
+            "disable_module_upload": True,
+        },
+    )
+    cfg = fake_inner.config["pickling"]
+    assert cfg["ignore_system_modules"] is True
+    assert cfg["module_filter"](object()) is False
+
+
+def test_yt_prod_client_pickling_module_filter_invokes_existing_callable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prior = MagicMock()
+    fake_inner = MagicMock()
+    fake_inner.config = {"pickling": {"module_filter": prior}}
+    monkeypatch.setattr(
+        "yt_framework.yt.clients.client_prod.YtClient", lambda *a, **k: fake_inner
+    )
+    YTProdClient(
+        _null_logger("tests.client_prod.pickling_chain"),
+        secrets={"YT_PROXY": "http://proxy", "YT_TOKEN": "tok"},
+        pickling={"disable_module_upload": True},
+    )
+    mf = fake_inner.config["pickling"]["module_filter"]
+    sentinel = object()
+    assert mf(sentinel) is False
+    prior.assert_called_once_with(sentinel)
+
+
+def test_yt_prod_client_extract_columns_from_schema_value_returns_empty_for_non_list() -> (
+    None
+):
+    assert YTProdClient._extract_columns_from_schema_value("bad") == []
+
+
+def test_yt_prod_client_infer_columns_temp_yql_returns_empty_without_schema_attrs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, fake_inner = _prod_client_with_fake_inner(monkeypatch)
+    qobj = MagicMock()
+    qobj.get_state.return_value = "completed"
+    fake_inner.run_query.return_value = qobj
+    fake_inner.get.return_value = {}
+    assert client._infer_columns_temp_yql("//tmp/base") == []

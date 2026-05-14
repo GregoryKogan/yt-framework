@@ -52,6 +52,45 @@ def _write_minimal_stage_tree(pipeline_dir: Path, stage_folder: str) -> None:
     )
 
 
+def test_discover_stages_skips_module_attrs_that_are_not_types_before_subclass(
+    tmp_path: Path,
+) -> None:
+    pkg = tmp_path / "stages"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    stage_dir = pkg / "with_scalar"
+    stage_dir.mkdir()
+    (stage_dir / "__init__.py").write_text("", encoding="utf-8")
+    (stage_dir / "stage.py").write_text(
+        "from yt_framework.core.stage import BaseStage\n"
+        "NOT_A_TYPE = 123\n"
+        "class DiscoveredStage(BaseStage):\n"
+        "    def run(self, debug):\n"
+        "        return debug\n",
+        encoding="utf-8",
+    )
+    log = logging.getLogger("test.discovery.scalar")
+    found = discover_stages(tmp_path, log)
+    assert len(found) == 1 and found[0].__name__ == "DiscoveredStage"
+
+
+def test_discover_stages_returns_empty_when_stage_module_has_no_base_stage_subclass(
+    tmp_path: Path,
+) -> None:
+    pkg = tmp_path / "stages"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    stage_dir = pkg / "no_subclass"
+    stage_dir.mkdir()
+    (stage_dir / "__init__.py").write_text("", encoding="utf-8")
+    (stage_dir / "stage.py").write_text(
+        "class NotStage:\n    def run(self, debug):\n        return debug\n",
+        encoding="utf-8",
+    )
+    log = logging.getLogger("test.discovery.nosub")
+    assert discover_stages(tmp_path, log) == []
+
+
 def test_discover_stages_imports_base_stage_subclass_from_stage_module(
     tmp_path: Path,
 ) -> None:
