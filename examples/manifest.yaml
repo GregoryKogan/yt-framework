@@ -1,0 +1,80 @@
+# Catalog of runnable example pipelines (see docs/testing/example-pipelines.md).
+# Every examples/*/pipeline.py must appear here; drift is caught by pytest.
+
+version: 1
+
+pipelines:
+  - slug: "01_hello_world"
+    ci_tier: always
+    requirements: []
+    commands:
+      - ["pipeline.py"]
+
+  - slug: "02_multi_stage_pipeline"
+    ci_tier: always
+    requirements: []
+    commands:
+      - ["pipeline.py"]
+
+  - slug: "03_yql_operations"
+    ci_tier: always
+    requirements: []
+    commands:
+      - ["pipeline.py"]
+
+  - slug: "04_map_operation"
+    ci_tier: always
+    requirements: []
+    commands:
+      - ["pipeline.py"]
+
+  - slug: "05_vanilla_operation"
+    ci_tier: always
+    requirements: []
+    commands:
+      - ["pipeline.py"]
+
+  - slug: "06_s3_integration"
+    ci_tier: cluster_optional
+    requirements: ["yt_cluster", "s3"]
+    commands:
+      - ["pipeline.py"]
+
+  - slug: "07_custom_docker"
+    ci_tier: cluster_optional
+    requirements: ["yt_cluster", "docker_image"]
+    commands:
+      - ["pipeline.py"]
+
+  - slug: "08_multiple_configs"
+    ci_tier: always
+    requirements: []
+    commands:
+      - ["pipeline.py"]
+      - ["pipeline.py", "--config", "configs/config_large.yaml"]
+      - ["pipeline.py", "--config", "configs/config_custom.yaml"]
+
+  - slug: "09_multiple_operations"
+    ci_tier: always
+    requirements: []
+    commands:
+      - ["pipeline.py"]
+
+  - slug: "10_custom_upload"
+    ci_tier: always
+    requirements: []
+    commands:
+      - ["pipeline.py"]
+
+  - slug: "environment_log"
+    ci_tier: always
+    requirements: []
+    commands:
+      - ["pipeline.py"]
+
+  - slug: "video_gpu"
+    # Dev mode still exercises map wiring; mapper imports torch/ultralytics (not in default CI env).
+    ci_tier: manual
+    requirements: ["heavy_python"]
+    commands:
+      - ["pipeline.py"]

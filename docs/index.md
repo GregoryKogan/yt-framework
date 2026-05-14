@@ -11,6 +11,7 @@ This documentation explains how to build and run data processing pipelines on YT
 architecture/layers
 configuration/index
 testing/yt-cluster-integration
+testing/example-pipelines
 operations/index
 advanced/index
 reference/api

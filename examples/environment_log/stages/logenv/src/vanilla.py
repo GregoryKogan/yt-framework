@@ -11,7 +11,7 @@ import platform
 import socket
 import subprocess
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
@@ -572,7 +572,7 @@ def log_metadata(logger, start_time) -> None:
     """Log execution metadata."""
     log_section_header(logger, "11. EXECUTION METADATA")
 
-    end_time = datetime.now(datetime.UTC)
+    end_time = datetime.now(UTC)
     duration = (end_time - start_time).total_seconds()
 
     logger.info("Start time (UTC): %s", start_time.isoformat())
@@ -594,7 +594,7 @@ def log_metadata(logger, start_time) -> None:
 
 def main() -> None:
     """Main execution function."""
-    start_time = datetime.now(datetime.UTC)
+    start_time = datetime.now(UTC)
 
     # Initialize logger
     logger = get_logger("logenv", level=logging.INFO)

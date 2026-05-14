@@ -2,15 +2,17 @@
 
 These tests call a live YTsaurus cell through `YTProdClient` and `yt.wrapper`. They live under `tests/integration/yt_cluster/` and use the pytest marker `yt_cluster`.
 
+The same **collection skip** rules apply to `tests/integration/examples_cluster/` (subprocess checks for prod-oriented demos). Both packages are skipped when `CI=true` or when `YT_PROXY`/`YT_TOKEN` are not available from the usual cluster test env files.
+
 ## When pytest collects them
 
-pytest loads that directory only if both `YT_PROXY` and `YT_TOKEN` are set after this lookup:
+pytest loads those directories only if both `YT_PROXY` and `YT_TOKEN` are set after this lookup:
 
 1. `YT_FRAMEWORK_CLUSTER_TEST_ENV` — path to a `KEY=value` file (same format as `configs/secrets.env`).
 2. Otherwise, if `yt-cluster-test.env` exists at the **repository root**, that file is read.
 3. Values from the process environment override the file for the keys listed in the example file.
 
-If the pair is missing, the whole package is skipped at collection time. On CI hosts, `CI=true` also forces that skip. **GitHub Actions** additionally runs `pytest -m "not yt_cluster"`, so those tests never run in CI even if credentials were present by mistake.
+If the pair is missing, those packages are skipped at collection time. On CI hosts, `CI=true` also forces that skip. **GitHub Actions** additionally runs `pytest -m "not yt_cluster"`, so real-cluster tests never run in CI even if credentials were present by mistake.
 
 ## Setup
 
@@ -36,6 +38,30 @@ Narrower:
 conda run -n yt-framework -- pytest tests/integration/yt_cluster/test_yql.py -xvs
 ```
 
+(example-pipelines-cluster)=
+## Example pipelines on a real cell
+
+Optional subprocess tests under `tests/integration/examples_cluster/` exercise the prod-mode demos `06_s3_integration` and `07_custom_docker`. They reuse the same `yt-cluster-test.env` (or `YT_FRAMEWORK_CLUSTER_TEST_ENV`) as the library’s cluster tests: credentials are merged into a temp copy of the example so we never require committing `secrets.env` inside `examples/`.
+
+**S3 listing (`06_s3_integration`)**
+
+1. Set `YT_FRAMEWORK_EXAMPLE_S3=1`.
+2. Put `S3_ENDPOINT`, `S3_DOWNLOAD_ACCESS_KEY`, and `S3_DOWNLOAD_SECRET_KEY` in `yt-cluster-test.env` and/or `examples/06_s3_integration/configs/secrets.env`.
+3. Fill `client.input_bucket` and `client.input_prefix` in `examples/06_s3_integration/stages/list_s3/config.yaml` for a bucket you may read.
+
+**Custom Docker (`07_custom_docker`)**
+
+1. Set `YT_FRAMEWORK_EXAMPLE_DOCKER=1`.
+2. Ensure the image referenced in that example’s stage config is pullable on your cell.
+
+Run only those tests:
+
+```bash
+conda run -n yt-framework -- pytest tests/integration/examples_cluster/ -m yt_cluster -xvs
+```
+
+Details on env files: [Example pipelines](example-pipelines.md).
+
 ## What the tests assume
 
 - **Cypress namespace**: `//tmp/yt-framework/testing/<session_id>/…` for tables and files. The session fixture creates that node and deletes it recursively after the run.
@@ -47,5 +73,6 @@ conda run -n yt-framework -- pytest tests/integration/yt_cluster/test_yql.py -xv
 
 ## See also
 
+- [Example pipelines](example-pipelines.md)
 - [Secrets and env files](../configuration/secrets.md)
 - [Cluster requirements](../configuration/cluster-requirements.md)
