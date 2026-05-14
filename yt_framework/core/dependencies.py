@@ -1,8 +1,9 @@
 """Concrete ``PipelineStageDependencies`` for stage ``run()`` injection.
 
-The :class:`~yt_framework.operations.stage_contracts.StageDependencies` protocol
-and :class:`~yt_framework.operations.stage_contracts.StageContext` live under
-``yt_framework.operations`` so operation drivers do not import ``core``.
+The :class:`~yt_framework.contracts.StageDependencies` protocol and
+:class:`~yt_framework.contracts.StageContext` live under ``yt_framework.contracts``
+so ``core`` and operation drivers share types without ``operations`` importing
+``core``.
 """
 
 from dataclasses import dataclass
@@ -10,10 +11,7 @@ from pathlib import Path
 
 from omegaconf import DictConfig
 
-from yt_framework.operations import stage_contracts
 from yt_framework.yt.clients.client_base import BaseYTClient
-
-StageDependencies = stage_contracts.StageDependencies
 
 
 @dataclass

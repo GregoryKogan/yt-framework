@@ -91,7 +91,7 @@ cannot_depend_on = [
 
 [[modules]]
 path = "yt_framework.yt.support"
-depends_on = ["yt_framework", "ytjobs"]
+depends_on = ["yt_framework"]
 layer = "yt"
 cannot_depend_on = [
     "yt_framework.core",
@@ -114,6 +114,7 @@ depends_on = [
 ]
 layer = "yt"
 cannot_depend_on = [
+    "yt_framework.contracts",
     "yt_framework.core",
     "yt_framework.operations",
     "yt_framework.typed_jobs",
@@ -140,9 +141,102 @@ cannot_depend_on = [
 ]
 
 [[modules]]
+path = "yt_framework.contracts"
+depends_on = ["yt_framework.yt.clients"]
+layer = "operations"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.job_command",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.utils",
+    "yt_framework.yt",
+    "ytjobs",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+    "ytjobs.s3",
+]
+
+[[modules]]
+path = "yt_framework.operations._internal"
+depends_on = [
+    "yt_framework.contracts",
+    "yt_framework.job_command",
+    "yt_framework.utils",
+    "ytjobs",
+]
+layer = "operations"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.yt",
+    "yt_framework.yt.clients",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+    "ytjobs.s3",
+]
+
+[[modules]]
+path = "yt_framework.operations.common"
+depends_on = [
+    "yt_framework.contracts",
+    "yt_framework.operations._internal",
+    "yt_framework.utils",
+    "yt_framework.yt.clients",
+]
+layer = "operations"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.job_command",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.yt",
+    "ytjobs",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+    "ytjobs.s3",
+]
+
+[[modules]]
+path = "yt_framework.operations.command_ops"
+depends_on = [
+    "yt_framework.contracts",
+    "yt_framework.job_command",
+    "yt_framework.operations.common",
+    "yt_framework.operations._internal",
+    "yt_framework.utils",
+    "yt_framework.yt.clients",
+]
+layer = "operations"
+cannot_depend_on = [
+    "yt_framework",
+    "yt_framework.core",
+    "yt_framework.operations",
+    "yt_framework.typed_jobs",
+    "yt_framework.yt",
+    "ytjobs.checkpoint",
+    "ytjobs.config",
+    "ytjobs.logging",
+    "ytjobs.mapper",
+]
+
+[[modules]]
 path = "yt_framework.operations"
 depends_on = [
-    "yt_framework.job_command",
+    "yt_framework.contracts",
+    "yt_framework.operations.command_ops",
+    "yt_framework.operations.common",
+    "yt_framework.operations._internal",
     "yt_framework.utils",
     "yt_framework.yt.clients",
     "ytjobs",
@@ -162,6 +256,7 @@ cannot_depend_on = [
 [[modules]]
 path = "yt_framework.core"
 depends_on = [
+    "yt_framework.contracts",
     "yt_framework.operations",
     "yt_framework.utils",
     "yt_framework.yt",

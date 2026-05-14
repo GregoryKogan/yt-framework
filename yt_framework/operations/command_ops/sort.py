@@ -10,7 +10,7 @@ from yt_framework.utils.logging import log_header, log_success
 if TYPE_CHECKING:
     from omegaconf import DictConfig
 
-    from yt_framework.operations.stage_contracts import StageContext
+    from yt_framework.contracts import StageContext
 
 
 def _sort_input_table(operation_config: DictConfig) -> str:

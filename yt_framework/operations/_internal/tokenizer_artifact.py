@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from omegaconf import DictConfig
 
-    from yt_framework.operations.stage_contracts import StageContext
+    from yt_framework.contracts import StageContext
 
 
 def _nonempty_str(value: object) -> str | None:

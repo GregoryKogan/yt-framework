@@ -14,8 +14,7 @@ from typing import Any, Protocol
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
-import yt_framework
-import ytjobs
+from yt_framework._layout import distribution_site_root
 from yt_framework.yt.support.dev_simulator import (
     DuckDBSimulator,
     extract_output_table,
@@ -74,12 +73,12 @@ def dev_run_yql_simulation(
 
 
 def _dev_append_distinct_pythonpath_root(
-    pp_parts: list[str], *, package: object
+    pp_parts: list[str], *, package_name: str
 ) -> None:
-    mod_file = getattr(package, "__file__", None)
-    if not mod_file:
+    try:
+        root = str(distribution_site_root(package_name))
+    except (ModuleNotFoundError, OSError, ValueError):
         return
-    root = str(Path(mod_file).resolve().parent.parent)
     if root not in pp_parts:
         pp_parts.append(root)
 
@@ -87,8 +86,8 @@ def _dev_append_distinct_pythonpath_root(
 def dev_pythonpath_entries(pipeline_dir: Path, env_merged: dict[str, str]) -> list[str]:
     """Ordered PYTHONPATH segments for dev subprocesses."""
     pp_parts = [str(pipeline_dir)]
-    _dev_append_distinct_pythonpath_root(pp_parts, package=yt_framework)
-    _dev_append_distinct_pythonpath_root(pp_parts, package=ytjobs)
+    _dev_append_distinct_pythonpath_root(pp_parts, package_name="yt_framework")
+    _dev_append_distinct_pythonpath_root(pp_parts, package_name="ytjobs")
     if env_merged.get("PYTHONPATH"):
         pp_parts.append(env_merged["PYTHONPATH"])
     return pp_parts
