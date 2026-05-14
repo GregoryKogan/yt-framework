@@ -268,7 +268,7 @@ YT Framework uses **pytest** for testing (available as a dev dependency). Alongs
 1. **Dev Mode Testing**: Use dev mode to test changes locally
 2. **Example Pipelines**: Run existing examples to verify compatibility
 3. **Manual Testing**: Create test pipelines to exercise new features
-4. **Real cluster integration tests** (optional): pytest package under `tests/integration/yt_cluster/`; see [docs/testing/yt-cluster-integration.md](docs/testing/yt-cluster-integration.md)
+4. **Real cluster integration tests** (optional): pytest packages under `tests/integration/yt_cluster/` and `tests/integration/examples_cluster/`; see [docs/testing/yt-cluster-integration.md](docs/testing/yt-cluster-integration.md) and [docs/testing/example-pipelines.md](docs/testing/example-pipelines.md)
 
 ### Running Tests
 
@@ -291,7 +291,7 @@ conda run -n yt-framework -- pytest tests/test_stage.py
 
 ### Real cluster integration tests (optional)
 
-If `YT_PROXY` and `YT_TOKEN` are available from a repo-root `yt-cluster-test.env` file (see `yt-cluster-test.example.env`), from `YT_FRAMEWORK_CLUSTER_TEST_ENV`, or from the environment, pytest **collects** `tests/integration/yt_cluster/` on your machine. That directory is also ignored when `CI=true` (typical on CI hosts), and **GitHub Actions** runs `pytest -m "not yt_cluster"` so real-cluster tests never execute there even if secrets were misconfigured. Without credentials and outside CI, the same package is skipped at collection time.
+If `YT_PROXY` and `YT_TOKEN` are available from a repo-root `yt-cluster-test.env` file (see `yt-cluster-test.example.env`), from `YT_FRAMEWORK_CLUSTER_TEST_ENV`, or from the environment, pytest **collects** `tests/integration/yt_cluster/` and `tests/integration/examples_cluster/` on your machine. Those directories are also ignored when `CI=true` (typical on CI hosts), and **GitHub Actions** runs `pytest -m "not yt_cluster"` so real-cluster tests never execute there even if secrets were misconfigured. Without credentials and outside CI, the same packages are skipped at collection time.
 
 Run only those tests:
 
@@ -305,7 +305,7 @@ If you keep `yt-cluster-test.env` in your clone and run the full pytest command 
 
 ### CI (GitHub Actions)
 
-The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs Ruff, Vulture, Xenon, `tach check`, strict BasedPyright, and `pytest -m "not yt_cluster"` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). After pytest writes `coverage.json`, CI runs `python scripts/coverage/check_line_coverage.py coverage.json`, which fails if any statement under those two packages is still marked missing (branch coverage is collected separately and is not part of that gate). Real YT cluster tests are excluded because the runner has no cell access. To require a green check before merging, configure branch protection on GitHub and add `lint`, `typecheck`, and `test` as required status checks.
+The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs Ruff, Vulture, Xenon, `tach check`, strict BasedPyright, and `pytest -m "not yt_cluster"` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). That pytest run includes dev-tier [example pipeline smoke tests](docs/testing/example-pipelines.md) under `tests/integration/example_pipelines/`. After pytest writes `coverage.json`, CI runs `python scripts/coverage/check_line_coverage.py coverage.json`, which fails if any statement under those two packages is still marked missing (branch coverage is collected separately and is not part of that gate). Real YT cluster tests are excluded because the runner has no cell access. To require a green check before merging, configure branch protection on GitHub and add `lint`, `typecheck`, and `test` as required status checks.
 
 ### Coverage badge (maintainers)
 
@@ -350,14 +350,21 @@ python pipeline.py
 
 ### Testing with Examples
 
-Before submitting a PR, verify your changes work with multiple examples:
+Catalog and subprocess checks live in [`examples/manifest.yaml`](examples/manifest.yaml); see [docs/testing/example-pipelines.md](docs/testing/example-pipelines.md).
+
+From the repo root (uses the same pytest selection as CI for dev-tier demos):
 
 ```bash
-for example in examples/*/; do
-    cd "$example"
-    python pipeline.py
-    cd ../..
-done
+conda run -n yt-framework -- pytest tests/integration/example_pipelines/test_smoke.py -m examples --tb=short
+```
+
+Optional prod demos on a real cell (same credential rules as cluster IT) are documented in [docs/testing/yt-cluster-integration.md](docs/testing/yt-cluster-integration.md#example-pipelines-cluster).
+
+You can still run a single tree by hand, for example:
+
+```bash
+cd examples/01_hello_world
+python pipeline.py
 ```
 
 ## Documentation
