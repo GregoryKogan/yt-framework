@@ -874,3 +874,40 @@ def test_dev_yql_helpers_forward_max_row_weight_to_run_yql(
     method = getattr(client, method_name)
     method(replace(build_req(), max_row_weight="64M"))
     assert run_yql.call_args.kwargs.get("max_row_weight") == "64M"
+
+
+def test_dev_pipeline_dir_or_raise_when_pipeline_dir_cleared(
+    tmp_path: Path,
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.pd_none"), pipeline_dir=tmp_path
+    )
+    client.pipeline_dir = None
+    with pytest.raises(RuntimeError, match="pipeline_dir is required"):
+        client._pipeline_dir_or_raise()
+
+
+def test_dev_row_count_counts_nonempty_lines(tmp_path: Path) -> None:
+    client = YTDevClient(_null_logger("tests.client_dev.rc"), pipeline_dir=tmp_path)
+    client.write_table("//t", [{"k": 1}, {"k": 2}])
+    assert client.row_count("//t") == 2
+
+
+def test_dev_get_table_columns_propagates_non_value_error_after_log(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.gtc_exc"), pipeline_dir=tmp_path
+    )
+
+    def _boom(_path: str) -> list[dict[str, object]]:
+        msg = "disk"
+        raise OSError(msg)
+
+    monkeypatch.setattr(client, "read_table", _boom)
+    caplog.set_level(logging.ERROR)
+    with pytest.raises(OSError, match="disk"):
+        client._get_table_columns("//t")
+    assert "Failed to get table columns" in caplog.text

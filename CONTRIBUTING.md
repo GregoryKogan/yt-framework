@@ -82,7 +82,7 @@ Contributions come in many forms:
    pre-commit install
    ```
 
-   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Ruff](https://docs.astral.sh/ruff/) (`ruff check --fix` and `ruff format`), strict [BasedPyright](https://docs.basedpyright.com/), [Vulture](https://github.com/jendrikseipp/vulture) (dead-code scan for `yt_framework` and `ytjobs`; see `[tool.vulture]` in `pyproject.toml`), [Xenon](https://github.com/rubik/xenon) (cyclomatic complexity on those packages; thresholds in [.pre-commit-config.yaml](.pre-commit-config.yaml)), [Tach](https://github.com/tach-org/tach) as local hooks `tach-check` and `tach-external` (`tach check` for internal module boundaries and `tach check-external` so third-party imports match `[project] dependencies` in `pyproject.toml`; Tach is pinned to the same version as in the dev extra), the **`yt-framework-pre-commit-policy`** hook (`python scripts/precommit/run.py`, configured under `[tool.yt_framework.pre_commit]` in `pyproject.toml`: by default **550** lines max per `*.py` under the listed roots (same newline count as `wc -l`), **10** max immediate non-ignored children per directory, and **5** max underscore-separated segments in each bound name across the AST—see that table for overrides), and **`python -m pytest -m "not yt_cluster"`** from the `pytest` hook in [.pre-commit-config.yaml](.pre-commit-config.yaml) (`language: python` with `additional_dependencies` aligned to `[project] dependencies` in `pyproject.toml`, not `language: system` / Conda). You can still run `conda run -n yt-framework -- python -m pytest …` locally when you prefer the Conda env. To skip hooks in an emergency, use `git commit --no-verify` or `git push --no-verify`. To run checks manually before commit, use:
+   Run this once per clone. On each commit, [pre-commit](https://pre-commit.com/) runs [Ruff](https://docs.astral.sh/ruff/) (`ruff check --fix` and `ruff format`), strict [BasedPyright](https://docs.basedpyright.com/), [Vulture](https://github.com/jendrikseipp/vulture) (dead-code scan for `yt_framework` and `ytjobs`; see `[tool.vulture]` in `pyproject.toml`), [Xenon](https://github.com/rubik/xenon) (cyclomatic complexity on those packages; thresholds in [.pre-commit-config.yaml](.pre-commit-config.yaml)), [Tach](https://github.com/tach-org/tach) as local hooks `tach-check` and `tach-external` (`tach check` for internal module boundaries and `tach check-external` so third-party imports match `[project] dependencies` in `pyproject.toml`; Tach is pinned to the same version as in the dev extra), the **`yt-framework-pre-commit-policy`** hook (`python scripts/precommit/run.py`, configured under `[tool.yt_framework.pre_commit]` in `pyproject.toml`: by default **550** lines max per `*.py` under the listed roots (same newline count as `wc -l`), **10** max immediate non-ignored children per directory, and **5** max underscore-separated segments in each bound name across the AST—see that table for overrides), and **`python scripts/coverage/run_pytest_line_gate.py`** from the `pytest` hook (same as CI: `pytest -m "not yt_cluster"` over `yt_framework` and `ytjobs` with `--cov-report=json`, then [`scripts/coverage/check_line_coverage.py`](scripts/coverage/check_line_coverage.py) so commits cannot pass with missed statements). The hook uses `language: python` with `additional_dependencies` aligned to `[project] dependencies` in `pyproject.toml`, not `language: system` / Conda. You can still run `conda run -n yt-framework -- python scripts/coverage/run_pytest_line_gate.py` locally when you prefer the Conda env. To skip hooks in an emergency, use `git commit --no-verify` or `git push --no-verify`. To run checks manually before commit, use:
 
    ```bash
    pre-commit run ruff-check --all-files
@@ -96,9 +96,9 @@ Contributions come in many forms:
    pre-commit run pytest --all-files
    ```
 
-   Or directly (same Conda env): `conda run -n yt-framework -- ruff check .`, `conda run -n yt-framework -- ruff format .`, `conda run -n yt-framework -- basedpyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`, `conda run -n yt-framework -- vulture`, `conda run -n yt-framework -- xenon --max-absolute=A --max-modules=A --max-average=A yt_framework ytjobs`, `conda run -n yt-framework -- python scripts/precommit/run.py`, `conda run -n yt-framework -- tach check`, `conda run -n yt-framework -- tach check-external`, and `conda run -n yt-framework -- python -m pytest -m "not yt_cluster"`.
+   Or directly (same Conda env): `conda run -n yt-framework -- ruff check .`, `conda run -n yt-framework -- ruff format .`, `conda run -n yt-framework -- basedpyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"`, `conda run -n yt-framework -- vulture`, `conda run -n yt-framework -- xenon --max-absolute=A --max-modules=A --max-average=A yt_framework ytjobs`, `conda run -n yt-framework -- python scripts/precommit/run.py`, `conda run -n yt-framework -- tach check`, `conda run -n yt-framework -- tach check-external`, and `conda run -n yt-framework -- python scripts/coverage/run_pytest_line_gate.py`.
 
-   When you change runtime dependencies under `[project] dependencies` in `pyproject.toml`, update the `pytest` hook’s `additional_dependencies` in [.pre-commit-config.yaml](.pre-commit-config.yaml) so the hook’s venv matches.
+   When you change runtime dependencies under `[project] dependencies` in `pyproject.toml`, update the `pytest` hook’s `additional_dependencies` in [.pre-commit-config.yaml](.pre-commit-config.yaml) so the hook’s venv matches (including `pytest-cov` for the coverage gate).
 
 6. **Set up YT credentials** (for production mode testing):
 
@@ -279,7 +279,11 @@ When tests are available, run them with:
 conda run -n yt-framework -- pytest
 
 # Run with coverage (matches CI; excludes real-cluster marker `yt_cluster`)
-conda run -n yt-framework -- pytest -m "not yt_cluster" --cov=yt_framework --cov=ytjobs
+conda run -n yt-framework -- pytest -m "not yt_cluster" --cov=yt_framework --cov=ytjobs --cov-report=json:coverage.json
+conda run -n yt-framework -- python scripts/coverage/check_line_coverage.py coverage.json
+
+# Same checks as the pre-commit `pytest` hook (pytest + JSON report + line gate)
+conda run -n yt-framework -- python scripts/coverage/run_pytest_line_gate.py
 
 # Run specific test file
 conda run -n yt-framework -- pytest tests/test_stage.py
@@ -301,7 +305,7 @@ If you keep `yt-cluster-test.env` in your clone and run the full pytest command 
 
 ### CI (GitHub Actions)
 
-The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs Ruff, Vulture, Xenon, `tach check`, strict BasedPyright, and `pytest -m "not yt_cluster"` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). Real YT cluster tests are excluded because the runner has no cell access. To require a green check before merging, configure branch protection on GitHub and add `lint`, `typecheck`, and `test` as required status checks.
+The workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs Ruff, Vulture, Xenon, `tach check`, strict BasedPyright, and `pytest -m "not yt_cluster"` with coverage over `yt_framework` and `ytjobs` on every **push to any branch** and on **pull requests** targeting `main` or `dev` (Python 3.11, `pip install -e ".[dev]"`). After pytest writes `coverage.json`, CI runs `python scripts/coverage/check_line_coverage.py coverage.json`, which fails if any statement under those two packages is still marked missing (branch coverage is collected separately and is not part of that gate). Real YT cluster tests are excluded because the runner has no cell access. To require a green check before merging, configure branch protection on GitHub and add `lint`, `typecheck`, and `test` as required status checks.
 
 ### Coverage badge (maintainers)
 

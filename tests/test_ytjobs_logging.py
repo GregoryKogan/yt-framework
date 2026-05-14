@@ -32,6 +32,16 @@ def test_text_formatter_includes_bracketed_name_level_and_message() -> None:
     )
 
 
+def test_text_formatter_base_message_line_omits_logger_name_when_absent() -> None:
+    from types import SimpleNamespace
+
+    formatter = TextFormatter()
+    rec = SimpleNamespace(levelname="INFO", exc_info=None)
+    rec.getMessage = lambda: "hi"
+    line = formatter._base_message_line(rec, "ts", "INFO", "hi")
+    assert line == "[ts] INFO: hi"
+
+
 def test_text_formatter_appends_extra_context_and_formats_collections() -> None:
     formatter = TextFormatter()
     record = logging.LogRecord(

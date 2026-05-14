@@ -100,6 +100,17 @@ def test_log_config_shows_not_set_for_empty_secret_value(
     assert "(not set)" in caplog.text, "empty secret-like value should not leak"
 
 
+def test_log_config_logs_non_secret_keys_without_masking(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    log = logging.getLogger("tests.logging.cfgplain")
+    log.setLevel(logging.INFO)
+    caplog.set_level(logging.INFO, logger="tests.logging.cfgplain")
+    with caplog.at_level(logging.INFO, logger="tests.logging.cfgplain"):
+        log_config(log, {"mode": "dev"}, title="Cfg")
+    assert "mode: dev" in caplog.text
+
+
 def test_setup_logging_writes_plain_formatter_when_stdout_not_tty(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

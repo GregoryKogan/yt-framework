@@ -13,6 +13,7 @@ from yt_framework.operations._internal.dependency_strategy import (
     DependencyBuildResult,
 )
 from yt_framework.operations.command_ops.map_reduce import run_map_reduce, run_reduce
+from yt_framework.operations.command_ops.map_reduce_support import str_list_from_config
 from yt_framework.yt.clients.client_base import BaseYTClient
 
 _LOG = logging.getLogger("tests.map_reduce")
@@ -338,3 +339,7 @@ def test_run_reduce_replaces_reducer_when_tar_bootstrap_command_set(
     assert run_reduce(ctx, cfg, job="orig") is True
     spec = ctx.deps.yt_client.run_reduce_submit.call_args[0][0]
     assert spec.reducer == "bash -c reduce-wrap"
+
+
+def test_str_list_from_config_scalar_wraps_single_value() -> None:
+    assert str_list_from_config("col") == ["col"]

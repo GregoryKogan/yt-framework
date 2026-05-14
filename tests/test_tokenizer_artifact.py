@@ -10,6 +10,7 @@ from omegaconf import OmegaConf
 from yt_framework.core.dependencies import PipelineStageDependencies
 from yt_framework.core.stage import StageContext
 from yt_framework.operations._internal.tokenizer_artifact import (
+    _artifact_name_from_job,
     _prepare_local_archive,
     init_tokenizer_artifact_directory,
     resolve_tokenizer_archive_name,
@@ -29,6 +30,10 @@ def test_resolve_tokenizer_artifact_name_uses_explicit_artifact_name() -> None:
     stage = OmegaConf.create({})
     tok = OmegaConf.create({"artifact_name": "  my_tok  "})
     assert resolve_tokenizer_artifact_name(stage, tok) == "my_tok"
+
+
+def test_artifact_name_from_job_returns_none_when_names_missing() -> None:
+    assert _artifact_name_from_job(OmegaConf.create({"job": {}})) is None
 
 
 def test_resolve_tokenizer_artifact_name_falls_back_to_job_tokenizer_name() -> None:

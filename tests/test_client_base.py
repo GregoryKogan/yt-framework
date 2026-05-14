@@ -216,3 +216,9 @@ def test_base_yt_client_wait_for_operation_returns_false_when_wait_raises() -> N
 def test_stub_base_client_run_yql_accepts_max_row_weight_override() -> None:
     c = _StubBaseClient(_null_logger("tests.client_base.yql_mrw"))
     assert c.run_yql("SELECT 1", max_row_weight="64M") is None
+
+
+def test_base_yt_client_run_vanilla_requires_operation_resources_instance() -> None:
+    c = _StubBaseClient(_null_logger("tests.client_base.vanilla_res"))
+    with pytest.raises(TypeError, match="resources=OperationResources"):
+        c.run_vanilla("true", [], {}, "t", resources={"pool": "p"})

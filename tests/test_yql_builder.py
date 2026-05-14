@@ -9,6 +9,7 @@ from yt_framework.yt.clients.yql.yql_builder import (
     _format_group_by_list,
     _format_join_conditions,
     _format_order_by_list,
+    _join_query_on_branch,
     build_distinct_query,
     build_filter_query,
     build_group_by_query,
@@ -353,3 +354,77 @@ def test_build_limit_query_appends_limit() -> None:
     )
     assert q.rstrip().endswith("LIMIT 10;")
     assert "FROM `//in`" in q
+
+
+def test_build_join_query_raises_when_using_columns_empty_with_select_columns() -> None:
+    with pytest.raises(ValueError, match="using_columns must be set"):
+        build_join_query(
+            JoinTablesRequest(
+                left_table="//l",
+                right_table="//r",
+                output_table="//o",
+                on=[],
+                select_columns=["id"],
+                how="inner",
+            ),
+        )
+
+
+def test_join_query_on_branch_raises_when_join_conditions_empty() -> None:
+    with pytest.raises(ValueError, match="join_conditions must be set"):
+        _join_query_on_branch(
+            max_row_weight=None,
+            output_table="//o",
+            select_clause="a.*, b.*",
+            left_table="//l",
+            right_table="//r",
+            join_type="INNER",
+            join_conditions="",
+        )
+
+
+def test_build_filter_query_raises_when_columns_missing() -> None:
+    with pytest.raises(ValueError, match="FilterTableRequest.columns"):
+        build_filter_query(
+            FilterTableRequest(
+                input_table="//in",
+                output_table="//out",
+                condition="1=1",
+                columns=None,
+            ),
+        )
+
+
+def test_build_union_query_raises_when_columns_missing() -> None:
+    with pytest.raises(ValueError, match="UnionTablesRequest.columns"):
+        build_union_query(
+            UnionTablesRequest(
+                tables=["//a", "//b"],
+                output_table="//o",
+                columns=None,
+            ),
+        )
+
+
+def test_build_sort_query_raises_when_columns_missing() -> None:
+    with pytest.raises(ValueError, match="SortTableRequest.columns"):
+        build_sort_query(
+            SortTableRequest(
+                input_table="//in",
+                output_table="//out",
+                order_by="id",
+                columns=None,
+            ),
+        )
+
+
+def test_build_limit_query_raises_when_columns_missing() -> None:
+    with pytest.raises(ValueError, match="LimitTableRequest.columns"):
+        build_limit_query(
+            LimitTableRequest(
+                input_table="//in",
+                output_table="//out",
+                limit=1,
+                columns=None,
+            ),
+        )

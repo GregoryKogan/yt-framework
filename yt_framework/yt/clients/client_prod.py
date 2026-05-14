@@ -3,7 +3,7 @@
 import contextlib
 import logging
 import uuid
-from typing import Any, Literal, cast
+from typing import Any, Literal, NoReturn, cast
 
 from yt.wrapper import TablePath, YtClient
 from yt.wrapper import format as yt_format
@@ -28,11 +28,11 @@ from yt_framework.yt.support.max_row_weight import (
 )
 
 
-def _raise_value_error(message: str) -> None:
+def _raise_value_error(message: str) -> NoReturn:
     raise ValueError(message)
 
 
-def _raise_value_error_from(cause: BaseException, message: str) -> None:
+def _raise_value_error_from(cause: BaseException, message: str) -> NoReturn:
     raise ValueError(message) from cause
 
 
@@ -325,8 +325,6 @@ SELECT * FROM `{table_path}` LIMIT 0;"""  # noqa: S608
             f"explicit column selection, or delete and recreate it. Original error: {read_error}"
         )
         _raise_value_error_from(read_error, msg)
-        unreachable = "unreachable"
-        raise AssertionError(unreachable)
 
     def _get_table_columns(self, table_path: str) -> list[str]:
         """Get column names from a table.

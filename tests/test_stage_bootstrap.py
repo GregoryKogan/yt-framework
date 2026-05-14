@@ -208,3 +208,52 @@ def test_stage_bootstrap_typed_job_unpickle_runs_bootstrap_when_stage_name_set(
     job = StageBootstrapTypedJob()
     pickle.loads(pickle.dumps(job))
     assert str(workspace) in sys.path, "unpickle should bootstrap PYTHONPATH root"
+
+
+def test_safe_extractall_rejects_path_traversal_member(tmp_path: Path) -> None:
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    bad = tmp_path / "evil.tgz"
+    with tarfile.open(bad, "w:gz") as tf:
+        info = tarfile.TarInfo(name="../outside")
+        info.size = 0
+        tf.addfile(info, io.BytesIO())
+    with tarfile.open(bad, "r:gz") as tf, pytest.raises(RuntimeError, match="outside"):
+        sb._safe_extractall(tf, dest)
+
+
+def test_scan_for_source_tarball_skips_empty_and_duplicate_bases(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "source.tar.gz").touch()
+    monkeypatch.chdir(tmp_path)
+    base = str(tmp_path)
+    assert sb._scan_for_source_tarball(["", base, base]) == base
+
+
+def test_extract_tokenizer_returns_when_archive_file_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TOKENIZER_ARTIFACT_FILE", "missing.tgz")
+    monkeypatch.setenv("TOKENIZER_ARTIFACT_DIR", "d")
+    sb._extract_tokenizer_artifact_if_needed(str(tmp_path))
+
+
+def test_extract_tokenizer_returns_when_marker_already_present(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path
+    art = root / "tok.tgz"
+    with tarfile.open(art, "w:gz") as tf:
+        z = tarfile.TarInfo("x")
+        z.size = 0
+        tf.addfile(z, io.BytesIO())
+    tdir = root / "tokenizer_artifacts" / "tok"
+    tdir.mkdir(parents=True)
+    (tdir / ".extracted").write_text("ok\n", encoding="utf-8")
+    monkeypatch.setenv("TOKENIZER_ARTIFACT_FILE", "tok.tgz")
+    monkeypatch.setenv("TOKENIZER_ARTIFACT_DIR", str(tdir.relative_to(root)))
+    sb._extract_tokenizer_artifact_if_needed(str(root))

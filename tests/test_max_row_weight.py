@@ -59,3 +59,38 @@ def test_ensure_max_row_weight_pragma_validates_embedded_value_when_no_override(
 def test_ensure_max_row_weight_pragma_leaves_valid_embedded_pragma_unchanged() -> None:
     q = 'PRAGMA yt.MaxRowWeight = "64M";\nSELECT 1'
     assert ensure_max_row_weight_pragma(q) == q
+
+
+def test_parse_max_row_weight_bytes_rejects_empty_string() -> None:
+    with pytest.raises(ValueError, match="non-empty"):
+        parse_max_row_weight_bytes("   ")
+
+
+def test_parse_max_row_weight_bytes_rejects_bad_numeric_suffix() -> None:
+    with pytest.raises(ValueError, match="invalid max_row_weight numeric part"):
+        parse_max_row_weight_bytes("10aM")
+
+
+def test_parse_max_row_weight_bytes_rejects_unrecognized_token() -> None:
+    with pytest.raises(ValueError, match="unrecognized"):
+        parse_max_row_weight_bytes("12MB")
+
+
+def test_validate_max_row_weight_rejects_blank_override() -> None:
+    with pytest.raises(ValueError, match="non-empty"):
+        validate_max_row_weight("  ")
+
+
+def test_ensure_max_row_weight_pragma_prepends_when_query_has_no_pragma() -> None:
+    q = "SELECT 1"
+    out = ensure_max_row_weight_pragma(q)
+    assert out.startswith('PRAGMA yt.MaxRowWeight = "128M";\n')
+    assert out.endswith(q)
+
+
+def test_ensure_max_row_weight_pragma_replaces_first_pragma_when_override_given() -> (
+    None
+):
+    q = 'PRAGMA yt.MaxRowWeight = "64M";\nSELECT 1'
+    out = ensure_max_row_weight_pragma(q, max_row_weight="128M")
+    assert 'PRAGMA yt.MaxRowWeight = "128M"' in out.split("\n", maxsplit=1)[0]

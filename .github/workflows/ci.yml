@@ -94,6 +94,9 @@ jobs:
             --cov-report=term-missing \
             --cov-report=json:coverage.json
 
+      - name: Require 100% statement coverage (yt_framework + ytjobs)
+        run: python scripts/coverage/check_line_coverage.py coverage.json
+
       - name: Publish coverage badge to gist
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.COVERAGE_GIST_ID != ''
         env:

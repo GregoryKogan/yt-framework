@@ -177,3 +177,11 @@ def test_init_checkpoint_directory_propagates_upload_failure(
                 }
             ),
         )
+
+
+def test_init_checkpoint_directory_skips_validation_when_model_name_not_string(
+    tmp_path: Path,
+) -> None:
+    ctx, yt = _ctx(tmp_path, job_section={"model_name": 123})
+    init_checkpoint_directory(ctx, OmegaConf.create({"checkpoint_base": "//yt/cp"}))
+    yt.exists.assert_not_called()

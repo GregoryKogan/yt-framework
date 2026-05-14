@@ -472,6 +472,32 @@ def test_main_exits_with_code_1_when_pipeline_run_fails(
 
 
 @patch("yt_framework.core.pipeline.upload_all_code")
+def test_upload_code_passes_explicit_build_folder_over_config_value(
+    mock_upload: object,
+    tmp_path: Path,
+) -> None:
+    _touch_configs_secrets(tmp_path)
+    coded = tmp_path / "stages" / "coded"
+    (coded / "src").mkdir(parents=True)
+    (coded / "src" / "mapper.py").write_text("#\n", encoding="utf-8")
+    cfg = OmegaConf.create(
+        {
+            "pipeline": {"mode": "dev", "build_folder": "//yt/ignored"},
+            "stages": {"enabled_stages": ["coded"]},
+        }
+    )
+
+    class _P(BasePipeline):
+        def setup(self) -> None:
+            self.set_stage_registry(StageRegistry())
+
+    pipeline = _P(cfg, tmp_path)
+    pipeline.upload_code("//yt/explicit")
+    assert mock_upload.call_count == 1
+    assert mock_upload.call_args.kwargs["build_folder"] == "//yt/explicit"
+
+
+@patch("yt_framework.core.pipeline.upload_all_code")
 def test_upload_code_calls_upload_all_code_with_pipeline_build_folder(
     mock_upload: object,
     tmp_path: Path,

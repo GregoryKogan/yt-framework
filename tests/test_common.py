@@ -212,3 +212,43 @@ def test_extract_secure_env_client_kwargs_reads_operation_options() -> None:
         "environment_public_keys": ["DEBUG"],
         "use_plain_environment_for_secrets": True,
     }
+
+
+def test_extract_secure_env_client_kwargs_wraps_scalar_public_key_as_list() -> None:
+    cfg = OmegaConf.create({"environment_public_keys": "DEBUG"})
+    out = extract_secure_env_client_kwargs(cfg)
+    assert out == {"environment_public_keys": ["DEBUG"]}
+
+
+def test_build_operation_environment_tokenizer_returns_early_without_artifact_base(
+    tmp_path: Path,
+) -> None:
+    ctx = _stage_context_with_configs(tmp_path)
+    op_cfg = OmegaConf.create({"tokenizer_artifact": {}})
+    with patch("yt_framework.operations.common.init_tokenizer_artifact_directory"):
+        env = build_operation_environment(
+            ctx,
+            op_cfg,
+            _LOG,
+            include_tokenizer_artifact=True,
+            include_stage_name=False,
+        )
+    assert "TOKENIZER_ARTIFACT_FILE" not in env
+
+
+def test_build_operation_environment_tokenizer_skips_keys_when_name_unresolvable(
+    tmp_path: Path,
+) -> None:
+    ctx = _stage_context_with_configs(tmp_path)
+    op_cfg = OmegaConf.create(
+        {"tokenizer_artifact": {"artifact_base": "//home/a", "artifact_name": ""}}
+    )
+    with patch("yt_framework.operations.common.init_tokenizer_artifact_directory"):
+        env = build_operation_environment(
+            ctx,
+            op_cfg,
+            _LOG,
+            include_tokenizer_artifact=True,
+            include_stage_name=False,
+        )
+    assert "TOKENIZER_ARTIFACT_FILE" not in env
