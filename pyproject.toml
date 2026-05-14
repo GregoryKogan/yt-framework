@@ -113,7 +113,7 @@ ignore = [
 "yt_framework/yt/support/_client_dev_runtime.py" = ["PLR0913", "ANN401", "TC003"]
 "yt_framework/yt/clients/yql/yql_builder.py" = ["PLR0913"]
 "yt_framework/operations/_internal/upload_wrappers.py" = ["TC003"]
-"yt_framework/operations/stage_contracts.py" = ["TC001", "TC002", "TC003"]
+"yt_framework/contracts/stage.py" = ["TC001", "TC002", "TC003"]
 "yt_framework/yt/clients/client_wait.py" = ["TC002", "TC003"]
 # Tests: pydocstyle and strict try/except/annotation rules are intentionally relaxed.
 "tests/**" = [

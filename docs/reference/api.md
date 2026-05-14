@@ -11,7 +11,8 @@ Use the sidebar headings for modules. Anything not listed is still in the source
 ## Layout
 
 - **Core** — pipeline, stage, registry, discovery, `self.deps` injection
-- **Operations** — map, vanilla, map-reduce/reduce, S3 helpers, table helpers, checkpoint upload, sort, tokenizer artifact wiring; stage contracts (`stage_contracts`) shared with `core` without reversing the dependency
+- **Contracts** — `StageDependencies` and `StageContext` shared by `core` and operation drivers (prefer `yt_framework.contracts`; `operations.stage_contracts` is a thin re-export)
+- **Operations** — map, vanilla, map-reduce/reduce, S3 helpers, table helpers, checkpoint upload, sort, tokenizer artifact wiring
 - **Typed jobs** — `StageBootstrapTypedJob`
 - **YT** — `yt.support` (shared runtime helpers), `yt.clients` (public client API and mixins), and `yt` entry (`factory`, package exports)
 - **Utils** — env files, logging setup, ignore patterns
@@ -90,16 +91,25 @@ How-to guides under `docs/operations`, `docs/configuration`, and `docs/advanced`
    :show-inheritance:
 ```
 
-## Operations
+## Contracts
 
-### Stage contracts (injection and context)
+### Stage injection types
 
 ```{eval-rst}
-.. automodule:: yt_framework.operations.stage_contracts
+.. automodule:: yt_framework.contracts.stage
    :members:
    :undoc-members:
    :show-inheritance:
 ```
+
+### Import path note
+
+`yt_framework.operations.stage_contracts` re-exports
+:class:`~yt_framework.contracts.stage.StageContext` and
+:class:`~yt_framework.contracts.stage.StageDependencies` only. Prefer
+``from yt_framework.contracts import …``.
+
+## Operations
 
 ### Map Operations
 

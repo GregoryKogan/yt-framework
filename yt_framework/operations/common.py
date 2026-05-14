@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     import logging
     from pathlib import Path
 
-    from yt_framework.operations.stage_contracts import StageContext
+    from yt_framework.contracts import StageContext
 
 
 def _dict_config_or(node: object, *, fallback: DictConfig) -> DictConfig:

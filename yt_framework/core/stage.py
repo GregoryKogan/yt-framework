@@ -10,8 +10,8 @@ from pathlib import Path
 
 from omegaconf import DictConfig, OmegaConf
 
+from yt_framework.contracts import StageContext, StageDependencies
 from yt_framework.core.debug_context import DebugContext
-from yt_framework.operations.stage_contracts import StageContext, StageDependencies
 
 
 class BaseStage(ABC):

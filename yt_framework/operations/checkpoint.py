@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from omegaconf import DictConfig
 
 if TYPE_CHECKING:
-    from yt_framework.operations.stage_contracts import StageContext
+    from yt_framework.contracts import StageContext
 
 
 def _raise_file_not_found(message: str) -> None:

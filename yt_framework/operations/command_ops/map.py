@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
     from yt.wrapper.schema import TableSchema
 
-    from yt_framework.operations.stage_contracts import StageContext
+    from yt_framework.contracts import StageContext
     from yt_framework.yt.clients.client_base import OperationResources
 
 

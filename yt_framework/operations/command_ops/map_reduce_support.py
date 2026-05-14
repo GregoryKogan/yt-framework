@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from yt.wrapper import Operation
 
-    from yt_framework.operations.stage_contracts import StageContext
+    from yt_framework.contracts import StageContext
 
 
 def wait_operation_with_log(
