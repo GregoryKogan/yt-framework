@@ -313,6 +313,7 @@ class BaseYTClient(ClientOperationWaitMixin, YqlOpsABC, ABC):
         max_failed_jobs: int = 1,
         docker_auth: dict[str, str] | None = None,
         job: object = None,
+        sort_by: list[str] | None = None,
         **kwargs: object,
     ) -> Operation:
         """Run a reduce-only operation (delegates to :meth:`run_reduce_submit`)."""
@@ -325,6 +326,7 @@ class BaseYTClient(ClientOperationWaitMixin, YqlOpsABC, ABC):
                 files=file_pairs_tuple(files),
                 resources=resources,
                 env=env_pairs_tuple(env),
+                sort_by=None if sort_by is None else tuple(sort_by),
                 output_schema=output_schema,
                 max_failed_jobs=max_failed_jobs,
                 docker_auth=docker_auth_tuple(docker_auth),

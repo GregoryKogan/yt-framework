@@ -1,4 +1,4 @@
-"""Dev-mode map-reduce, reduce, and sort stubs."""
+"""Dev-mode map-reduce, reduce, and sort execution."""
 
 # pyright: reportAttributeAccessIssue=false, reportUnusedImport=false, reportPrivateUsage=false
 
@@ -19,26 +19,38 @@ if TYPE_CHECKING:
         ReduceSubmitSpec,
     )
 
-from yt_framework.job_command import is_typed_job, resolve_aliased_job
+from yt_framework.job_command import resolve_aliased_job
 from yt_framework.yt.clients._client_split.dev_operation import DevOperation
 from yt_framework.yt.support._client_dev_runtime import (
     dev_apply_stage_checkpoint_fallback,
+    dev_copy_output_to_table,
     dev_find_checkpoint_in_config,
     dev_pythonpath_entries,
+    dev_resolve_sort_keys,
     dev_resolve_ytjobs_source,
+    dev_run_command_leg_subprocess,
     dev_scan_stages_checkpoint,
+    dev_sort_jsonl_file,
     dev_try_upload_one_dependency,
 )
 from yt_framework.yt.support.operation_secure_env import pop_secure_env_client_kwargs
 
+_DEV_STRING_COMMAND_MSG = (
+    "Dev mode supports only string commands; TypedJob legs are supported in prod mode."
+)
+
 
 class ClientDevMrReduceSortMixin:
-    """Mixin for dev map-reduce / reduce / sort no-ops."""
+    """Mixin for dev map-reduce, reduce, and sort."""
+
+    @staticmethod
+    def _require_dev_string_command(leg: object) -> str:
+        if not isinstance(leg, str):
+            raise NotImplementedError(_DEV_STRING_COMMAND_MSG)
+        return leg
 
     def run_map_reduce_submit(self, spec: MapReduceSubmitSpec) -> Operation:
-        """Dev: no-op; copy input table to output table."""
-        mapper = spec.mapper
-        reducer = spec.reducer
+        """Run map-reduce locally: mapper subprocess, sort, reducer subprocess."""
         input_table = spec.input_table
         output_table = spec.output_table
         reduce_by_cols = spec.reduce_by_list()
@@ -49,8 +61,6 @@ class ClientDevMrReduceSortMixin:
         output_schema = spec.output_schema
         max_failed_jobs = spec.max_failed_jobs
         docker_auth = spec.docker_auth_dict()
-        map_job = spec.map_job
-        reduce_job = spec.reduce_job
         kwargs = dict(spec.extras_dict())
         self.logger.debug(
             "Dev map-reduce ignoring hints: reduce_by=%s sort_by=%s schema=%s max_failed=%s files=%s docker=%s env_keys=%s pool=%s",
@@ -67,44 +77,73 @@ class ClientDevMrReduceSortMixin:
         pop_secure_env_client_kwargs(_kw)
         mapper_leg = resolve_aliased_job(
             legacy_name="mapper",
-            legacy_value=mapper,
+            legacy_value=spec.mapper,
             preferred_name="map_job",
-            preferred_value=map_job,
+            preferred_value=spec.map_job,
         )
         reducer_leg = resolve_aliased_job(
             legacy_name="reducer",
-            legacy_value=reducer,
+            legacy_value=spec.reducer,
             preferred_name="reduce_job",
-            preferred_value=reduce_job,
+            preferred_value=spec.reduce_job,
         )
+        mapper_command = self._require_dev_string_command(mapper_leg)
+        reducer_command = self._require_dev_string_command(reducer_leg)
 
-        def _leg_desc(obj: object) -> str:
-            if is_typed_job(obj):
-                return "TypedJob"
-            if isinstance(obj, str):
-                return "command (prod uses JsonFormat on this leg)"
-            return f"invalid leg type {type(obj).__name__} (expected TypedJob or str)"
-
-        self.logger.info(
-            "Dev: map-reduce mapper leg: %s; reducer leg: %s",
-            _leg_desc(mapper_leg),
-            _leg_desc(reducer_leg),
-        )
-        self.logger.info("Dev: map-reduce no-op (copying input -> output)")
         self._pipeline_dir_or_raise()
-        self._dev_dir().mkdir(parents=True, exist_ok=True)
-        input_path = self._table_local_path(input_table)
-        output_path = self._table_local_path(output_table)
-        if input_path.exists():
-            shutil.copy2(input_path, output_path)
-        else:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text("")
-        return cast("Operation", DevOperation(0))
+        self.logger.info("Submitting map-reduce operation (dev)")
+        self.logger.info("  Input: %s", input_table)
+        self.logger.info("  Output: %s", output_table)
+        self.logger.info("  Mapper command: %s", mapper_command)
+        self.logger.info("  Reducer command: %s", reducer_command)
+
+        sandbox_dir, sandbox_input, intermediate, sandbox_output = (
+            self._prepare_mr_sandbox(input_table, output_table)
+        )
+        self._upload_files(files, sandbox_dir)
+        env_merged = self._setup_map_environment(env)
+        out_basename = self._table_basename(output_table)
+        mapper_log = self._dev_dir() / f"{out_basename}_mapper.log"
+        reducer_log = self._dev_dir() / f"{out_basename}_reducer.log"
+
+        map_rc, map_hint = dev_run_command_leg_subprocess(
+            command=mapper_command,
+            sandbox_dir=sandbox_dir,
+            sandbox_input=sandbox_input,
+            sandbox_output=intermediate,
+            env_merged=env_merged,
+            logs_path=mapper_log,
+        )
+        if map_rc != 0:
+            return cast(
+                "Operation",
+                DevOperation(map_rc, map_hint, leg_name="Mapper"),
+            )
+
+        sort_keys = dev_resolve_sort_keys(
+            reduce_by=reduce_by_cols,
+            sort_by=sort_by,
+        )
+        self.logger.info("  Dev: sorting intermediate by %s", sort_keys)
+        dev_sort_jsonl_file(intermediate, sort_keys)
+
+        red_rc, red_hint = dev_run_command_leg_subprocess(
+            command=reducer_command,
+            sandbox_dir=sandbox_dir,
+            sandbox_input=intermediate,
+            sandbox_output=sandbox_output,
+            env_merged=env_merged,
+            logs_path=reducer_log,
+        )
+        dev_copy_output_to_table(
+            proc_returncode=red_rc,
+            sandbox_output=sandbox_output,
+            output_table_local_path=self._table_local_path(output_table),
+        )
+        return cast("Operation", DevOperation(red_rc, red_hint, leg_name="Reducer"))
 
     def run_reduce_submit(self, spec: ReduceSubmitSpec) -> Operation:
-        """Dev: no-op; copy input table to output table."""
-        reducer = spec.reducer
+        """Run reduce locally: auto-sort input by reduce_by, then reducer subprocess."""
         input_table = spec.input_table
         output_table = spec.output_table
         reduce_by_cols = spec.reduce_by_list()
@@ -114,7 +153,6 @@ class ClientDevMrReduceSortMixin:
         output_schema = spec.output_schema
         max_failed_jobs = spec.max_failed_jobs
         docker_auth = spec.docker_auth_dict()
-        job = spec.job
         kwargs = dict(spec.extras_dict())
         self.logger.debug(
             "Dev reduce ignoring hints: reduce_by=%s schema=%s max_failed=%s files=%s docker=%s env_keys=%s pool=%s",
@@ -130,28 +168,48 @@ class ClientDevMrReduceSortMixin:
         pop_secure_env_client_kwargs(_kw)
         reducer_leg = resolve_aliased_job(
             legacy_name="reducer",
-            legacy_value=reducer,
+            legacy_value=spec.reducer,
             preferred_name="job",
-            preferred_value=job,
+            preferred_value=spec.job,
         )
-        if is_typed_job(reducer_leg):
-            rdesc = "TypedJob"
-        elif isinstance(reducer_leg, str):
-            rdesc = "command (prod uses JsonFormat on this leg)"
-        else:
-            rdesc = f"invalid leg type {type(reducer_leg).__name__} (expected TypedJob or str)"
-        self.logger.info("Dev: reduce leg: %s", rdesc)
-        self.logger.info("Dev: reduce no-op (copying input -> output)")
+        reducer_command = self._require_dev_string_command(reducer_leg)
+
         self._pipeline_dir_or_raise()
-        self._dev_dir().mkdir(parents=True, exist_ok=True)
-        input_path = self._table_local_path(input_table)
-        output_path = self._table_local_path(output_table)
-        if input_path.exists():
-            shutil.copy2(input_path, output_path)
-        else:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text("")
-        return cast("Operation", DevOperation(0))
+        self.logger.info("Submitting reduce operation (dev)")
+        self.logger.info("  Input: %s", input_table)
+        self.logger.info("  Output: %s", output_table)
+        self.logger.info("  Reducer command: %s", reducer_command)
+
+        sandbox_dir, sandbox_input, sandbox_output = self._prepare_reduce_sandbox(
+            input_table,
+            output_table,
+        )
+        self._upload_files(files, sandbox_dir)
+        env_merged = self._setup_map_environment(env)
+        out_basename = self._table_basename(output_table)
+        reducer_log = self._dev_dir() / f"{out_basename}_reducer.log"
+
+        sort_keys = dev_resolve_sort_keys(
+            reduce_by=reduce_by_cols,
+            sort_by=spec.sort_by_list(),
+        )
+        self.logger.info("  Dev: sorting input by %s", sort_keys)
+        dev_sort_jsonl_file(sandbox_input, sort_keys)
+
+        red_rc, red_hint = dev_run_command_leg_subprocess(
+            command=reducer_command,
+            sandbox_dir=sandbox_dir,
+            sandbox_input=sandbox_input,
+            sandbox_output=sandbox_output,
+            env_merged=env_merged,
+            logs_path=reducer_log,
+        )
+        dev_copy_output_to_table(
+            proc_returncode=red_rc,
+            sandbox_output=sandbox_output,
+            output_table_local_path=self._table_local_path(output_table),
+        )
+        return cast("Operation", DevOperation(red_rc, red_hint, leg_name="Reducer"))
 
     def run_sort(
         self,
@@ -293,41 +351,92 @@ class ClientDevMrReduceSortMixin:
                 logger=self.logger,
             )
 
-    def _prepare_map_sandbox(
-        self,
-        input_table: str,
-        output_table: str,
-    ) -> tuple[Path, Path, Path]:
-        """Prepare sandbox directory and input/output file paths."""
-        self._pipeline_dir_or_raise()
-
+    def _dev_input_path_or_raise(self, input_table: str) -> Path:
         input_path = self._table_local_path(input_table)
-
         if not input_path.exists():
             msg = (
                 f"Dev: input table file not found: {input_path}. "
                 "Create it (e.g. run a previous stage or add .jsonl manually)."
             )
             raise FileNotFoundError(msg)
+        return input_path
 
+    def _prepare_operation_sandbox(
+        self,
+        input_table: str,
+        output_table: str,
+        *,
+        dir_prefix: str,
+        intermediate: bool = False,
+    ) -> tuple[Path, Path, Path] | tuple[Path, Path, Path, Path]:
+        """Prepare sandbox with ``input.jsonl`` and ``output.jsonl`` (optional intermediate)."""
+        input_path = self._dev_input_path_or_raise(input_table)
         self._dev_dir().mkdir(parents=True, exist_ok=True)
-
-        # Create sandbox directory
-        sandbox_dir = (
-            self._dev_dir()
-            / f"sandbox_{self._table_basename(input_table)}->{self._table_basename(output_table)}"
-        )
+        in_base = self._table_basename(input_table)
+        out_base = self._table_basename(output_table)
+        sandbox_dir = self._dev_dir() / f"{dir_prefix}{in_base}->{out_base}"
         sandbox_dir.mkdir(parents=True, exist_ok=True)
-
-        # Setup input/output files in sandbox
         sandbox_input = sandbox_dir / "input.jsonl"
         sandbox_output = sandbox_dir / "output.jsonl"
         shutil.copy2(input_path, sandbox_input)
-
         self.logger.info("  Dev: sandbox=%s", sandbox_dir)
+        if intermediate:
+            intermediate_path = sandbox_dir / "intermediate.jsonl"
+            self.logger.info(
+                "  Dev: stdin=%s, intermediate=%s, stdout=%s",
+                sandbox_input,
+                intermediate_path,
+                sandbox_output,
+            )
+            return sandbox_dir, sandbox_input, intermediate_path, sandbox_output
         self.logger.info("  Dev: stdin=%s, stdout=%s", sandbox_input, sandbox_output)
-
         return sandbox_dir, sandbox_input, sandbox_output
+
+    def _prepare_mr_sandbox(
+        self,
+        input_table: str,
+        output_table: str,
+    ) -> tuple[Path, Path, Path, Path]:
+        """Prepare map-reduce sandbox with intermediate JSONL between legs."""
+        return cast(
+            "tuple[Path, Path, Path, Path]",
+            self._prepare_operation_sandbox(
+                input_table,
+                output_table,
+                dir_prefix="sandbox_mr_",
+                intermediate=True,
+            ),
+        )
+
+    def _prepare_reduce_sandbox(
+        self,
+        input_table: str,
+        output_table: str,
+    ) -> tuple[Path, Path, Path]:
+        """Prepare reduce-only sandbox."""
+        return cast(
+            "tuple[Path, Path, Path]",
+            self._prepare_operation_sandbox(
+                input_table,
+                output_table,
+                dir_prefix="sandbox_reduce_",
+            ),
+        )
+
+    def _prepare_map_sandbox(
+        self,
+        input_table: str,
+        output_table: str,
+    ) -> tuple[Path, Path, Path]:
+        """Prepare sandbox directory and input/output file paths."""
+        return cast(
+            "tuple[Path, Path, Path]",
+            self._prepare_operation_sandbox(
+                input_table,
+                output_table,
+                dir_prefix="sandbox_",
+            ),
+        )
 
     def _setup_map_environment(self, env: dict[str, str]) -> dict[str, str]:
         """Build the environment dict for a dev-mode map run."""

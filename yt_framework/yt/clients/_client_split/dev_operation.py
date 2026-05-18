@@ -4,9 +4,16 @@
 class DevOperation:
     """Fake operation for dev run_map; implements wait, get_state, get_error."""
 
-    def __init__(self, returncode: int, stderr_message: str = "") -> None:
+    def __init__(
+        self,
+        returncode: int,
+        stderr_message: str = "",
+        *,
+        leg_name: str = "Mapper",
+    ) -> None:
         self._returncode = returncode
         self._stderr = stderr_message
+        self._leg_name = leg_name
         self.id = f"dev-operation-{id(self)}"  # Fake operation ID for dev mode
 
     def wait(self) -> None:
@@ -18,4 +25,7 @@ class DevOperation:
     def get_error(self) -> str | None:
         if self._returncode == 0:
             return None
-        return self._stderr or f"Mapper exited with code {self._returncode}"
+        leg_msg = f"{self._leg_name} exited with code {self._returncode}"
+        if self._stderr:
+            return f"{leg_msg}. {self._stderr}"
+        return leg_msg

@@ -570,53 +570,128 @@ def test_dev_client_run_yql_warns_when_input_table_jsonl_missing(
     )
 
 
-def test_dev_client_run_map_reduce_copies_input_jsonl_to_output(
-    tmp_path: Path,
-) -> None:
+_DEV_MR_MAPPER = """#!/usr/bin/env python3
+import json
+import sys
+
+for line in sys.stdin:
+    row = json.loads(line)
+    print(json.dumps({"k": row["k"], "v": int(row["v"])}), flush=True)
+"""
+
+_DEV_MR_REDUCER = """#!/usr/bin/env python3
+import json
+import sys
+
+cur_k = None
+s = 0
+
+
+def flush() -> None:
+    global cur_k, s
+    if cur_k is not None:
+        print(json.dumps({"k": cur_k, "sum_v": s}), flush=True)
+
+
+for line in sys.stdin:
+    row = json.loads(line)
+    k, v = row["k"], int(row["v"])
+    if cur_k is None:
+        cur_k, s = k, v
+    elif k == cur_k:
+        s += v
+    else:
+        flush()
+        cur_k, s = k, v
+flush()
+"""
+
+
+def _write_mr_job_scripts(pipeline_dir: Path) -> list[tuple[str, str]]:
+    (pipeline_dir / "mapper.py").write_text(_DEV_MR_MAPPER, encoding="utf-8")
+    (pipeline_dir / "reducer.py").write_text(_DEV_MR_REDUCER, encoding="utf-8")
+    return [
+        ("//yt/mapper.py", "mapper.py"),
+        ("//yt/reducer.py", "reducer.py"),
+    ]
+
+
+def test_dev_client_run_map_reduce_sums_by_key(tmp_path: Path) -> None:
     client = YTDevClient(_null_logger("tests.client_dev.mr"), pipeline_dir=tmp_path)
-    client.write_table("//tmp/mr_in", [{"row": 1}], append=False)
+    client.write_table(
+        "//tmp/mr_in",
+        [
+            {"k": "a", "v": 1},
+            {"k": "a", "v": 2},
+            {"k": "b", "v": 3},
+        ],
+        append=False,
+    )
+    deps = _write_mr_job_scripts(tmp_path)
     op = client.run_map_reduce(
         "python3 mapper.py",
         "python3 reducer.py",
         "//tmp/mr_in",
         "//tmp/mr_out",
-        ["id"],
-        [],
+        ["k"],
+        deps,
         OperationResources(),
         {},
     )
-    assert op.get_state() == "completed" and client.read_table("//tmp/mr_out") == [
-        {"row": 1}
-    ], "dev run_map_reduce copies input table jsonl to output"
+    assert op.get_state() == "completed", "map-reduce must finish successfully"
+    got = {r["k"]: r["sum_v"] for r in client.read_table("//tmp/mr_out")}
+    assert got == {"a": 3, "b": 3}, "dev map-reduce runs mapper then reducer"
 
 
-def test_dev_client_run_map_reduce_writes_empty_output_when_input_missing(
-    tmp_path: Path,
-) -> None:
+def test_dev_client_run_map_reduce_raises_when_input_missing(tmp_path: Path) -> None:
     client = YTDevClient(
         _null_logger("tests.client_dev.mr_miss"), pipeline_dir=tmp_path
     )
+    with pytest.raises(FileNotFoundError, match="input table file not found"):
+        client.run_map_reduce(
+            "python3 mapper.py",
+            "python3 reducer.py",
+            "//tmp/missing_in",
+            "//tmp/mr_empty_out",
+            ["k"],
+            [],
+            OperationResources(),
+            {},
+        )
+
+
+def test_dev_client_run_map_reduce_fails_when_mapper_exits_nonzero(
+    tmp_path: Path,
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.mr_fail"), pipeline_dir=tmp_path
+    )
+    client.write_table("//tmp/mr_in", [{"k": "a", "v": 1}], append=False)
     op = client.run_map_reduce(
-        "m",
-        "r",
-        "//tmp/missing_in",
-        "//tmp/mr_empty_out",
-        [],
-        [],
+        "exit 1",
+        "python3 reducer.py",
+        "//tmp/mr_in",
+        "//tmp/mr_out",
+        ["k"],
+        _write_mr_job_scripts(tmp_path),
         OperationResources(),
         {},
     )
-    assert op.get_state() == "completed"
-    assert client.read_table("//tmp/mr_empty_out") == []
+    assert op.get_state() == "failed", "mapper failure should fail the operation"
+    assert not client._table_local_path("//tmp/mr_out").exists(), (
+        "reducer must not run when mapper fails"
+    )
 
 
-def test_dev_client_run_reduce_copies_input_jsonl_to_output(
+def test_dev_client_run_reduce_fails_when_reducer_exits_nonzero(
     tmp_path: Path,
 ) -> None:
-    client = YTDevClient(_null_logger("tests.client_dev.red"), pipeline_dir=tmp_path)
-    client.write_table("//tmp/rd_in", [{"k": "v"}], append=False)
+    client = YTDevClient(
+        _null_logger("tests.client_dev.red_fail"), pipeline_dir=tmp_path
+    )
+    client.write_table("//tmp/rd_in", [{"k": "a", "v": 1}], append=False)
     op = client.run_reduce(
-        "python3 reducer.py",
+        "exit 3",
         "//tmp/rd_in",
         "//tmp/rd_out",
         ["k"],
@@ -624,9 +699,73 @@ def test_dev_client_run_reduce_copies_input_jsonl_to_output(
         OperationResources(),
         {},
     )
-    assert op.get_state() == "completed" and client.read_table("//tmp/rd_out") == [
-        {"k": "v"}
-    ], "dev run_reduce copies input table jsonl to output"
+    assert op.get_state() == "failed", "reducer failure should fail the operation"
+    error = op.get_error()
+    assert error is not None and error.startswith("Reducer exited with code 3"), error
+
+
+def test_dev_client_run_map_relative_path_in_sandbox(tmp_path: Path) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.map_cwd"), pipeline_dir=tmp_path
+    )
+    client.write_table("//tmp/map_in", [{"x": 1}], append=False)
+    op = client.run_map(
+        "test -f input.jsonl",
+        "//tmp/map_in",
+        "//tmp/map_out",
+        [],
+        OperationResources(),
+        {},
+    )
+    assert op.get_state() == "completed", (
+        "map command should resolve input.jsonl relative to sandbox cwd"
+    )
+
+
+def test_dev_client_run_reduce_sums_unsorted_input_after_auto_sort(
+    tmp_path: Path,
+) -> None:
+    client = YTDevClient(_null_logger("tests.client_dev.red"), pipeline_dir=tmp_path)
+    client.write_table(
+        "//tmp/rd_in",
+        [
+            {"k": "b", "v": 1},
+            {"k": "a", "v": 2},
+            {"k": "a", "v": 1},
+        ],
+        append=False,
+    )
+    (tmp_path / "reducer.py").write_text(_DEV_MR_REDUCER, encoding="utf-8")
+    op = client.run_reduce(
+        "python3 reducer.py",
+        "//tmp/rd_in",
+        "//tmp/rd_out",
+        ["k"],
+        [("//yt/reducer.py", "reducer.py")],
+        OperationResources(),
+        {},
+    )
+    assert op.get_state() == "completed", "reduce must finish successfully"
+    got = {r["k"]: r["sum_v"] for r in client.read_table("//tmp/rd_out")}
+    assert got == {"a": 3, "b": 1}, "dev reduce auto-sorts then runs reducer"
+
+
+def test_dev_client_run_map_reduce_raises_for_typed_job_legs(tmp_path: Path) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.mr_typed"), pipeline_dir=tmp_path
+    )
+    client.write_table("//tmp/mr_in", [{"k": "a", "v": 1}], append=False)
+    with pytest.raises(NotImplementedError, match="string commands"):
+        client.run_map_reduce(
+            TypedJob(),
+            "python3 reducer.py",
+            "//tmp/mr_in",
+            "//tmp/mr_out",
+            ["k"],
+            [],
+            OperationResources(),
+            {},
+        )
 
 
 def test_dev_client_join_tables_materializes_joined_rows_in_output_jsonl(
