@@ -72,4 +72,6 @@ If omitted, the uploader picks defaults (e.g. first existing among `reducer.py`,
 
 ## Dev client
 
-`client_dev` does not execute map-reduce legs; it logs whether each leg would be TypedJob or command (`JsonFormat` in prod) for sanity checks.
+In dev mode, map-reduce and reduce run locally as subprocesses (JSONL stdin/stdout), same contract as command-mode map. Map-reduce runs mapper → sort by `sort_by` or `reduce_by` → reducer. Reduce-only auto-sorts by `reduce_by` before the reducer.
+
+String commands only; TypedJob legs stay prod-only. See [Dev vs prod — MapReduce and Reduce](../dev-vs-prod.md).

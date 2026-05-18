@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import logging
 import re
 import shutil
@@ -255,6 +256,42 @@ def dev_rewrite_build_path_cmd(
     )
 
 
+def dev_resolve_sort_keys(
+    *,
+    reduce_by: list[str],
+    sort_by: list[str] | None,
+) -> list[str]:
+    """Return sort columns for dev reduce legs (``sort_by`` when set, else ``reduce_by``)."""
+    if sort_by:
+        return list(sort_by)
+    return list(reduce_by)
+
+
+def _dev_read_jsonl_rows(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped:
+            rows.append(json.loads(stripped))
+    return rows
+
+
+def _dev_write_jsonl_rows(path: Path, rows: list[dict[str, Any]]) -> None:
+    with path.open("w", encoding="utf-8") as out:
+        for row in rows:
+            out.write(json.dumps(row, ensure_ascii=False))
+            out.write("\n")
+
+
+def dev_sort_jsonl_file(path: Path, sort_keys: list[str]) -> None:
+    """Sort JSONL rows in place by ``sort_keys`` (stable, missing keys sort as ``None``)."""
+    if not sort_keys:
+        return
+    rows = _dev_read_jsonl_rows(path)
+    rows.sort(key=lambda row: tuple(row.get(key) for key in sort_keys))
+    _dev_write_jsonl_rows(path, rows)
+
+
 def dev_copy_map_output_table(
     *,
     proc_returncode: int,
@@ -309,6 +346,48 @@ def dev_run_map_subprocess(
     )
     err_hint = f"Stderr written to {logs_path}" if proc.returncode != 0 else ""
     return proc.returncode, err_hint
+
+
+def dev_run_command_leg_subprocess(
+    *,
+    command: str,
+    sandbox_dir: Path,
+    sandbox_input: Path,
+    sandbox_output: Path,
+    env_merged: dict[str, str],
+    logs_path: Path,
+) -> tuple[int, str]:
+    """Run a map/reduce command leg in sandbox; write stdout to ``sandbox_output`` only."""
+    with (
+        sandbox_input.open() as fin,
+        sandbox_output.open("w") as fout,
+        logs_path.open("w") as ferr,
+    ):
+        proc = subprocess.run(  # noqa: S603
+            ["/bin/bash", "-c", command],
+            stdin=fin,
+            stdout=fout,
+            stderr=ferr,
+            env=env_merged,
+            cwd=str(sandbox_dir),
+            check=False,
+            shell=False,
+        )
+    err_hint = f"Stderr written to {logs_path}" if proc.returncode != 0 else ""
+    return proc.returncode, err_hint
+
+
+def dev_copy_output_to_table(
+    *,
+    proc_returncode: int,
+    sandbox_output: Path,
+    output_table_local_path: Path,
+) -> None:
+    """Copy sandbox JSONL to the dev table path when the leg succeeded."""
+    if proc_returncode != 0 or not sandbox_output.exists():
+        return
+    output_table_local_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(sandbox_output, output_table_local_path)
 
 
 def dev_import_ytjobs_dir() -> Path | None:

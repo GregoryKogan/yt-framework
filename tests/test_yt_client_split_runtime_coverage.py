@@ -523,8 +523,13 @@ def _mr_resources() -> OperationResources:
     return OperationResources()
 
 
-def test_dev_map_reduce_submit_describes_invalid_mapper_leg(tmp_path: Path) -> None:
+def test_dev_map_reduce_submit_raises_for_non_string_mapper_leg(
+    tmp_path: Path,
+) -> None:
     client = YTDevClient(_null_logger("tests.dev.mr_bad"), pipeline_dir=tmp_path)
+    inp = client._table_local_path("//i")
+    inp.parent.mkdir(parents=True, exist_ok=True)
+    inp.write_text('{"k":"a"}\n', encoding="utf-8")
     spec = MapReduceSubmitSpec(
         mapper=42,
         reducer="./r.sh",
@@ -535,11 +540,15 @@ def test_dev_map_reduce_submit_describes_invalid_mapper_leg(tmp_path: Path) -> N
         resources=_mr_resources(),
         env=(),
     )
-    client.run_map_reduce_submit(spec)
+    with pytest.raises(NotImplementedError, match="string commands"):
+        client.run_map_reduce_submit(spec)
 
 
-def test_dev_reduce_submit_describes_invalid_reducer_leg(tmp_path: Path) -> None:
+def test_dev_reduce_submit_raises_for_non_string_reducer_leg(tmp_path: Path) -> None:
     client = YTDevClient(_null_logger("tests.dev.red_bad"), pipeline_dir=tmp_path)
+    inp = client._table_local_path("//i")
+    inp.parent.mkdir(parents=True, exist_ok=True)
+    inp.write_text('{"k":"a"}\n', encoding="utf-8")
     spec = ReduceSubmitSpec(
         reducer=42,
         input_table="//i",
@@ -549,14 +558,15 @@ def test_dev_reduce_submit_describes_invalid_reducer_leg(tmp_path: Path) -> None
         resources=_mr_resources(),
         env=(),
     )
-    client.run_reduce_submit(spec)
+    with pytest.raises(NotImplementedError, match="string commands"):
+        client.run_reduce_submit(spec)
 
 
-def test_dev_map_reduce_submit_logs_typed_job_legs(tmp_path: Path) -> None:
+def test_dev_map_reduce_submit_raises_for_typed_job_legs(tmp_path: Path) -> None:
     client = YTDevClient(_null_logger("tests.dev.mr_typed"), pipeline_dir=tmp_path)
     inp = client._table_local_path("//i")
     inp.parent.mkdir(parents=True, exist_ok=True)
-    inp.write_text("row\n", encoding="utf-8")
+    inp.write_text('{"k":"a","v":1}\n', encoding="utf-8")
     spec = MapReduceSubmitSpec(
         mapper=_TypedLeg(),
         reducer=_TypedLeg(),
@@ -567,14 +577,15 @@ def test_dev_map_reduce_submit_logs_typed_job_legs(tmp_path: Path) -> None:
         resources=_mr_resources(),
         env=(),
     )
-    client.run_map_reduce_submit(spec)
+    with pytest.raises(NotImplementedError, match="string commands"):
+        client.run_map_reduce_submit(spec)
 
 
-def test_dev_reduce_submit_logs_typed_job_leg(tmp_path: Path) -> None:
+def test_dev_reduce_submit_raises_for_typed_job_leg(tmp_path: Path) -> None:
     client = YTDevClient(_null_logger("tests.dev.red_typed"), pipeline_dir=tmp_path)
     inp = client._table_local_path("//i")
     inp.parent.mkdir(parents=True, exist_ok=True)
-    inp.write_text("row\n", encoding="utf-8")
+    inp.write_text('{"k":"a","v":1}\n', encoding="utf-8")
     spec = ReduceSubmitSpec(
         reducer=_TypedLeg(),
         input_table="//i",
@@ -584,7 +595,8 @@ def test_dev_reduce_submit_logs_typed_job_leg(tmp_path: Path) -> None:
         resources=_mr_resources(),
         env=(),
     )
-    client.run_reduce_submit(spec)
+    with pytest.raises(NotImplementedError, match="string commands"):
+        client.run_reduce_submit(spec)
 
 
 def test_dev_try_copy_tarball_returns_false_without_build_dir(tmp_path: Path) -> None:

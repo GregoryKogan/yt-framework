@@ -88,6 +88,34 @@ Typical flow:
 
 See [Map operations — Append output](operations/map.md) (`append: true` section).
 
+Command-mode mappers only (string commands). TypedJob map legs run on the cluster in prod.
+
+### MapReduce (dev)
+
+Typical flow:
+
+1. Sandbox: `.dev/sandbox_mr_<input>-><output>/` with `input.jsonl`, `intermediate.jsonl`, and `output.jsonl`.
+2. Copy input JSONL into the sandbox and upload file dependencies (same as map).
+3. Run the mapper command as a subprocess; stdout becomes `intermediate.jsonl`.
+4. Sort intermediate rows by `sort_by` when set, otherwise by `reduce_by`.
+5. Run the reducer command; stdout becomes the output table at `.dev/<output>.jsonl`.
+6. Stderr for each leg: `.dev/<output_basename>_mapper.log` and `_reducer.log`.
+
+String commands only; TypedJob map-reduce legs are prod-only (same rule as map).
+
+Dev runs one mapper and one reducer process (no shuffle partitions). For command-mode reducers that expect sorted keys, dev sorting matches what the cluster provides after shuffle.
+
+### Reduce (dev)
+
+Typical flow:
+
+1. Sandbox: `.dev/sandbox_reduce_<input>-><output>/`.
+2. Copy input JSONL, upload dependencies, auto-sort rows by `reduce_by`.
+3. Run the reducer subprocess; stdout becomes `.dev/<output>.jsonl`.
+4. Stderr: `.dev/<output_basename>_reducer.log`.
+
+String commands only. Dev auto-sorts before the reducer so you do not need a separate `run_sort` stage locally. In prod, the input table must already be sorted by `reduce_by` (or run sort first).
+
 ### Vanilla (dev)
 
 1. Sandbox under `.dev/<stage>_sandbox/` (name depends on stage).
