@@ -72,6 +72,6 @@ If omitted, the uploader picks defaults (e.g. first existing among `reducer.py`,
 
 ## Dev client
 
-In dev mode, map-reduce and reduce run locally as subprocesses (JSONL stdin/stdout), same contract as command-mode map. Map-reduce runs mapper → sort by `sort_by` or `reduce_by` → reducer. Reduce-only auto-sorts by `reduce_by` before the reducer.
+In dev mode, map-reduce and reduce run locally as subprocesses (JSONL stdin/stdout) with the same contract as command-mode map. Map-reduce runs mapper → sort by `sort_by` or `reduce_by` → reducer. Reduce-only auto-sorts by `reduce_by` before the reducer.
 
 String commands only; TypedJob legs stay prod-only. See [Dev vs prod — MapReduce and Reduce](../dev-vs-prod.md).

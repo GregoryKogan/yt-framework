@@ -97,7 +97,7 @@ Typical flow:
 1. Sandbox: `.dev/sandbox_mr_<input>-><output>/` with `input.jsonl`, `intermediate.jsonl`, and `output.jsonl`.
 2. Copy input JSONL into the sandbox and upload file dependencies (same as map).
 3. Run the mapper command as a subprocess; stdout becomes `intermediate.jsonl`.
-4. Sort intermediate rows by `sort_by` when set, otherwise by `reduce_by`.
+4. Sort intermediate rows by `sort_by` when set, otherwise by `reduce_by` (loads the JSONL into memory; for small local fixtures only).
 5. Run the reducer command; stdout becomes the output table at `.dev/<output>.jsonl`.
 6. Stderr for each leg: `.dev/<output_basename>_mapper.log` and `_reducer.log`.
 
@@ -110,7 +110,7 @@ Dev runs one mapper and one reducer process (no shuffle partitions). For command
 Typical flow:
 
 1. Sandbox: `.dev/sandbox_reduce_<input>-><output>/`.
-2. Copy input JSONL, upload dependencies, auto-sort rows by `reduce_by`.
+2. Copy input JSONL, upload dependencies, auto-sort rows by `reduce_by` (in-memory; small fixtures only).
 3. Run the reducer subprocess; stdout becomes `.dev/<output>.jsonl`.
 4. Stderr: `.dev/<output_basename>_reducer.log`.
 

@@ -25,6 +25,47 @@ def test_dev_resolve_sort_keys_falls_back_to_reduce_by() -> None:
     assert keys == ["k"], "reduce_by used when sort_by absent"
 
 
+def test_dev_sort_jsonl_file_missing_sort_key_sorts_before_present(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "rows.jsonl"
+    path.write_text(
+        '{"k":"b"}\n{}\n{"k":"a"}\n',
+        encoding="utf-8",
+    )
+    dev_sort_jsonl_file(path, ["k"])
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert rows == [{}, {"k": "a"}, {"k": "b"}], (
+        "rows missing sort key sort before rows that define the key"
+    )
+
+
+def test_dev_sort_jsonl_file_mixed_types_do_not_raise(tmp_path: Path) -> None:
+    path = tmp_path / "rows.jsonl"
+    path.write_text(
+        '{"k": 2}\n{"k": "1"}\n{"k": 10}\n',
+        encoding="utf-8",
+    )
+    dev_sort_jsonl_file(path, ["k"])
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert rows == [{"k": "1"}, {"k": 10}, {"k": 2}], (
+        "mixed types sort by JSON canonical string without TypeError"
+    )
+
+
+def test_dev_sort_jsonl_file_multi_key_missing_secondary_key(tmp_path: Path) -> None:
+    path = tmp_path / "rows.jsonl"
+    path.write_text(
+        '{"k":"a","v":2}\n{"k":"a"}\n{"k":"a","v":1}\n',
+        encoding="utf-8",
+    )
+    dev_sort_jsonl_file(path, ["k", "v"])
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert rows == [{"k": "a"}, {"k": "a", "v": 1}, {"k": "a", "v": 2}], (
+        "missing secondary sort key sorts before rows that define it"
+    )
+
+
 def test_dev_sort_jsonl_file_orders_rows_by_keys(tmp_path: Path) -> None:
     path = tmp_path / "rows.jsonl"
     path.write_text(

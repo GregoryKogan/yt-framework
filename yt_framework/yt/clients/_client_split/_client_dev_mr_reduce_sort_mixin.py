@@ -357,14 +357,15 @@ class ClientDevMrReduceSortMixin:
             raise FileNotFoundError(msg)
         return input_path
 
-    def _prepare_named_sandbox(
+    def _prepare_operation_sandbox(
         self,
         input_table: str,
         output_table: str,
         *,
         dir_prefix: str,
-    ) -> tuple[Path, Path, Path]:
-        """Prepare sandbox with ``input.jsonl`` and ``output.jsonl``."""
+        intermediate: bool = False,
+    ) -> tuple[Path, Path, Path] | tuple[Path, Path, Path, Path]:
+        """Prepare sandbox with ``input.jsonl`` and ``output.jsonl`` (optional intermediate)."""
         input_path = self._dev_input_path_or_raise(input_table)
         self._dev_dir().mkdir(parents=True, exist_ok=True)
         in_base = self._table_basename(input_table)
@@ -375,6 +376,15 @@ class ClientDevMrReduceSortMixin:
         sandbox_output = sandbox_dir / "output.jsonl"
         shutil.copy2(input_path, sandbox_input)
         self.logger.info("  Dev: sandbox=%s", sandbox_dir)
+        if intermediate:
+            intermediate_path = sandbox_dir / "intermediate.jsonl"
+            self.logger.info(
+                "  Dev: stdin=%s, intermediate=%s, stdout=%s",
+                sandbox_input,
+                intermediate_path,
+                sandbox_output,
+            )
+            return sandbox_dir, sandbox_input, intermediate_path, sandbox_output
         self.logger.info("  Dev: stdin=%s, stdout=%s", sandbox_input, sandbox_output)
         return sandbox_dir, sandbox_input, sandbox_output
 
@@ -384,24 +394,15 @@ class ClientDevMrReduceSortMixin:
         output_table: str,
     ) -> tuple[Path, Path, Path, Path]:
         """Prepare map-reduce sandbox with intermediate JSONL between legs."""
-        input_path = self._dev_input_path_or_raise(input_table)
-        self._dev_dir().mkdir(parents=True, exist_ok=True)
-        in_base = self._table_basename(input_table)
-        out_base = self._table_basename(output_table)
-        sandbox_dir = self._dev_dir() / f"sandbox_mr_{in_base}->{out_base}"
-        sandbox_dir.mkdir(parents=True, exist_ok=True)
-        sandbox_input = sandbox_dir / "input.jsonl"
-        intermediate = sandbox_dir / "intermediate.jsonl"
-        sandbox_output = sandbox_dir / "output.jsonl"
-        shutil.copy2(input_path, sandbox_input)
-        self.logger.info("  Dev: sandbox=%s", sandbox_dir)
-        self.logger.info(
-            "  Dev: stdin=%s, intermediate=%s, stdout=%s",
-            sandbox_input,
-            intermediate,
-            sandbox_output,
+        return cast(
+            "tuple[Path, Path, Path, Path]",
+            self._prepare_operation_sandbox(
+                input_table,
+                output_table,
+                dir_prefix="sandbox_mr_",
+                intermediate=True,
+            ),
         )
-        return sandbox_dir, sandbox_input, intermediate, sandbox_output
 
     def _prepare_reduce_sandbox(
         self,
@@ -409,10 +410,13 @@ class ClientDevMrReduceSortMixin:
         output_table: str,
     ) -> tuple[Path, Path, Path]:
         """Prepare reduce-only sandbox."""
-        return self._prepare_named_sandbox(
-            input_table,
-            output_table,
-            dir_prefix="sandbox_reduce_",
+        return cast(
+            "tuple[Path, Path, Path]",
+            self._prepare_operation_sandbox(
+                input_table,
+                output_table,
+                dir_prefix="sandbox_reduce_",
+            ),
         )
 
     def _prepare_map_sandbox(
@@ -421,10 +425,13 @@ class ClientDevMrReduceSortMixin:
         output_table: str,
     ) -> tuple[Path, Path, Path]:
         """Prepare sandbox directory and input/output file paths."""
-        return self._prepare_named_sandbox(
-            input_table,
-            output_table,
-            dir_prefix="sandbox_",
+        return cast(
+            "tuple[Path, Path, Path]",
+            self._prepare_operation_sandbox(
+                input_table,
+                output_table,
+                dir_prefix="sandbox_",
+            ),
         )
 
     def _setup_map_environment(self, env: dict[str, str]) -> dict[str, str]:
