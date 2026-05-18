@@ -25,4 +25,7 @@ class DevOperation:
     def get_error(self) -> str | None:
         if self._returncode == 0:
             return None
-        return self._stderr or f"{self._leg_name} exited with code {self._returncode}"
+        leg_msg = f"{self._leg_name} exited with code {self._returncode}"
+        if self._stderr:
+            return f"{leg_msg}. {self._stderr}"
+        return leg_msg

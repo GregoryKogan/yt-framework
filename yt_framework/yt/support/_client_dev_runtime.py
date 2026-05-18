@@ -261,8 +261,12 @@ def dev_resolve_sort_keys(
     reduce_by: list[str],
     sort_by: list[str] | None,
 ) -> list[str]:
-    """Return sort columns for dev reduce legs (``sort_by`` when set, else ``reduce_by``)."""
-    if sort_by:
+    """Return sort columns for dev reduce legs.
+
+    Uses ``sort_by`` only when it is a non-empty list; ``None`` and ``[]`` fall back
+    to ``reduce_by``.
+    """
+    if sort_by is not None and len(sort_by) > 0:
         return list(sort_by)
     return list(reduce_by)
 
@@ -342,6 +346,7 @@ def _dev_run_bash_in_sandbox(
         sandbox_output.open("w") as fout,
         logs_path.open("w") as ferr,
     ):
+        # cwd=sandbox_dir so commands can use sandbox-relative paths (e.g. input.jsonl).
         proc = subprocess.run(  # noqa: S603
             ["/bin/bash", "-c", command],
             stdin=fin,

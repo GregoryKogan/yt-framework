@@ -683,6 +683,45 @@ def test_dev_client_run_map_reduce_fails_when_mapper_exits_nonzero(
     )
 
 
+def test_dev_client_run_reduce_fails_when_reducer_exits_nonzero(
+    tmp_path: Path,
+) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.red_fail"), pipeline_dir=tmp_path
+    )
+    client.write_table("//tmp/rd_in", [{"k": "a", "v": 1}], append=False)
+    op = client.run_reduce(
+        "exit 3",
+        "//tmp/rd_in",
+        "//tmp/rd_out",
+        ["k"],
+        [],
+        OperationResources(),
+        {},
+    )
+    assert op.get_state() == "failed", "reducer failure should fail the operation"
+    error = op.get_error()
+    assert error is not None and error.startswith("Reducer exited with code 3"), error
+
+
+def test_dev_client_run_map_relative_path_in_sandbox(tmp_path: Path) -> None:
+    client = YTDevClient(
+        _null_logger("tests.client_dev.map_cwd"), pipeline_dir=tmp_path
+    )
+    client.write_table("//tmp/map_in", [{"x": 1}], append=False)
+    op = client.run_map(
+        "test -f input.jsonl",
+        "//tmp/map_in",
+        "//tmp/map_out",
+        [],
+        OperationResources(),
+        {},
+    )
+    assert op.get_state() == "completed", (
+        "map command should resolve input.jsonl relative to sandbox cwd"
+    )
+
+
 def test_dev_client_run_reduce_sums_unsorted_input_after_auto_sort(
     tmp_path: Path,
 ) -> None:
