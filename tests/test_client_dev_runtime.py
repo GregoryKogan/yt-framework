@@ -25,6 +25,11 @@ def test_dev_resolve_sort_keys_falls_back_to_reduce_by() -> None:
     assert keys == ["k"], "reduce_by used when sort_by absent"
 
 
+def test_dev_resolve_sort_keys_empty_sort_by_uses_reduce_by() -> None:
+    keys = dev_resolve_sort_keys(reduce_by=["k"], sort_by=[])
+    assert keys == ["k"], "empty sort_by list falls back to reduce_by"
+
+
 def test_dev_sort_jsonl_file_missing_sort_key_sorts_before_present(
     tmp_path: Path,
 ) -> None:

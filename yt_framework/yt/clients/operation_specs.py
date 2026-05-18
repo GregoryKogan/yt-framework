@@ -136,6 +136,7 @@ class ReduceSubmitSpec:
     files: tuple[tuple[str, str], ...]
     resources: OperationResources
     env: tuple[tuple[str, str], ...]
+    sort_by: tuple[str, ...] | None = None
     output_schema: TableSchema | None = None
     max_failed_jobs: int = 1
     docker_auth: tuple[tuple[str, str], ...] | None = None
@@ -163,6 +164,12 @@ class ReduceSubmitSpec:
     def reduce_by_list(self) -> list[str]:
         """Return reduce-by columns as a mutable list."""
         return list(self.reduce_by)
+
+    def sort_by_list(self) -> list[str] | None:
+        """Return sort-by columns, or ``None`` if not specified."""
+        if self.sort_by is None:
+            return None
+        return list(self.sort_by)
 
 
 @dataclass(frozen=True)

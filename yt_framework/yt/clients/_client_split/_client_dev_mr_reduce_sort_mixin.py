@@ -189,8 +189,12 @@ class ClientDevMrReduceSortMixin:
         out_basename = self._table_basename(output_table)
         reducer_log = self._dev_dir() / f"{out_basename}_reducer.log"
 
-        self.logger.info("  Dev: sorting input by %s", reduce_by_cols)
-        dev_sort_jsonl_file(sandbox_input, reduce_by_cols)
+        sort_keys = dev_resolve_sort_keys(
+            reduce_by=reduce_by_cols,
+            sort_by=spec.sort_by_list(),
+        )
+        self.logger.info("  Dev: sorting input by %s", sort_keys)
+        dev_sort_jsonl_file(sandbox_input, sort_keys)
 
         red_rc, red_hint = dev_run_command_leg_subprocess(
             command=reducer_command,

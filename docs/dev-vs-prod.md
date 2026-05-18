@@ -101,7 +101,7 @@ Typical flow:
 5. Run the reducer command; stdout becomes the output table at `.dev/<output>.jsonl`.
 6. Stderr for each leg: `.dev/<output_basename>_mapper.log` and `_reducer.log`.
 
-String commands only; TypedJob map-reduce legs are prod-only (same rule as map).
+String commands only; TypedJob MapReduce legs are prod-only (same rule as map).
 
 Dev runs one mapper and one reducer process (no shuffle partitions). For command-mode reducers that expect sorted keys, dev sorting matches what the cluster provides after shuffle.
 
@@ -110,7 +110,7 @@ Dev runs one mapper and one reducer process (no shuffle partitions). For command
 Typical flow:
 
 1. Sandbox: `.dev/sandbox_reduce_<input>-><output>/`.
-2. Copy input JSONL, upload dependencies, auto-sort rows by `reduce_by` (in-memory; small fixtures only).
+2. Copy input JSONL, upload dependencies, auto-sort rows by `sort_by` when set in config, otherwise `reduce_by` (in-memory; small fixtures only).
 3. Run the reducer subprocess; stdout becomes `.dev/<output>.jsonl`.
 4. Stderr: `.dev/<output_basename>_reducer.log`.
 

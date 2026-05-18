@@ -306,6 +306,22 @@ def test_run_reduce_forwards_string_operation_description_as_title(
     assert spec.extras_dict().get("title") == "reduce-title"
 
 
+def test_run_reduce_forwards_sort_by_on_submit_spec(tmp_path: Path) -> None:
+    ctx = _mr_stage_context(tmp_path, name="red_sort")
+    cfg = OmegaConf.create(
+        {
+            "input_table": "//i",
+            "output_table": "//o",
+            "reduce_by": ["k"],
+            "sort_by": ["k", "v"],
+            "resources": {"pool": "p"},
+        }
+    )
+    assert run_reduce(ctx, cfg, job="r") is True
+    spec = ctx.deps.yt_client.run_reduce_submit.call_args[0][0]
+    assert spec.sort_by_list() == ["k", "v"], "sort_by should be on ReduceSubmitSpec"
+
+
 def test_run_reduce_forwards_max_row_weight_override(tmp_path: Path) -> None:
     ctx = _mr_stage_context(tmp_path, name="red_mrw")
     cfg = OmegaConf.create(

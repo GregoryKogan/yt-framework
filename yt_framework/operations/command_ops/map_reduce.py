@@ -350,6 +350,9 @@ def run_reduce(
 
     max_failed_jobs = extract_max_failed_jobs(operation_config, logger)
 
+    sort_by = str_list_from_config(operation_config.get("sort_by"))
+    sort_by_list = sort_by or None
+
     reduce_kw = _reduce_description_kwargs(operation_config, logger)
 
     passthrough = collect_passthrough_kwargs(
@@ -358,6 +361,7 @@ def run_reduce(
             "input_table",
             "output_table",
             "reduce_by",
+            "sort_by",
             "resources",
             "env",
             "max_failed_job_count",
@@ -387,6 +391,7 @@ def run_reduce(
             files=file_pairs_tuple(dependencies),
             resources=resources,
             env=env_pairs_tuple(env),
+            sort_by=None if sort_by_list is None else tuple(sort_by_list),
             output_schema=output_schema,
             max_failed_jobs=max_failed_jobs,
             docker_auth=docker_auth_tuple(docker_auth),
