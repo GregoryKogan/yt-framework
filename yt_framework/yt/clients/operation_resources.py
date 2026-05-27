@@ -1,5 +1,8 @@
-"""Re-export :class:`OperationResources` from ``yt_framework.yt.support``."""
+"""Re-export operation resource types from ``yt_framework.yt.support``."""
 
-from yt_framework.yt.support.operation_resources import OperationResources
+from yt_framework.yt.support.operation_resources import (
+    OperationResources,
+    validate_cpu_limit,
+)
 
-__all__ = ["OperationResources"]
+__all__ = ["OperationResources", "validate_cpu_limit"]

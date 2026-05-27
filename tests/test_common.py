@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from omegaconf import OmegaConf
 
 from yt_framework.core.dependencies import PipelineStageDependencies
@@ -42,6 +43,25 @@ def test_extract_operation_resources_reads_top_level_keys() -> None:
     assert res.pool == "heavy"
     assert res.memory_gb == 16
     assert res.cpu_limit == 8
+
+
+def test_extract_operation_resources_parses_fractional_cpu_limit() -> None:
+    cfg = OmegaConf.create({"cpu_limit": 0.5})
+    res = extract_operation_resources(cfg, _LOG)
+    assert res.cpu_limit == 0.5
+
+
+def test_extract_operation_resources_parses_fractional_cpu_limit_in_nested_resources() -> (
+    None
+):
+    cfg = OmegaConf.create({"resources": {"cpu_limit": 0.5}})
+    res = extract_operation_resources(cfg, _LOG)
+    assert res.cpu_limit == 0.5
+
+
+def test_extract_operation_resources_rejects_bool_cpu_limit() -> None:
+    with pytest.raises(TypeError, match="cpu_limit must be a positive number"):
+        extract_operation_resources(OmegaConf.create({"cpu_limit": True}), _LOG)
 
 
 def test_extract_operation_resources_reads_nested_resources_block() -> None:

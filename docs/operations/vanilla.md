@@ -221,7 +221,7 @@ resources:
   pool: default              # YT pool name
   pool_tree: null            # Optional: pool tree
   memory_limit_gb: 2         # Memory (GB)
-  cpu_limit: 1               # CPU cores
+  cpu_limit: 1               # CPU cores (fractional, e.g. 0.5)
   gpu_limit: 0               # GPU count (default: 0)
   user_slots: null           # Optional: user slots limit
 ```
@@ -229,7 +229,7 @@ resources:
 **Resource guidelines:**
 
 - **Memory**: Allocate based on task needs
-- **CPU**: More CPUs = faster execution
+- **CPU**: More cores = faster execution; fractional limits (e.g. `0.5`) are supported
 - **GPU**: Set to 1+ for GPU workloads (requires custom Docker)
 
 ### Advanced Configuration
