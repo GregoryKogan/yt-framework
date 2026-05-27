@@ -23,8 +23,28 @@ def test_operation_resources_rejects_non_positive_memory_gb() -> None:
 
 
 def test_operation_resources_rejects_non_positive_cpu_limit() -> None:
-    with pytest.raises(ValueError, match="cpu_limit must be set to a positive integer"):
+    with pytest.raises(ValueError, match="cpu_limit must be a positive number"):
         OperationResources(cpu_limit=0)
+
+
+def test_operation_resources_accepts_fractional_cpu_limit() -> None:
+    resources = OperationResources(cpu_limit=0.5)
+    assert resources.cpu_limit == 0.5
+
+
+def test_operation_resources_rejects_zero_fractional_cpu_limit() -> None:
+    with pytest.raises(ValueError, match="cpu_limit must be a positive number"):
+        OperationResources(cpu_limit=0.0)
+
+
+def test_operation_resources_rejects_negative_fractional_cpu_limit() -> None:
+    with pytest.raises(ValueError, match="cpu_limit must be a positive number"):
+        OperationResources(cpu_limit=-0.5)
+
+
+def test_operation_resources_rejects_bool_cpu_limit() -> None:
+    with pytest.raises(TypeError, match="cpu_limit must be a positive number"):
+        OperationResources(cpu_limit=True)  # type: ignore[arg-type]
 
 
 def test_operation_resources_rejects_negative_gpu_limit() -> None:

@@ -44,6 +44,12 @@ def test_extract_operation_resources_reads_top_level_keys() -> None:
     assert res.cpu_limit == 8
 
 
+def test_extract_operation_resources_parses_fractional_cpu_limit() -> None:
+    cfg = OmegaConf.create({"cpu_limit": 0.5})
+    res = extract_operation_resources(cfg, _LOG)
+    assert res.cpu_limit == 0.5
+
+
 def test_extract_operation_resources_reads_nested_resources_block() -> None:
     cfg = OmegaConf.create({"resources": {"pool": "nest", "job_count": 3}})
     res = extract_operation_resources(cfg, _LOG)

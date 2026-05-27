@@ -1,11 +1,21 @@
 """Operation resource limits for YT jobs."""
 
+import math
 from dataclasses import dataclass
 
 
 def _require_positive_resource(name: str, value: int) -> None:
     if value <= 0:
         msg = f"{name} must be set to a positive integer, got {value}"
+        raise ValueError(msg)
+
+
+def _require_positive_cpu_limit(name: str, value: object) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        msg = f"{name} must be a positive number, got {value!r}"
+        raise TypeError(msg)
+    if value <= 0 or not math.isfinite(float(value)):
+        msg = f"{name} must be a positive number, got {value}"
         raise ValueError(msg)
 
 
@@ -28,14 +38,14 @@ class OperationResources:
         pool_tree: Optional pool tree name (default: None).
         docker_image: Optional Docker image name for containerized execution (default: None).
         memory_gb: Memory allocation in GB (default: 4). In config files, use `memory_limit_gb`.
-        cpu_limit: CPU cores allocated (default: 2).
+        cpu_limit: CPU cores allocated per job; fractional values allowed (default: 2).
         gpu_limit: Number of GPUs allocated (default: 0).
         job_count: Number of parallel jobs (default: 1).
         user_slots: Optional user slots limit (default: None).
 
     Raises:
-        ValueError: If memory_gb, cpu_limit, or job_count are not positive integers,
-                   or if gpu_limit is negative.
+        ValueError: If memory_gb or job_count are not positive integers, if cpu_limit
+                   is not a positive number, or if gpu_limit is negative.
 
     """
 
@@ -43,7 +53,7 @@ class OperationResources:
     pool_tree: str | None = None
     docker_image: str | None = None
     memory_gb: int = 4
-    cpu_limit: int = 2
+    cpu_limit: float = 2
     gpu_limit: int = 0
     job_count: int = 1
     user_slots: int | None = None
@@ -51,6 +61,6 @@ class OperationResources:
     def __post_init__(self) -> None:
         """Validate resource fields after initialization."""
         _require_positive_resource("memory_gb", self.memory_gb)
-        _require_positive_resource("cpu_limit", self.cpu_limit)
+        _require_positive_cpu_limit("cpu_limit", self.cpu_limit)
         _require_non_negative_gpu(self.gpu_limit)
         _require_positive_resource("job_count", self.job_count)

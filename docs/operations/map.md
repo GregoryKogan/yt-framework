@@ -238,7 +238,7 @@ resources:
   pool: default              # YT pool name
   pool_tree: null            # Optional: pool tree
   memory_limit_gb: 4        # Memory per job (GB)
-  cpu_limit: 2               # CPU cores per job
+  cpu_limit: 2               # CPU cores per job (fractional, e.g. 0.5)
   job_count: 2               # Number of parallel jobs
   gpu_limit: 0               # GPU count (default: 0)
   user_slots: null           # Optional: user slots limit
@@ -247,7 +247,7 @@ resources:
 **Resources (rule of thumb):**
 
 - Raise `memory_limit_gb` when a single row plus model weights no longer fits.
-- `cpu_limit` helps per-task throughput; `job_count` spreads rows across tasks.
+- `cpu_limit` helps per-task throughput; fractional values (e.g. `0.5`, `0.1`) are passed through to YTsaurus; `job_count` spreads rows across tasks.
 - `gpu_limit` > 0 only works with an image that actually exposes GPUs to Python.
 
 ### Advanced Configuration
