@@ -19,6 +19,17 @@ def _require_positive_cpu_limit(name: str, value: object) -> None:
         raise ValueError(msg)
 
 
+def validate_cpu_limit(name: str, value: object) -> None:
+    """Validate a ``cpu_limit`` value (config or constructor).
+
+    Raises:
+        TypeError: If ``value`` is not an ``int`` or ``float`` (e.g. ``bool``).
+        ValueError: If ``value`` is not a positive finite number.
+
+    """
+    _require_positive_cpu_limit(name, value)
+
+
 def _require_non_negative_gpu(gpu_limit: int) -> None:
     if gpu_limit < 0:
         msg = f"gpu_limit must be set to a non-negative integer, got {gpu_limit}"
@@ -45,7 +56,8 @@ class OperationResources:
 
     Raises:
         ValueError: If memory_gb or job_count are not positive integers, if cpu_limit
-                   is not a positive number, or if gpu_limit is negative.
+                   is not a positive finite number, or if gpu_limit is negative.
+        TypeError: If cpu_limit is not an ``int`` or ``float`` (e.g. ``bool``).
 
     """
 

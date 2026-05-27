@@ -1,6 +1,7 @@
 """Tests for yt_framework.yt.clients.client_base (OperationResources + BaseYTClient helpers)."""
 
 import logging
+import math
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -45,6 +46,21 @@ def test_operation_resources_rejects_negative_fractional_cpu_limit() -> None:
 def test_operation_resources_rejects_bool_cpu_limit() -> None:
     with pytest.raises(TypeError, match="cpu_limit must be a positive number"):
         OperationResources(cpu_limit=True)  # type: ignore[arg-type]
+
+
+def test_operation_resources_rejects_non_finite_cpu_limit() -> None:
+    with pytest.raises(ValueError, match="cpu_limit must be a positive number"):
+        OperationResources(cpu_limit=float("inf"))
+
+
+def test_operation_resources_rejects_negative_infinite_cpu_limit() -> None:
+    with pytest.raises(ValueError, match="cpu_limit must be a positive number"):
+        OperationResources(cpu_limit=float("-inf"))
+
+
+def test_operation_resources_rejects_nan_cpu_limit() -> None:
+    with pytest.raises(ValueError, match="cpu_limit must be a positive number"):
+        OperationResources(cpu_limit=math.nan)
 
 
 def test_operation_resources_rejects_negative_gpu_limit() -> None:

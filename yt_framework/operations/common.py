@@ -9,6 +9,7 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from yt_framework.utils.env import load_secrets
 from yt_framework.yt.clients.client_base import OperationResources
+from yt_framework.yt.clients.operation_resources import validate_cpu_limit
 
 from ._internal.tokenizer_artifact import (
     init_tokenizer_artifact_directory,
@@ -39,6 +40,7 @@ def _int_from_config_value(value: object) -> int:
 
 
 def _float_from_config_value(value: object) -> float:
+    validate_cpu_limit("cpu_limit", value)
     return float(cast("Any", value))
 
 
