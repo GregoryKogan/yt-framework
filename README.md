@@ -1,11 +1,12 @@
 # YT Framework
 
 [![PyPI - Version](https://img.shields.io/pypi/v/yt_framework)](https://pypi.org/project/yt-framework/)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/yt-framework?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads)](https://pypi.org/project/yt-framework/)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/yt_framework)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FGregoryKogan%2F293242803e295690b612e93aff8c151e%2Fraw%2Fyt-framework-coverage.json&cacheSeconds=60)](https://github.com/GregoryKogan/yt-framework/actions/workflows/ci.yml)
 [![Documentation Status](https://app.readthedocs.org/projects/yt-framework/badge/?version=latest)](https://yt-framework.readthedocs.io)
 [![CI](https://github.com/GregoryKogan/yt-framework/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/GregoryKogan/yt-framework/actions/workflows/ci.yml)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/GregoryKogan/yt-framework)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/yt_framework)
-[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FGregoryKogan%2F293242803e295690b612e93aff8c151e%2Fraw%2Fyt-framework-coverage.json&cacheSeconds=60)](https://github.com/GregoryKogan/yt-framework/actions/workflows/ci.yml)
 ![GitHub License](https://img.shields.io/github/license/GregoryKogan/yt-framework)
 
 **[PyPI](https://pypi.org/project/yt-framework/) | [Docs](https://yt-framework.readthedocs.io/en/latest/) | [DeepWiki](https://deepwiki.com/GregoryKogan/yt-framework) | [Examples](https://github.com/GregoryKogan/yt-framework/tree/main/examples)**
