@@ -157,4 +157,4 @@ If the cell default image lacks those pins, build a [custom Docker image](https:
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md)
