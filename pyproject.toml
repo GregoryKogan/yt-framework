@@ -94,6 +94,7 @@ ignore = [
 "yt_framework/yt/clients/client_dev.py" = ["ARG002", "PLR0913"]
 # Complexity: remaining high-arity API surfaces are isolated to explicit modules.
 "yt_framework/operations/_internal/dependency_strategy.py" = ["PLR0913"]
+"yt_framework/operations/command_ops/map.py" = ["PLR0913"]
 "yt_framework/operations/command_ops/map_reduce.py" = ["PLR0913"]
 "yt_framework/operations/command_ops/map_reduce_support.py" = ["D103"]
 "yt_framework/operations/s3.py" = ["PLR0913"]
