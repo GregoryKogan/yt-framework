@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     import logging
     from pathlib import Path
 
+    from yt.wrapper import Operation
     from yt.wrapper.schema import TableSchema
 
     from yt_framework.contracts import StageContext
@@ -173,8 +174,10 @@ def run_map(
     output_schema: TableSchema | None = None,
     mapper: object | None = None,
     job: object | None = None,
-) -> bool:
-    """Run YT map operation and wait for completion.
+    *,
+    sync: bool = True,
+) -> bool | Operation:
+    """Run YT map operation and optionally wait for completion.
 
     All job parameters (pool, memory, CPU, Docker image, etc.) are automatically
     extracted from operation_config. Operation config should be passed from
@@ -188,9 +191,12 @@ def run_map(
         mapper: Optional mapper leg (legacy name). When omitted, framework uses command wrapper.
             Can be a TypedJob instance or command string.
         job: Preferred mapper leg alias. Can be a TypedJob instance or command string.
+        sync: If True (default), wait for operation completion and return bool.
+            If False, submit the operation and return the Operation object immediately.
 
     Returns:
-        True if successful, False otherwise
+        If ``sync=True``: True if successful, False otherwise.
+        If ``sync=False``: the submitted ``yt.wrapper.Operation`` object.
 
     """
     logger = context.logger
@@ -273,6 +279,9 @@ def run_map(
             extras=extras_tuple(merged_extras),
         ),
     )
+
+    if not sync:
+        return operation
 
     # Wait for completion
     success = context.deps.yt_client.wait_for_operation(operation)
