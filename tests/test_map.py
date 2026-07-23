@@ -156,3 +156,12 @@ def test_run_map_raises_when_mapper_missing_and_builder_command_missing(
     ctx = _map_stage_context(tmp_path)
     with pytest.raises(ValueError, match="Command not provided"):
         run_map(ctx, _minimal_map_config())
+
+
+def test_run_map_sync_false_returns_operation_without_waiting(
+    tmp_path: Path,
+) -> None:
+    ctx = _map_stage_context(tmp_path)
+    result = run_map(ctx, _minimal_map_config(), sync=False)
+    assert result is ctx.deps.yt_client.run_map_submit.return_value
+    ctx.deps.yt_client.wait_for_operation.assert_not_called()
